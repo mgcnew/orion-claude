@@ -1,8 +1,7 @@
 import { useState, useCallback } from 'react';
 import Icon from '../components/Icon.jsx';
 import Avatar from '../components/Avatar.jsx';
-import * as D from '../data/mock.js';
-import { useEmployees, useEmployee, useEmployeeCounts } from '../hooks/useEmployees.js';
+import { useEmployees, useEmployee, useEmployeeCounts, useEmployeeWarnings, useEmployeeVacations } from '../hooks/useEmployees.js';
 
 // ---- helpers shared across tabs ----
 const th = (w) => ({ textAlign: 'left', padding: '10px 14px', fontWeight: 600, width: w });
@@ -349,14 +348,16 @@ export function EmployeesList({ setRoute, setRouteParam, setRouteLabel }) {
 export function EmployeeProfile({ setRoute, employeeId }) {
   const [tab, setTab] = useState('dados');
   const { employee: emp, loading } = useEmployee(employeeId);
+  const { warnings } = useEmployeeWarnings(employeeId);
+  const { vacations } = useEmployeeVacations(employeeId);
   const tabs = [
     { id: 'dados', l: 'Dados pessoais', icon: 'user' },
     { id: 'prof', l: 'Profissionais', icon: 'briefcase' },
-    { id: 'docs', l: 'Documentos', icon: 'folder', n: 28 },
+    { id: 'docs', l: 'Documentos', icon: 'folder' },
     { id: 'ponto', l: 'Controle de ponto', icon: 'clock' },
-    { id: 'warn', l: 'Advertências', icon: 'alert', n: 1 },
-    { id: 'pay', l: 'Holerites', icon: 'pdf', n: 24 },
-    { id: 'ferias', l: 'Férias', icon: 'umbrella' },
+    { id: 'warn', l: 'Advertências', icon: 'alert', n: warnings.length || null },
+    { id: 'pay', l: 'Holerites', icon: 'pdf' },
+    { id: 'ferias', l: 'Férias', icon: 'umbrella', n: vacations.length || null },
     { id: 'hist', l: 'Histórico', icon: 'history' },
   ];
 
@@ -548,11 +549,11 @@ export function EmployeeProfile({ setRoute, employeeId }) {
 
       {tab === 'dados' && <DadosPessoais emp={emp} />}
       {tab === 'prof' && <DadosProfissionais emp={emp} />}
-      {tab === 'docs' && <DocsTab />}
+      {tab === 'docs' && <DocsTab employeeId={emp.id} />}
       {tab === 'ponto' && <PontoTab />}
-      {tab === 'warn' && <WarnTab />}
+      {tab === 'warn' && <WarnTab employeeId={emp.id} />}
       {tab === 'pay' && <PayTab emp={emp} />}
-      {tab === 'ferias' && <FeriasTab />}
+      {tab === 'ferias' && <FeriasTab employeeId={emp.id} />}
       {tab === 'hist' && <HistoryTab emp={emp} />}
     </div>
   );
@@ -657,11 +658,19 @@ function DadosProfissionais({ emp }) {
   );
 }
 
-function DocsTab() {
-  const cats = D.documentCategories.slice(0, 6);
+const DOC_CATEGORIES = [
+  { name: 'Admissão', icon: 'doc', color: '#2A5BFF' },
+  { name: 'Contratos', icon: 'folder', color: '#7C3AED' },
+  { name: 'Holerites', icon: 'pdf', color: '#059669' },
+  { name: 'Atestados', icon: 'alert', color: '#D97706' },
+  { name: 'Treinamentos', icon: 'sparkle', color: '#0EA5E9' },
+  { name: 'Rescisão', icon: 'trash', color: '#DC2626' },
+];
+
+function DocsTab({ employeeId }) {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
-      {cats.map((c, i) => (
+      {DOC_CATEGORIES.map((c, i) => (
         <div key={i} className="card" style={{ padding: 16, cursor: 'pointer' }}>
           <div className="row gap-2">
             <div
@@ -674,15 +683,14 @@ function DocsTab() {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
+                flexShrink: 0,
               }}
             >
               <Icon name={c.icon} size={17} />
             </div>
             <div className="grow">
               <div style={{ fontSize: 13.5, fontWeight: 600 }}>{c.name}</div>
-              <div style={{ fontSize: 11.5, color: 'var(--muted)' }}>
-                {Math.floor(Math.random() * 8) + 1} arquivos
-              </div>
+              <div style={{ fontSize: 11.5, color: 'var(--muted)' }}>0 arquivos</div>
             </div>
             <button className="btn ghost icon sm">
               <Icon name="more-v" size={13} />
@@ -779,63 +787,44 @@ function PontoTab() {
   );
 }
 
-function WarnTab() {
+function WarnTab({ employeeId }) {
+  const { warnings, loading } = useEmployeeWarnings(employeeId);
+  const severityColor = { verbal: 'warn', escrita: 'bad', suspensao: 'bad' };
+
   return (
     <div className="card" style={{ padding: 22 }}>
       <h3 style={{ margin: '0 0 16px', fontSize: 14, fontWeight: 700 }}>
         Advertências e ocorrências
       </h3>
-      <div className="col gap-3">
-        {[
-          {
-            d: '12 / 03 / 2024',
-            t: 'Advertência verbal',
-            k: 'warn',
-            desc: 'Atrasos recorrentes em Q1/2024',
-            who: 'Patricia Nobre',
-          },
-        ].map((w, i) => (
-          <div
-            key={i}
-            className="row gap-3"
-            style={{ padding: 14, border: '1px solid var(--line)', borderRadius: 10 }}
-          >
-            <div
-              className={`pill ${w.k}`}
-              style={{ width: 36, height: 36, padding: 0, borderRadius: 9, justifyContent: 'center' }}
-            >
-              <Icon name="alert" size={16} />
-            </div>
-            <div className="grow">
-              <div style={{ fontWeight: 600, fontSize: 13.5 }}>{w.t}</div>
-              <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
-                {w.desc} · aplicada por {w.who}
-              </div>
-            </div>
-            <span className="mono" style={{ fontSize: 12, color: 'var(--muted)' }}>
-              {w.d}
-            </span>
-            <button className="btn sm">
-              <Icon name="eye" size={13} /> Ver
-            </button>
-          </div>
-        ))}
-        <div
-          style={{
-            padding: 24,
-            textAlign: 'center',
-            color: 'var(--muted)',
-            fontSize: 13,
-            border: '1px dashed var(--line)',
-            borderRadius: 10,
-          }}
-        >
-          Nenhuma outra ocorrência nos últimos 12 meses ·{' '}
-          <a href="#" style={{ color: 'var(--brand)' }}>
-            Ver histórico completo
-          </a>
+      {loading ? (
+        <div className="pulse" style={{ fontSize: 13, color: 'var(--muted)' }}>Carregando…</div>
+      ) : warnings.length === 0 ? (
+        <div style={{ padding: 32, textAlign: 'center', color: 'var(--muted)', fontSize: 13, border: '1px dashed var(--line)', borderRadius: 10 }}>
+          Nenhuma advertência registrada.
         </div>
-      </div>
+      ) : (
+        <div className="col gap-3">
+          {warnings.map((w) => (
+            <div key={w.id} className="row gap-3" style={{ padding: 14, border: '1px solid var(--line)', borderRadius: 10 }}>
+              <div
+                className={`pill ${severityColor[w.severity] || 'warn'}`}
+                style={{ width: 36, height: 36, padding: 0, borderRadius: 9, justifyContent: 'center', flexShrink: 0 }}
+              >
+                <Icon name="alert" size={16} />
+              </div>
+              <div className="grow">
+                <div style={{ fontWeight: 600, fontSize: 13.5 }}>{w.type}</div>
+                <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
+                  {w.description}{w.applied_by ? ` · aplicada por ${w.applied_by}` : ''}
+                </div>
+              </div>
+              <span className="mono" style={{ fontSize: 12, color: 'var(--muted)', flexShrink: 0 }}>
+                {new Date(w.date + 'T00:00:00').toLocaleDateString('pt-BR')}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -887,30 +876,44 @@ function PayTab({ emp }) {
   );
 }
 
-function FeriasTab() {
+function FeriasTab({ employeeId }) {
+  const { vacations, loading } = useEmployeeVacations(employeeId);
+  const fmt = (d) => d ? new Date(d + 'T00:00:00').toLocaleDateString('pt-BR') : null;
+  const statusLabel = { concedido: 'Quitado', em_aberto: 'Em curso', agendado: 'Agendado' };
+  const statusColor = { concedido: 'ok', em_aberto: 'info', agendado: 'warn' };
+
   return (
     <div className="card" style={{ padding: 22 }}>
       <h3 style={{ margin: '0 0 16px', fontSize: 14, fontWeight: 700 }}>Períodos aquisitivos</h3>
-      {[
-        { p: '01/06/2025 → 31/05/2026', s: 'Em aberto · 30 dias disponíveis', k: 'info' },
-        { p: '01/06/2024 → 31/05/2025', s: 'Concedido · 15/09/2025 → 14/10/2025 (30d)', k: 'ok' },
-        { p: '01/06/2023 → 31/05/2024', s: 'Concedido · 18/09/2024 → 17/10/2024 (30d)', k: 'ok' },
-      ].map((p, i) => (
-        <div
-          key={i}
-          className="row gap-3"
-          style={{ padding: '12px 0', borderTop: i ? '1px solid var(--line-soft)' : 'none' }}
-        >
-          <Icon name="umbrella" size={18} style={{ color: 'var(--info)' }} />
-          <div className="grow">
-            <div style={{ fontSize: 13.5, fontWeight: 600 }} className="mono">
-              {p.p}
-            </div>
-            <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>{p.s}</div>
-          </div>
-          <span className={`pill ${p.k}`}>{p.k === 'ok' ? 'Quitado' : 'Em curso'}</span>
+      {loading ? (
+        <div className="pulse" style={{ fontSize: 13, color: 'var(--muted)' }}>Carregando…</div>
+      ) : vacations.length === 0 ? (
+        <div style={{ padding: 32, textAlign: 'center', color: 'var(--muted)', fontSize: 13, border: '1px dashed var(--line)', borderRadius: 10 }}>
+          Nenhum período registrado.
         </div>
-      ))}
+      ) : (
+        vacations.map((v, i) => {
+          const granted = v.granted_start && v.granted_end
+            ? ` · Concedido ${fmt(v.granted_start)} → ${fmt(v.granted_end)} (${v.days}d)`
+            : ` · ${v.days} dias disponíveis`;
+          return (
+            <div key={v.id} className="row gap-3" style={{ padding: '12px 0', borderTop: i ? '1px solid var(--line-soft)' : 'none' }}>
+              <Icon name="umbrella" size={18} style={{ color: 'var(--info)', flexShrink: 0 }} />
+              <div className="grow">
+                <div style={{ fontSize: 13.5, fontWeight: 600 }} className="mono">
+                  {fmt(v.period_start)} → {fmt(v.period_end)}
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
+                  {statusLabel[v.status] || v.status}{granted}
+                </div>
+              </div>
+              <span className={`pill ${statusColor[v.status] || 'info'}`}>
+                {statusLabel[v.status] || v.status}
+              </span>
+            </div>
+          );
+        })
+      )}
     </div>
   );
 }

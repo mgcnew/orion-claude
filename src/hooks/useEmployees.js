@@ -100,3 +100,47 @@ export async function updateEmployeeStatus(id, status) {
     .eq('id', id);
   return { error };
 }
+
+// Advertências de um funcionário
+export function useEmployeeWarnings(employeeId) {
+  const [warnings, setWarnings] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!employeeId) return;
+    setLoading(true);
+    supabase
+      .from('employee_warnings')
+      .select('*')
+      .eq('employee_id', employeeId)
+      .order('date', { ascending: false })
+      .then(({ data }) => {
+        setWarnings(data ?? []);
+        setLoading(false);
+      });
+  }, [employeeId]);
+
+  return { warnings, loading };
+}
+
+// Férias de um funcionário
+export function useEmployeeVacations(employeeId) {
+  const [vacations, setVacations] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!employeeId) return;
+    setLoading(true);
+    supabase
+      .from('employee_vacations')
+      .select('*')
+      .eq('employee_id', employeeId)
+      .order('period_start', { ascending: false })
+      .then(({ data }) => {
+        setVacations(data ?? []);
+        setLoading(false);
+      });
+  }, [employeeId]);
+
+  return { vacations, loading };
+}
