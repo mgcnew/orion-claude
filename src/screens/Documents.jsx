@@ -12,6 +12,7 @@ const CATEGORIES = [
   { id: 'ferias',      name: 'Férias',           icon: 'umbrella',    color: '#0891b2' },
   { id: 'juridico',    name: 'Jurídico',         icon: 'shield',      color: '#475569' },
   { id: 'exames',      name: 'Exames Médicos',   icon: 'fingerprint', color: '#db2777' },
+  { id: 'ponto',       name: 'Cartão de Ponto',  icon: 'clock',       color: '#0f766e' },
 ];
 
 const STATUS_MAP = {
