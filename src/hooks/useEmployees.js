@@ -43,7 +43,7 @@ export function useEmployee(id) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
+  const fetch = useCallback(() => {
     if (!id) return;
     setLoading(true);
     supabase
@@ -58,7 +58,9 @@ export function useEmployee(id) {
       });
   }, [id]);
 
-  return { employee, loading, error };
+  useEffect(() => { fetch(); }, [fetch]);
+
+  return { employee, loading, error, refetch: fetch };
 }
 
 // Contagens por status (para os tabs e KPIs)
@@ -66,20 +68,19 @@ export function useEmployeeCounts() {
   const [counts, setCounts] = useState({ todos: 0, ativo: 0, férias: 0, afastado: 0, desligado: 0 });
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    supabase
-      .from('employees')
-      .select('status')
-      .then(({ data }) => {
-        if (!data) return;
-        const c = { todos: data.length, ativo: 0, férias: 0, afastado: 0, desligado: 0 };
-        data.forEach((e) => { if (c[e.status] !== undefined) c[e.status]++; });
-        setCounts(c);
-        setLoading(false);
-      });
+  const fetch = useCallback(async () => {
+    setLoading(true);
+    const { data } = await supabase.from('employees').select('status');
+    if (!data) { setLoading(false); return; }
+    const c = { todos: data.length, ativo: 0, férias: 0, afastado: 0, desligado: 0 };
+    data.forEach((e) => { if (c[e.status] !== undefined) c[e.status]++; });
+    setCounts(c);
+    setLoading(false);
   }, []);
 
-  return { counts, loading };
+  useEffect(() => { fetch(); }, [fetch]);
+
+  return { counts, loading, refetch: fetch };
 }
 
 // Inserir novo funcionário
@@ -94,7 +95,7 @@ export async function createEmployee(data) {
     await supabase.from('employee_history').insert({
       employee_id: created.id,
       date: created.admission || created.created_at.split('T')[0],
-      event_type: 'other',
+      type: 'other',
       title: 'Admissão',
       description: 'Entrada na empresa'
     });
@@ -170,7 +171,7 @@ export function useEmployeeDocuments(employeeId) {
   const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const fetch = useCallback(() => {
     if (!employeeId) return;
     setLoading(true);
     supabase
@@ -184,7 +185,9 @@ export function useEmployeeDocuments(employeeId) {
       });
   }, [employeeId]);
 
-  return { documents, loading };
+  useEffect(() => { fetch(); }, [fetch]);
+
+  return { documents, loading, refetch: fetch };
 }
 
 // Todos os documentos
@@ -293,19 +296,18 @@ export async function createVacation(data) {
 }
 
 // Inserir documentos associados a um funcionário
-export async function createDocuments(employee_id, docs) {
+export async function createDocuments(employee_id, docs, uploaded_by = null) {
   if (!docs || docs.length === 0) return { data: null, error: null };
   const docsData = docs.map(d => ({
     employee_id,
     name: d.name,
-    category: d.category || 'Geral',
+    category: d.category || 'contratos',
     size: d.size || '0 KB',
     type: d.type || 'pdf',
     status: 'ok',
+    uploaded_by,
   }));
-  const { data, error } = await supabase
-    .from('documents')
-    .insert(docsData);
+  const { data, error } = await supabase.from('documents').insert(docsData);
   return { data, error };
 }
 

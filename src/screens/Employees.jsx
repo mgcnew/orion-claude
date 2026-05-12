@@ -1,7 +1,8 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import Icon from '../components/Icon.jsx';
 import Avatar from '../components/Avatar.jsx';
-import { useEmployees, useEmployee, useEmployeeCounts, useEmployeeWarnings, useEmployeeVacations, useEmployeeDocuments, useEmployeeHistory, useEmployeeTimeEntries, clockIn, clockOut, createEmployee, updateEmployeeStatus } from '../hooks/useEmployees.js';
+import { useEmployees, useEmployee, useEmployeeCounts, useEmployeeWarnings, useEmployeeVacations, useEmployeeDocuments, useEmployeeHistory, useEmployeeTimeEntries, clockIn, clockOut, createEmployee, updateEmployee, updateEmployeeStatus, createDocuments } from '../hooks/useEmployees.js';
+import { supabase } from '../lib/supabase.js';
 
 // ============================================================
 // MODAL BASE
@@ -81,6 +82,8 @@ export function NewEmployeeModal({ onClose, onCreated }) {
   const [form, setForm]     = useState(BLANK_EMP);
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState({});
+  const [docFiles, setDocFiles] = useState([]);
+  const docInputRef = useRef();
 
   useEffect(() => {
     const esc = (e) => e.key === 'Escape' && onClose();
@@ -119,9 +122,22 @@ export function NewEmployeeModal({ onClose, onCreated }) {
       cpf: form.cpf, birth_date: form.birth_date || null, civil_status: form.civil_status,
       status: 'ativo', hue: Math.floor(Math.random() * 360),
     };
-    const { error } = await createEmployee(payload);
+    const { created, error } = await createEmployee(payload);
+    if (error) { setSaving(false); alert('Erro ao salvar: ' + error.message); return; }
+    if (created && docFiles.length > 0) {
+      const { data: { user } } = await supabase.auth.getUser();
+      await createDocuments(
+        created.id,
+        docFiles.map(f => ({
+          name: f.name,
+          category: 'contratos',
+          size: f.size ? `${(f.size / 1024).toFixed(0)} KB` : '—',
+          type: f.type?.includes('image') ? 'image' : 'pdf',
+        })),
+        user?.id ?? null,
+      );
+    }
     setSaving(false);
-    if (error) { alert('Erro ao salvar: ' + error.message); return; }
     onCreated?.();
     onClose();
   };
@@ -328,6 +344,44 @@ export function NewEmployeeModal({ onClose, onCreated }) {
                   </div>
                 </div>
               ))}
+
+              {/* Documentos iniciais */}
+              <div style={{ background: 'var(--surface-2)', borderRadius: 10, padding: 16, border: '1px solid var(--line)' }}>
+                <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 10 }}>
+                  Documentos iniciais <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>(opcional)</span>
+                </div>
+                <input
+                  ref={docInputRef}
+                  type="file"
+                  multiple
+                  style={{ display: 'none' }}
+                  onChange={e => {
+                    setDocFiles(prev => [...prev, ...Array.from(e.target.files || [])]);
+                    e.target.value = '';
+                  }}
+                />
+                {docFiles.length === 0 ? (
+                  <button className="btn ghost sm" onClick={() => docInputRef.current?.click()}>
+                    <Icon name="upload" size={13} /> Selecionar arquivos
+                  </button>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {docFiles.map((f, i) => (
+                      <div key={i} className="row gap-2" style={{ fontSize: 12.5 }}>
+                        <Icon name="pdf" size={13} style={{ color: 'var(--brand)', flexShrink: 0 }} />
+                        <span style={{ flex: 1 }}>{f.name}</span>
+                        <span style={{ color: 'var(--muted)', fontSize: 11 }}>{(f.size / 1024).toFixed(0)} KB</span>
+                        <button className="btn ghost icon sm" onClick={() => setDocFiles(prev => prev.filter((_, j) => j !== i))}>
+                          <Icon name="x" size={11} />
+                        </button>
+                      </div>
+                    ))}
+                    <button className="btn ghost sm" style={{ marginTop: 4 }} onClick={() => docInputRef.current?.click()}>
+                      <Icon name="plus" size={13} /> Adicionar mais
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -952,14 +1006,338 @@ export function EmployeesList({ setRoute, setRouteParam, setRouteLabel }) {
 }
 
 // ============================================================
+// EXPORT PRONTUÁRIO
+// ============================================================
+function exportProntuario(emp) {
+  const fmt = (d) => d ? new Date(d + 'T00:00:00').toLocaleDateString('pt-BR') : '—';
+  const curr = (v) => v ? Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '—';
+  const html = `<!DOCTYPE html><html lang="pt-BR"><head>
+<meta charset="UTF-8"><title>Prontuário — ${emp.name}</title>
+<style>
+*{box-sizing:border-box}body{font-family:Arial,sans-serif;font-size:12px;color:#111;margin:0;padding:24px;line-height:1.5}
+h1{font-size:20px;margin:0 0 2px}h2{font-size:11px;text-transform:uppercase;letter-spacing:.7px;color:#555;margin:20px 0 8px;padding-bottom:4px;border-bottom:1px solid #e5e7eb}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px 24px;margin-bottom:4px}
+.f label{font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:2px}.f span{font-size:12px}
+.header{display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:14px;border-bottom:2px solid #2A5BFF;margin-bottom:14px}
+.badge{display:inline-block;font-size:11px;padding:2px 8px;border-radius:20px;background:#dbeafe;color:#1d4ed8;font-weight:600;margin-top:5px}
+@media print{body{padding:14px}}
+</style></head><body>
+<div class="header">
+  <div>
+    <h1>${emp.name}</h1>
+    <div style="color:#666;font-size:12px;margin-top:3px">${emp.role} &middot; ${emp.dept} &middot; ${emp.company}</div>
+    <span class="badge">${emp.status === 'ativo' ? 'Ativo' : emp.status}</span>
+  </div>
+  <div style="font-size:11px;color:#888;text-align:right">Emitido em ${new Date().toLocaleDateString('pt-BR')}<br/>Orion Gestão</div>
+</div>
+<h2>Dados Pessoais</h2>
+<div class="grid">
+  <div class="f"><label>CPF</label><span>${emp.cpf || '—'}</span></div>
+  <div class="f"><label>Nascimento</label><span>${fmt(emp.birth_date)}</span></div>
+  <div class="f"><label>Estado Civil</label><span>${emp.civil_status || '—'}</span></div>
+  <div class="f"><label>Telefone</label><span>${emp.phone || '—'}</span></div>
+  <div class="f"><label>E-mail</label><span>${emp.email_personal || '—'}</span></div>
+</div>
+<div class="grid">
+  <div class="f" style="grid-column:1/3"><label>Endereço</label><span>${[emp.address, emp.neighborhood].filter(Boolean).join(', ') || '—'}</span></div>
+  <div class="f"><label>CEP</label><span>${emp.zip_code || '—'}</span></div>
+  <div class="f"><label>Cidade / UF</label><span>${emp.city && emp.state ? emp.city + ' / ' + emp.state : '—'}</span></div>
+</div>
+<h2>Vínculo Empregatício</h2>
+<div class="grid">
+  <div class="f"><label>Cargo</label><span>${emp.role || '—'}</span></div>
+  <div class="f"><label>Departamento</label><span>${emp.dept || '—'}</span></div>
+  <div class="f"><label>Empresa</label><span>${emp.company || '—'}</span></div>
+  <div class="f"><label>Tipo de Contrato</label><span>${emp.contract || '—'}</span></div>
+  <div class="f"><label>Data de Admissão</label><span>${fmt(emp.admission)}</span></div>
+  <div class="f"><label>Salário Base</label><span>${curr(emp.salary)}</span></div>
+  <div class="f"><label>Carga Horária</label><span>${emp.workload || '—'}</span></div>
+  <div class="f"><label>Regime</label><span>${emp.regime || '—'}</span></div>
+  <div class="f"><label>Centro de Custo</label><span>${emp.cost_center || '—'}</span></div>
+  <div class="f"><label>Supervisor Direto</label><span>${emp.supervisor || '—'}</span></div>
+</div>
+<div style="margin-top:32px;padding-top:12px;border-top:1px solid #e5e7eb;font-size:10px;color:#999;text-align:center">
+  Documento gerado pelo sistema Orion Gestão &middot; ${new Date().toLocaleString('pt-BR')}
+</div>
+<script>window.onload=()=>{window.print()}</script>
+</body></html>`;
+  const win = window.open('', '_blank');
+  if (win) { win.document.write(html); win.document.close(); }
+}
+
+// ============================================================
+// MODAL EDITAR FUNCIONÁRIO
+// ============================================================
+const EDIT_EMP_STEPS = [
+  { id: 'pessoal',      label: 'Dados pessoais',     icon: 'user'      },
+  { id: 'profissional', label: 'Dados profissionais', icon: 'briefcase' },
+  { id: 'contato',      label: 'Contato & endereço',  icon: 'mail'      },
+];
+
+function EditEmployeeModal({ employee, onClose, onSaved }) {
+  const [step, setStep] = useState(0);
+  const [form, setForm] = useState({
+    name: employee.name || '', cpf: employee.cpf || '',
+    birth_date: employee.birth_date || '', civil_status: employee.civil_status || 'Solteiro(a)',
+    role: employee.role || '', dept: employee.dept || '',
+    company: employee.company || 'Orion Matriz', contract: employee.contract || 'CLT — Tempo indet.',
+    admission: employee.admission || '', salary: employee.salary?.toString() || '',
+    cost_center: employee.cost_center || '', workload: employee.workload || '44h semanais',
+    regime: employee.regime || 'Presencial', supervisor: employee.supervisor || '',
+    phone: employee.phone || '', email_personal: employee.email_personal || '',
+    address: employee.address || '', neighborhood: employee.neighborhood || '',
+    city: employee.city || '', state: employee.state || '', zip_code: employee.zip_code || '',
+  });
+  const [errors, setErrors] = useState({});
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    const esc = (e) => e.key === 'Escape' && onClose();
+    window.addEventListener('keydown', esc);
+    document.body.style.overflow = 'hidden';
+    return () => { window.removeEventListener('keydown', esc); document.body.style.overflow = ''; };
+  }, [onClose]);
+
+  const set = (k, v) => { setForm(f => ({ ...f, [k]: v })); setErrors(e => ({ ...e, [k]: undefined })); };
+
+  const validate = () => {
+    const e = {};
+    if (step === 0 && !form.name.trim()) e.name = 'Obrigatório';
+    if (step === 1) {
+      if (!form.role.trim()) e.role = 'Obrigatório';
+      if (!form.dept.trim()) e.dept = 'Obrigatório';
+    }
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  };
+
+  const next = () => { if (validate()) setStep(s => Math.min(s + 1, EDIT_EMP_STEPS.length - 1)); };
+  const prev = () => setStep(s => Math.max(s - 1, 0));
+
+  const handleSave = async () => {
+    if (!validate()) return;
+    setSaving(true);
+    const { error } = await updateEmployee(employee.id, {
+      name: form.name, role: form.role, dept: form.dept, company: form.company,
+      contract: form.contract, admission: form.admission || null,
+      salary: form.salary ? parseFloat(form.salary) : null,
+      cost_center: form.cost_center, workload: form.workload, regime: form.regime,
+      supervisor: form.supervisor, phone: form.phone, email_personal: form.email_personal,
+      address: form.address, neighborhood: form.neighborhood, city: form.city,
+      state: form.state, zip_code: form.zip_code,
+      cpf: form.cpf, birth_date: form.birth_date || null, civil_status: form.civil_status,
+    });
+    setSaving(false);
+    if (error) { alert('Erro ao salvar: ' + error.message); return; }
+    onSaved?.();
+    onClose();
+  };
+
+  return (
+    <div
+      style={{
+        position: 'fixed', inset: 0, zIndex: 300,
+        background: 'rgba(0,0,0,.5)', backdropFilter: 'blur(4px)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: 'clamp(8px, 2vw, 24px)',
+      }}
+      onClick={onClose}
+    >
+      <div
+        style={{
+          width: '100%', maxWidth: 640,
+          background: 'var(--surface)', borderRadius: 16,
+          boxShadow: '0 32px 80px rgba(0,0,0,.25)',
+          display: 'flex', flexDirection: 'column',
+          maxHeight: 'calc(100dvh - 32px)',
+          overflow: 'hidden',
+        }}
+        onClick={e => e.stopPropagation()}
+      >
+        {/* ── HEADER fixo ── */}
+        <div style={{ flexShrink: 0, borderBottom: '1px solid var(--line)' }}>
+          <div style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 16, fontWeight: 700 }}>Editar funcionário</div>
+              <div style={{ fontSize: 12.5, color: 'var(--muted)', marginTop: 2 }}>{employee.name} · {employee.role}</div>
+            </div>
+            <button className="btn ghost icon sm" onClick={onClose}><Icon name="x" size={15} /></button>
+          </div>
+
+          {/* barra de progresso — idêntica ao NewEmployeeModal */}
+          <div style={{ padding: '0 20px 16px', display: 'flex', alignItems: 'flex-start' }}>
+            {EDIT_EMP_STEPS.map((s, i) => (
+              <div key={s.id} style={{ display: 'flex', alignItems: 'flex-start', flex: i < EDIT_EMP_STEPS.length - 1 ? 1 : 0 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5 }}>
+                  <div style={{
+                    width: 28, height: 28, borderRadius: '50%',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    background: i < step ? 'var(--ok)' : i === step ? 'var(--brand)' : 'var(--surface-2)',
+                    border: `2px solid ${i < step ? 'var(--ok)' : i === step ? 'var(--brand)' : 'var(--line)'}`,
+                    color: i <= step ? '#fff' : 'var(--muted)',
+                    fontSize: 12, fontWeight: 700, flexShrink: 0, transition: 'all .2s',
+                  }}>
+                    {i < step ? <Icon name="check" size={12} /> : i + 1}
+                  </div>
+                  <span style={{
+                    fontSize: 10, fontWeight: i === step ? 700 : 400,
+                    color: i === step ? 'var(--ink)' : 'var(--muted)',
+                    textAlign: 'center', lineHeight: 1.25,
+                    width: 60, wordBreak: 'break-word',
+                  }}>
+                    {s.label}
+                  </span>
+                </div>
+                {i < EDIT_EMP_STEPS.length - 1 && (
+                  <div style={{
+                    flex: 1, height: 2, margin: '13px 6px 0',
+                    background: i < step ? 'var(--ok)' : 'var(--line)',
+                    transition: 'background .3s', minWidth: 8,
+                  }} />
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* ── BODY rolável ── */}
+        <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, padding: '20px 20px 8px' }}>
+          {step === 0 && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14 }}>
+              <FL label="Nome completo *" span={2}>
+                <input className={`field ${errors.name ? 'error' : ''}`} value={form.name} onChange={e => set('name', e.target.value)} />
+                {errors.name && <span style={{ fontSize: 11, color: 'var(--bad)' }}>{errors.name}</span>}
+              </FL>
+              <FL label="CPF">
+                <input className="field" value={form.cpf} onChange={e => set('cpf', e.target.value)} placeholder="000.000.000-00" />
+              </FL>
+              <FL label="Data de nascimento">
+                <input type="date" className="field" value={form.birth_date} onChange={e => set('birth_date', e.target.value)} />
+              </FL>
+              <FL label="Estado civil" span={2}>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {['Solteiro(a)', 'Casado(a)', 'Divorciado(a)', 'Viúvo(a)'].map(v => (
+                    <button key={v} onClick={() => set('civil_status', v)} style={{
+                      flex: '1 1 110px', padding: '8px 4px', borderRadius: 8, border: '1px solid',
+                      borderColor: form.civil_status === v ? 'var(--brand)' : 'var(--line)',
+                      background: form.civil_status === v ? 'var(--brand-tint)' : 'var(--surface-2)',
+                      color: form.civil_status === v ? 'var(--brand)' : 'var(--muted)',
+                      fontWeight: form.civil_status === v ? 700 : 400, fontSize: 12, cursor: 'pointer',
+                    }}>{v}</button>
+                  ))}
+                </div>
+              </FL>
+            </div>
+          )}
+
+          {step === 1 && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14 }}>
+              <FL label="Cargo *">
+                <input className={`field ${errors.role ? 'error' : ''}`} value={form.role} onChange={e => set('role', e.target.value)} />
+                {errors.role && <span style={{ fontSize: 11, color: 'var(--bad)' }}>{errors.role}</span>}
+              </FL>
+              <FL label="Departamento *">
+                <input className={`field ${errors.dept ? 'error' : ''}`} value={form.dept} onChange={e => set('dept', e.target.value)} />
+                {errors.dept && <span style={{ fontSize: 11, color: 'var(--bad)' }}>{errors.dept}</span>}
+              </FL>
+              <FL label="Empresa">
+                <select className="field" value={form.company} onChange={e => set('company', e.target.value)}>
+                  {['Orion Matriz','Orion Filial SP','Orion Filial RJ','Orion Filial MG'].map(c => <option key={c}>{c}</option>)}
+                </select>
+              </FL>
+              <FL label="Tipo de contrato">
+                <select className="field" value={form.contract} onChange={e => set('contract', e.target.value)}>
+                  {['CLT — Tempo indet.','CLT — Tempo det.','PJ','Estágio','Temporário','Aprendiz'].map(c => <option key={c}>{c}</option>)}
+                </select>
+              </FL>
+              <FL label="Data de admissão">
+                <input type="date" className="field" value={form.admission} onChange={e => set('admission', e.target.value)} />
+              </FL>
+              <FL label="Salário base (R$)">
+                <input className="field" value={form.salary} onChange={e => set('salary', e.target.value)} placeholder="0,00" />
+              </FL>
+              <FL label="Centro de custo">
+                <input className="field" value={form.cost_center} onChange={e => set('cost_center', e.target.value)} />
+              </FL>
+              <FL label="Supervisor direto">
+                <input className="field" value={form.supervisor} onChange={e => set('supervisor', e.target.value)} />
+              </FL>
+              <FL label="Carga horária">
+                <select className="field" value={form.workload} onChange={e => set('workload', e.target.value)}>
+                  {['44h semanais','40h semanais','30h semanais','20h semanais'].map(c => <option key={c}>{c}</option>)}
+                </select>
+              </FL>
+              <FL label="Regime de trabalho">
+                <select className="field" value={form.regime} onChange={e => set('regime', e.target.value)}>
+                  {['Presencial','Remoto','Híbrido (2×3)','Híbrido (3×2)'].map(c => <option key={c}>{c}</option>)}
+                </select>
+              </FL>
+            </div>
+          )}
+
+          {step === 2 && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14 }}>
+              <FL label="Telefone">
+                <input className="field" value={form.phone} onChange={e => set('phone', e.target.value)} placeholder="+55 11 9 0000-0000" />
+              </FL>
+              <FL label="E-mail pessoal">
+                <input type="email" className="field" value={form.email_personal} onChange={e => set('email_personal', e.target.value)} />
+              </FL>
+              <FL label="Logradouro" span={2}>
+                <input className="field" value={form.address} onChange={e => set('address', e.target.value)} placeholder="Rua, número, complemento" />
+              </FL>
+              <FL label="Bairro">
+                <input className="field" value={form.neighborhood} onChange={e => set('neighborhood', e.target.value)} />
+              </FL>
+              <FL label="CEP">
+                <input className="field" value={form.zip_code} onChange={e => set('zip_code', e.target.value)} placeholder="00000-000" />
+              </FL>
+              <FL label="Cidade">
+                <input className="field" value={form.city} onChange={e => set('city', e.target.value)} />
+              </FL>
+              <FL label="Estado (UF)">
+                <input className="field" value={form.state} onChange={e => set('state', e.target.value)} placeholder="SP" maxLength={2} style={{ textTransform: 'uppercase' }} />
+              </FL>
+            </div>
+          )}
+        </div>
+
+        {/* ── FOOTER fixo ── */}
+        <div style={{
+          flexShrink: 0, padding: '14px 20px',
+          borderTop: '1px solid var(--line)',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          background: 'var(--surface)',
+        }}>
+          <button className="btn" onClick={step === 0 ? onClose : prev}>
+            {step === 0 ? 'Cancelar' : <><Icon name="chevron-left" size={13} /> Voltar</>}
+          </button>
+          <span style={{ fontSize: 12, color: 'var(--muted)' }}>Etapa {step + 1} de {EDIT_EMP_STEPS.length}</span>
+          {step < EDIT_EMP_STEPS.length - 1 ? (
+            <button className="btn primary" onClick={next}>
+              Próximo <Icon name="chevron-right" size={13} />
+            </button>
+          ) : (
+            <button className="btn primary" onClick={handleSave} disabled={saving}>
+              {saving ? 'Salvando…' : <><Icon name="check" size={13} /> Salvar alterações</>}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
 // PROFILE
 // ============================================================
 export function EmployeeProfile({ setRoute, employeeId }) {
   const [tab, setTab] = useState('dados');
-  const { employee: emp, loading } = useEmployee(employeeId);
+  const [showEdit, setShowEdit] = useState(false);
+  const { employee: emp, loading, refetch: refetchEmp } = useEmployee(employeeId);
   const { warnings } = useEmployeeWarnings(employeeId);
   const { vacations } = useEmployeeVacations(employeeId);
-  const { documents } = useEmployeeDocuments(employeeId);
+  const { documents, refetch: refetchDocs } = useEmployeeDocuments(employeeId);
   const { history } = useEmployeeHistory(employeeId);
   const { timeEntries, refetch: refetchTimeEntries } = useEmployeeTimeEntries(employeeId);
 
@@ -992,6 +1370,7 @@ export function EmployeeProfile({ setRoute, employeeId }) {
   }
 
   return (
+    <>
     <div className="fade-up" style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
       {/* Back */}
       <button className="btn ghost sm" style={{ alignSelf: 'flex-start' }} onClick={() => setRoute('employees')}>
@@ -1061,10 +1440,10 @@ export function EmployeeProfile({ setRoute, employeeId }) {
             <button className="btn">
               <Icon name="mail" size={14} /> Enviar mensagem
             </button>
-            <button className="btn">
+            <button className="btn" onClick={() => exportProntuario(emp)}>
               <Icon name="download" size={14} /> Exportar prontuário
             </button>
-            <button className="btn primary">
+            <button className="btn primary" onClick={() => setShowEdit(true)}>
               <Icon name="edit" size={14} /> Editar
             </button>
             <button className="btn ghost icon">
@@ -1085,7 +1464,7 @@ export function EmployeeProfile({ setRoute, employeeId }) {
                 return `${yrs > 0 ? yrs + ' ano' + (yrs !== 1 ? 's' : '') : ''} ${yrs > 0 && mos > 0 ? '· ' : ''}${mos > 0 ? mos + ' ' + (mos !== 1 ? 'meses' : 'mês') : ''}`;
               })(), i: 'history' },
             { l: 'Banco de horas', v: '—', i: 'clock' },
-            { l: 'Atestados', v: documents.filter(d => d.category === 'Atestados').length.toString(), i: 'doc' },
+            { l: 'Atestados', v: documents.filter(d => d.category === 'atestados').length.toString(), i: 'doc' },
             { l: 'Próximas férias', v: (() => {
                 const scheduled = vacations.find(v => v.status === 'agendado');
                 return scheduled ? new Date(scheduled.period_start + 'T00:00:00').toLocaleDateString('pt-BR').slice(0, 5) : '—';
@@ -1166,13 +1545,22 @@ export function EmployeeProfile({ setRoute, employeeId }) {
 
       {tab === 'dados' && <DadosPessoais emp={emp} />}
       {tab === 'prof' && <DadosProfissionais emp={emp} />}
-      {tab === 'docs' && <DocsTab documents={documents} />}
+      {tab === 'docs' && <DocsTab employeeId={emp.id} documents={documents} refetch={refetchDocs} />}
       {tab === 'ponto' && <PontoTab employeeId={emp.id} timeEntries={timeEntries} refetch={refetchTimeEntries} />}
       {tab === 'warn' && <WarnTab employeeId={emp.id} />}
       {tab === 'pay' && <PayTab emp={emp} documents={documents} />}
       {tab === 'ferias' && <FeriasTab employeeId={emp.id} />}
       {tab === 'hist' && <HistoryTab emp={emp} history={history} />}
     </div>
+
+    {showEdit && emp && (
+      <EditEmployeeModal
+        employee={emp}
+        onClose={() => setShowEdit(false)}
+        onSaved={() => { refetchEmp(); setShowEdit(false); }}
+      />
+    )}
+  </>
   );
 }
 
@@ -1276,50 +1664,96 @@ function DadosProfissionais({ emp }) {
 }
 
 const DOC_CATEGORIES = [
-  { name: 'Admissão', icon: 'doc', color: '#2A5BFF' },
-  { name: 'Contratos', icon: 'folder', color: '#7C3AED' },
-  { name: 'Holerites', icon: 'pdf', color: '#059669' },
-  { name: 'Atestados', icon: 'alert', color: '#D97706' },
-  { name: 'Treinamentos', icon: 'sparkle', color: '#0EA5E9' },
-  { name: 'Rescisão', icon: 'trash', color: '#DC2626' },
+  { id: 'contratos',    name: 'Contratos',     icon: 'doc',         color: '#2A5BFF' },
+  { id: 'holerites',   name: 'Holerites',      icon: 'pdf',         color: '#059669' },
+  { id: 'atestados',   name: 'Atestados',      icon: 'image',       color: '#D97706' },
+  { id: 'rg-cpf',      name: 'RG / CPF',       icon: 'user',        color: '#1F8A5B' },
+  { id: 'exames',      name: 'Exames Médicos', icon: 'fingerprint', color: '#db2777' },
+  { id: 'ferias',      name: 'Férias',         icon: 'umbrella',    color: '#0891b2' },
+  { id: 'advertencias',name: 'Advertências',   icon: 'alert',       color: '#a855f7' },
+  { id: 'juridico',    name: 'Jurídico',       icon: 'shield',      color: '#475569' },
 ];
 
-function DocsTab({ documents }) {
+function DocsTab({ employeeId, documents = [], refetch }) {
+  const [uploading, setUploading] = useState(false);
+  const [uploadCat, setUploadCat] = useState(null);
+  const [userId, setUserId] = useState(null);
+  const fileInputRef = useRef();
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => setUserId(user?.id ?? null));
+  }, []);
+
+  const handleUpload = async (files) => {
+    if (!files?.length) return;
+    setUploading(true);
+    const rows = Array.from(files).map(f => ({
+      employee_id: employeeId,
+      name: f.name,
+      category: uploadCat,
+      size: f.size ? `${(f.size / 1024).toFixed(0)} KB` : '—',
+      type: f.type?.includes('image') ? 'image' : 'pdf',
+      status: 'ok',
+      uploaded_by: userId,
+    }));
+    const { error } = await supabase.from('documents').insert(rows);
+    setUploading(false);
+    if (error) alert('Erro ao fazer upload: ' + error.message);
+    else refetch?.();
+  };
+
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
-      {DOC_CATEGORIES.map((c, i) => {
-        const count = documents.filter(d => d.category === c.name).length;
-        return (
-          <div key={i} className="card" style={{ padding: 16, cursor: 'pointer' }}>
-            <div className="row gap-2">
-              <div
-                style={{
-                  width: 36,
-                  height: 36,
-                  borderRadius: 8,
-                  background: c.color + '1f',
-                  color: c.color,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0,
-                }}
-              >
-                <Icon name={c.icon} size={17} />
-              </div>
-              <div className="grow">
-                <div style={{ fontSize: 13.5, fontWeight: 600 }}>{c.name}</div>
-                <div style={{ fontSize: 11.5, color: 'var(--muted)' }}>
-                  {count} arquivo{count !== 1 ? 's' : ''}
+    <div>
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        style={{ display: 'none' }}
+        onChange={e => { handleUpload(e.target.files); e.target.value = ''; }}
+      />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 14 }}>
+        {DOC_CATEGORIES.map((c) => {
+          const catDocs = documents.filter(d => d.category === c.id);
+          return (
+            <div key={c.id} className="card" style={{ padding: 16 }}>
+              <div className="row gap-2" style={{ marginBottom: catDocs.length ? 10 : 0 }}>
+                <div style={{
+                  width: 34, height: 34, borderRadius: 8,
+                  background: c.color + '1f', color: c.color,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                }}>
+                  <Icon name={c.icon} size={16} />
                 </div>
+                <div className="grow">
+                  <div style={{ fontSize: 13, fontWeight: 600 }}>{c.name}</div>
+                  <div style={{ fontSize: 11.5, color: 'var(--muted)' }}>
+                    {catDocs.length} arquivo{catDocs.length !== 1 ? 's' : ''}
+                  </div>
+                </div>
+                <button
+                  className="btn ghost sm"
+                  title={`Upload em ${c.name}`}
+                  disabled={uploading}
+                  onClick={() => { setUploadCat(c.id); setTimeout(() => fileInputRef.current?.click(), 0); }}
+                >
+                  <Icon name="upload" size={13} />
+                </button>
               </div>
-              <button className="btn ghost icon sm">
-                <Icon name="more-v" size={13} />
-              </button>
+              {catDocs.length > 0 && (
+                <div style={{ borderTop: '1px solid var(--line)', paddingTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {catDocs.map(d => (
+                    <div key={d.id} className="row gap-2" style={{ fontSize: 12.5 }}>
+                      <Icon name={d.type === 'image' ? 'image' : 'pdf'} size={13} style={{ color: c.color, flexShrink: 0 }} />
+                      <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.name}</span>
+                      <span style={{ color: 'var(--muted)', fontSize: 11, flexShrink: 0 }}>{d.size}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
     </div>
   );
 }

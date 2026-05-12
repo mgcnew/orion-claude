@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import Icon from '../components/Icon.jsx';
 import { useAllDocuments } from '../hooks/useEmployees.js';
 import { supabase } from '../lib/supabase.js';
@@ -42,10 +42,16 @@ export default function DocumentsScreen({ addToast }) {
   const [search, setSearch]     = useState('');
   const [dragOver, setDragOver] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [selected, setSelected] = useState(new Set());
+  const [userId, setUserId]     = useState(null);
   const fileInputRef = useRef();
 
-  const { documents: raw, loading, refetch } = useAllDocuments();
+  const { documents: raw, loading, error, refetch } = useAllDocuments();
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => setUserId(user?.id ?? null));
+  }, []);
 
   const docs = raw.map(d => ({
     id: d.id,
@@ -78,17 +84,32 @@ export default function DocumentsScreen({ addToast }) {
     if (!files?.length) return;
     setUploading(true);
     const file = files[0];
-    const { error } = await supabase.from('documents').insert({
+    const { error: upErr } = await supabase.from('documents').insert({
       name: file.name || `Documento_${Date.now()}.pdf`,
       category: cat || CATEGORIES[0].id,
       size: file.size ? `${(file.size / 1024 / 1024).toFixed(1)} MB` : '—',
       type: file.type?.includes('image') ? 'image' : 'pdf',
       status: 'ok',
+      uploaded_by: userId,
     });
-    if (error) addToast({ kind: 'bad', msg: 'Erro ao fazer upload' });
+    if (upErr) addToast({ kind: 'bad', msg: 'Erro ao fazer upload: ' + upErr.message });
     else { addToast({ kind: 'ok', msg: `${file.name || 'Arquivo'} enviado` }); refetch(); }
     setUploading(false);
-  }, [cat, addToast, refetch]);
+  }, [cat, addToast, refetch, userId]);
+
+  const handleDelete = useCallback(async () => {
+    if (!selected.size) return;
+    setDeleting(true);
+    const ids = [...selected];
+    const { error: delErr } = await supabase.from('documents').delete().in('id', ids);
+    setDeleting(false);
+    if (delErr) addToast({ kind: 'bad', msg: 'Erro ao excluir: ' + delErr.message });
+    else {
+      addToast({ kind: 'ok', msg: `${ids.length} documento(s) excluído(s)` });
+      setSelected(new Set());
+      refetch();
+    }
+  }, [selected, addToast, refetch]);
 
   const onDrop = (e) => {
     e.preventDefault();
@@ -285,7 +306,14 @@ export default function DocumentsScreen({ addToast }) {
             <strong>{selected.size} selecionados</strong>
             <span style={{ flex: 1 }} />
             <button className="btn sm"><Icon name="download" size={13} /> Baixar</button>
-            <button className="btn sm"><Icon name="trash" size={13} /> Excluir</button>
+            <button
+              className="btn sm"
+              style={{ color: 'var(--bad)', borderColor: 'var(--bad)' }}
+              onClick={handleDelete}
+              disabled={deleting}
+            >
+              <Icon name="trash" size={13} /> {deleting ? 'Excluindo…' : 'Excluir'}
+            </button>
             <button className="btn ghost sm icon" onClick={() => setSelected(new Set())}>
               <Icon name="x" size={13} />
             </button>
@@ -297,6 +325,13 @@ export default function DocumentsScreen({ addToast }) {
           {loading ? (
             <div style={{ padding: 48, textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>
               <div className="pulse">Carregando documentos…</div>
+            </div>
+          ) : error ? (
+            <div style={{ padding: 48, textAlign: 'center', color: 'var(--bad)', fontSize: 13 }}>
+              <Icon name="alert" size={28} style={{ opacity: 0.5, marginBottom: 10 }} />
+              <div style={{ fontWeight: 600, marginBottom: 4 }}>Erro ao carregar documentos</div>
+              <div style={{ fontSize: 12, color: 'var(--muted)' }}>{error}</div>
+              <button className="btn sm" style={{ marginTop: 14 }} onClick={refetch}>Tentar novamente</button>
             </div>
           ) : filtered.length === 0 ? (
             <div style={{ padding: 64, textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>
