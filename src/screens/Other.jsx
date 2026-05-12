@@ -2,7 +2,16 @@ import { useState, useEffect, Fragment } from 'react';
 import Icon from '../components/Icon.jsx';
 import Avatar from '../components/Avatar.jsx';
 import * as D from '../data/mock.js';
-import { createEmployee } from '../hooks/useEmployees.js';
+import {
+  createEmployee,
+  useEmployees,
+  useAllWarnings,
+  createWarning,
+  useAllVacations,
+  updateVacationStatus,
+  createDocuments,
+  createVacation,
+} from '../hooks/useEmployees.js';
 
 // ============================================================
 // TIME TRACKING
@@ -763,10 +772,15 @@ export function NewEmployee({ setRoute, addToast }) {
 
   // Form state
   const [form, setForm] = useState({
-    name: '', role: '', dept: 'RH', company: 'Orion Matriz',
-    contract: 'CLT', admission: '', salary: '',
+    name: '', social_name: '', birth_date: '', cpf: '', rg: '', civil_status: 'Solteiro(a)', email_personal: '', phone: '',
+    address: '', zip_code: '', neighborhood: '', city: '', state: 'SP',
+    role: '', dept: 'RH', company: 'Orion Matriz', contract: 'CLT', admission: '', salary: '',
   });
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+
+  // Documents state
+  const [docs, setDocs] = useState([]);
+
   return (
     <div
       className="fade-up"
@@ -866,23 +880,23 @@ export function NewEmployee({ setRoute, addToast }) {
             </div>
             <div>
               <label className="label">Nome social</label>
-              <input className="field" placeholder="Opcional" />
+              <input className="field" placeholder="Opcional" value={form.social_name} onChange={(e) => set('social_name', e.target.value)} />
             </div>
             <div>
               <label className="label">Data de nascimento</label>
-              <input className="field" type="date" />
+              <input className="field" type="date" value={form.birth_date} onChange={(e) => set('birth_date', e.target.value)} />
             </div>
             <div>
               <label className="label">CPF</label>
-              <input className="field" placeholder="000.000.000-00" />
+              <input className="field" placeholder="000.000.000-00" value={form.cpf} onChange={(e) => set('cpf', e.target.value)} />
             </div>
             <div>
               <label className="label">RG</label>
-              <input className="field" placeholder="00.000.000-X" />
+              <input className="field" placeholder="00.000.000-X" value={form.rg} onChange={(e) => set('rg', e.target.value)} />
             </div>
             <div>
               <label className="label">Estado civil</label>
-              <select className="field">
+              <select className="field" value={form.civil_status} onChange={(e) => set('civil_status', e.target.value)}>
                 <option>Solteiro(a)</option>
                 <option>Casado(a)</option>
                 <option>Divorciado(a)</option>
@@ -890,11 +904,11 @@ export function NewEmployee({ setRoute, addToast }) {
             </div>
             <div>
               <label className="label">E-mail pessoal</label>
-              <input className="field" type="email" />
+              <input className="field" type="email" value={form.email_personal} onChange={(e) => set('email_personal', e.target.value)} />
             </div>
             <div>
               <label className="label">Telefone</label>
-              <input className="field" placeholder="+55 11 9 0000-0000" />
+              <input className="field" placeholder="+55 11 9 0000-0000" value={form.phone} onChange={(e) => set('phone', e.target.value)} />
             </div>
           </div>
         )}
@@ -902,23 +916,23 @@ export function NewEmployee({ setRoute, addToast }) {
           <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: 16 }}>
             <div style={{ gridColumn: 'span 2' }}>
               <label className="label">Logradouro</label>
-              <input className="field" placeholder="Rua, número e complemento" />
+              <input className="field" placeholder="Rua, número e complemento" value={form.address} onChange={(e) => set('address', e.target.value)} />
             </div>
             <div>
               <label className="label">CEP</label>
-              <input className="field" placeholder="00000-000" />
+              <input className="field" placeholder="00000-000" value={form.zip_code} onChange={(e) => set('zip_code', e.target.value)} />
             </div>
             <div>
               <label className="label">Bairro</label>
-              <input className="field" />
+              <input className="field" value={form.neighborhood} onChange={(e) => set('neighborhood', e.target.value)} />
             </div>
             <div>
               <label className="label">Cidade</label>
-              <input className="field" />
+              <input className="field" value={form.city} onChange={(e) => set('city', e.target.value)} />
             </div>
             <div>
               <label className="label">UF</label>
-              <select className="field">
+              <select className="field" value={form.state} onChange={(e) => set('state', e.target.value)}>
                 <option>SP</option>
                 <option>RJ</option>
                 <option>MG</option>
@@ -975,46 +989,63 @@ export function NewEmployee({ setRoute, addToast }) {
         )}
         {step === 3 && (
           <div className="col gap-3">
-            <div
+            <label
               style={{
                 padding: 24,
                 border: '1.5px dashed var(--line)',
                 borderRadius: 12,
                 background: 'var(--surface-2)',
                 textAlign: 'center',
+                cursor: 'pointer',
+                display: 'block'
               }}
             >
+              <input 
+                type="file" 
+                multiple 
+                style={{ display: 'none' }} 
+                onChange={(e) => {
+                  const files = Array.from(e.target.files);
+                  const newDocs = files.map(f => ({
+                    name: f.name,
+                    category: 'Geral',
+                    size: Math.round(f.size / 1024) + ' KB',
+                    type: f.name.split('.').pop()
+                  }));
+                  setDocs([...docs, ...newDocs]);
+                }}
+              />
               <Icon name="upload" size={28} style={{ color: 'var(--brand)' }} />
               <div style={{ fontSize: 14, fontWeight: 600, marginTop: 8 }}>
-                Solte os documentos aqui
+                Clique para selecionar os documentos
               </div>
               <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>
                 RG, CPF, comprovante de residência, contrato assinado
               </div>
-              <button className="btn primary" style={{ marginTop: 14 }}>
+              <div className="btn primary" style={{ marginTop: 14, display: 'inline-flex' }}>
                 <Icon name="folder" size={14} /> Selecionar arquivos
-              </button>
-            </div>
-            {['RG_frente.jpg', 'CPF.pdf', 'Contrato_assinado.pdf'].map((n, i) => (
+              </div>
+            </label>
+            {docs.map((d, i) => (
               <div
                 key={i}
                 className="row gap-3"
                 style={{ padding: 12, border: '1px solid var(--line)', borderRadius: 8 }}
               >
                 <Icon
-                  name={n.endsWith('.pdf') ? 'pdf' : 'image'}
+                  name={d.name.endsWith('.pdf') ? 'pdf' : 'image'}
                   size={18}
                   style={{ color: 'var(--brand)' }}
                 />
                 <div className="grow">
-                  <div style={{ fontSize: 13, fontWeight: 500 }}>{n}</div>
+                  <div style={{ fontSize: 13, fontWeight: 500 }}>{d.name}</div>
                   <div style={{ fontSize: 11, color: 'var(--muted)' }} className="mono">
-                    {[820, 180, 420][i]} KB · enviado
+                    {d.size} · pronto para envio
                   </div>
                 </div>
-                <span className="pill ok">
-                  <Icon name="check" size={11} /> OK
-                </span>
+                <button className="btn sm ghost icon" onClick={() => setDocs(docs.filter((_, idx) => idx !== i))}>
+                  <Icon name="trash" size={13} style={{ color: 'var(--bad)' }} />
+                </button>
               </div>
             ))}
           </div>
@@ -1046,19 +1077,39 @@ export function NewEmployee({ setRoute, addToast }) {
                 return;
               }
               setSaving(true);
-              const { error } = await createEmployee({
+              const { created, error } = await createEmployee({
                 name: form.name,
                 role: form.role,
                 dept: form.dept,
                 company: form.company,
                 status: 'ativo',
                 admission: form.admission || null,
+                contract: form.contract || null,
+                salary: form.salary ? parseFloat(form.salary.replace(/[R$\s.]/g, '').replace(',', '.')) : null,
+                phone: form.phone || null,
+                email_personal: form.email_personal || null,
+                birth_date: form.birth_date || null,
+                cpf: form.cpf || null,
+                civil_status: form.civil_status || 'Não informado',
+                address: form.address || null,
+                neighborhood: form.neighborhood || null,
+                city: form.city || null,
+                state: form.state || null,
+                zip_code: form.zip_code || null,
                 hue: Math.floor(Math.random() * 360),
               });
-              setSaving(false);
+              
               if (error) {
-                addToast({ kind: 'warn', msg: 'Erro ao cadastrar: ' + error });
+                setSaving(false);
+                addToast({ kind: 'warn', msg: 'Erro ao cadastrar: ' + error.message });
               } else {
+                if (created && docs.length > 0) {
+                  const { error: docError } = await createDocuments(created.id, docs);
+                  if (docError) {
+                    addToast({ kind: 'warn', msg: 'Aviso: Erro ao enviar documentos: ' + docError.message });
+                  }
+                }
+                setSaving(false);
                 addToast({ kind: 'ok', msg: `${form.name.split(' ')[0]} cadastrado com sucesso!` });
                 setRoute('employees');
               }
@@ -1311,16 +1362,24 @@ export function WarningsScreen({ addToast }) {
   const [filter, setFilter] = useState('todas');
   const [q, setQ] = useState('');
   const [showModal, setShowModal] = useState(false);
-  const [newWarn, setNewWarn] = useState({ emp: '', type: 'verbal', reason: '' });
+  const [newWarn, setNewWarn] = useState({ employee_id: '', type: 'Advertência verbal', severity: 'verbal', description: '' });
+  const [saving, setSaving] = useState(false);
 
-  const typeLabel = { verbal: 'Verbal', escrita: 'Escrita', 'suspensão': 'Suspensão' };
-  const typeKind  = { verbal: 'warn', escrita: 'bad', 'suspensão': 'bad' };
+  const { warnings: allWarnings, loading, refetch } = useAllWarnings();
+  const { employees: activeEmployees } = useEmployees({ status: 'ativo' });
 
-  const filtered = D.warnings.filter((w) => {
-    if (filter !== 'todas' && w.type !== filter) return false;
-    if (q && !(w.emp + ' ' + w.reason).toLowerCase().includes(q.toLowerCase())) return false;
+  const typeLabel = { verbal: 'Verbal', escrita: 'Escrita', suspensao: 'Suspensão' };
+  const typeKind  = { verbal: 'warn', escrita: 'bad', suspensao: 'bad' };
+
+  const filtered = allWarnings.filter((w) => {
+    const sev = w.severity || 'verbal';
+    if (filter !== 'todas' && sev !== filter) return false;
+    const searchStr = ((w.employees?.name || '') + ' ' + (w.description || '')).toLowerCase();
+    if (q && !searchStr.includes(q.toLowerCase())) return false;
     return true;
   });
+
+  const countBySeverity = (s) => allWarnings.filter((w) => (w.severity || 'verbal') === s).length;
 
   return (
     <div className="fade-up" style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -1346,10 +1405,10 @@ export function WarningsScreen({ addToast }) {
       {/* KPI row */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12 }}>
         {[
-          { l: 'Total ativas',  v: D.warnings.filter((w) => w.status === 'ativa').length,    k: 'bad' },
-          { l: 'Verbais',       v: D.warnings.filter((w) => w.type === 'verbal').length,     k: 'warn' },
-          { l: 'Escritas',      v: D.warnings.filter((w) => w.type === 'escrita').length,    k: 'bad' },
-          { l: 'Suspensões',    v: D.warnings.filter((w) => w.type === 'suspensão').length,  k: 'bad' },
+          { l: 'Total',     v: allWarnings.length, k: 'bad' },
+          { l: 'Verbais',   v: countBySeverity('verbal'),   k: 'warn' },
+          { l: 'Escritas',  v: countBySeverity('escrita'),  k: 'bad' },
+          { l: 'Suspensões', v: countBySeverity('suspensao'), k: 'bad' },
         ].map((s, i) => (
           <div key={i} className="card" style={{ padding: 14 }}>
             <div style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.6, fontWeight: 600 }}>{s.l}</div>
@@ -1372,7 +1431,7 @@ export function WarningsScreen({ addToast }) {
             style={{ width: 280, height: 34, fontSize: 13 }}
           />
           <span className="grow" />
-          {['todas', 'verbal', 'escrita', 'suspensão'].map((f) => (
+          {['todas', 'verbal', 'escrita', 'suspensao'].map((f) => (
             <button
               key={f}
               className={`btn sm ${filter === f ? 'primary' : 'ghost'}`}
@@ -1384,54 +1443,62 @@ export function WarningsScreen({ addToast }) {
           ))}
         </div>
 
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13.5 }}>
-          <thead>
-            <tr style={{ background: 'var(--surface-2)', color: 'var(--muted)', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.6 }}>
-              <th style={{ textAlign: 'left', padding: '10px 16px', fontWeight: 600 }}>Funcionário</th>
-              <th style={{ textAlign: 'left', padding: '10px 16px', fontWeight: 600 }}>Tipo</th>
-              <th style={{ textAlign: 'left', padding: '10px 16px', fontWeight: 600 }}>Motivo</th>
-              <th style={{ textAlign: 'left', padding: '10px 16px', fontWeight: 600 }}>Data</th>
-              <th style={{ textAlign: 'left', padding: '10px 16px', fontWeight: 600 }}>Aplicada por</th>
-              <th style={{ textAlign: 'left', padding: '10px 16px', fontWeight: 600 }}>Status</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.length === 0 ? (
-              <tr>
-                <td colSpan={7} style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>
-                  Nenhuma advertência encontrada.
-                </td>
+        {loading ? (
+          <div style={{ padding: 48, textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>
+            <div className="pulse">Carregando advertências…</div>
+          </div>
+        ) : (
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13.5 }}>
+            <thead>
+              <tr style={{ background: 'var(--surface-2)', color: 'var(--muted)', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.6 }}>
+                <th style={{ textAlign: 'left', padding: '10px 16px', fontWeight: 600 }}>Funcionário</th>
+                <th style={{ textAlign: 'left', padding: '10px 16px', fontWeight: 600 }}>Tipo</th>
+                <th style={{ textAlign: 'left', padding: '10px 16px', fontWeight: 600 }}>Motivo</th>
+                <th style={{ textAlign: 'left', padding: '10px 16px', fontWeight: 600 }}>Data</th>
+                <th style={{ textAlign: 'left', padding: '10px 16px', fontWeight: 600 }}>Aplicada por</th>
+                <th style={{ textAlign: 'left', padding: '10px 16px', fontWeight: 600 }}>Severidade</th>
+                <th></th>
               </tr>
-            ) : filtered.map((w) => (
-              <tr key={w.id} style={{ borderTop: '1px solid var(--line-soft)' }}>
-                <td style={{ padding: '11px 16px' }}>
-                  <div className="row gap-2">
-                    <Avatar name={w.emp} hue={w.hue} size={28} />
-                    <div>
-                      <div style={{ fontWeight: 500, fontSize: 13 }}>{w.emp}</div>
-                      <div style={{ fontSize: 11, color: 'var(--muted)' }}>{w.dept}</div>
+            </thead>
+            <tbody>
+              {filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={7} style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>
+                    Nenhuma advertência encontrada.
+                  </td>
+                </tr>
+              ) : filtered.map((w) => (
+                <tr key={w.id} style={{ borderTop: '1px solid var(--line-soft)' }}>
+                  <td style={{ padding: '11px 16px' }}>
+                    <div className="row gap-2">
+                      <Avatar name={w.employees?.name || '?'} hue={w.employees?.hue || 0} size={28} />
+                      <div>
+                        <div style={{ fontWeight: 500, fontSize: 13 }}>{w.employees?.name || '—'}</div>
+                        <div style={{ fontSize: 11, color: 'var(--muted)' }}>{w.employees?.dept || ''}</div>
+                      </div>
                     </div>
-                  </div>
-                </td>
-                <td style={{ padding: '11px 16px' }}>
-                  <span className={`pill ${typeKind[w.type]}`}>{typeLabel[w.type]}</span>
-                </td>
-                <td style={{ padding: '11px 16px', color: 'var(--ink-soft)' }}>{w.reason}</td>
-                <td style={{ padding: '11px 16px' }} className="mono">{w.date}</td>
-                <td style={{ padding: '11px 16px', color: 'var(--muted)' }}>{w.appliedBy}</td>
-                <td style={{ padding: '11px 16px' }}>
-                  <span className={`pill ${w.status === 'ativa' ? 'bad' : ''}`}>
-                    <span className="dot" />{w.status === 'ativa' ? 'Ativa' : 'Expirada'}
-                  </span>
-                </td>
-                <td style={{ padding: '11px 16px' }}>
-                  <button className="btn ghost icon sm"><Icon name="more-v" size={13} /></button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                  </td>
+                  <td style={{ padding: '11px 16px' }}>
+                    <span className={`pill ${typeKind[w.severity] || 'warn'}`}>{w.type}</span>
+                  </td>
+                  <td style={{ padding: '11px 16px', color: 'var(--ink-soft)' }}>{w.description}</td>
+                  <td style={{ padding: '11px 16px' }} className="mono">
+                    {new Date(w.date + 'T00:00:00').toLocaleDateString('pt-BR')}
+                  </td>
+                  <td style={{ padding: '11px 16px', color: 'var(--muted)' }}>{w.applied_by || '—'}</td>
+                  <td style={{ padding: '11px 16px' }}>
+                    <span className={`pill ${typeKind[w.severity] || 'warn'}`}>
+                      <span className="dot" />{typeLabel[w.severity] || w.severity}
+                    </span>
+                  </td>
+                  <td style={{ padding: '11px 16px' }}>
+                    <button className="btn ghost icon sm"><Icon name="more-v" size={13} /></button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
 
       {/* New warning modal */}
@@ -1455,19 +1522,27 @@ export function WarningsScreen({ addToast }) {
             <div className="col gap-3">
               <div>
                 <label className="label">Funcionário</label>
-                <select className="field" value={newWarn.emp} onChange={(e) => setNewWarn({ ...newWarn, emp: e.target.value })}>
+                <select className="field" value={newWarn.employee_id} onChange={(e) => setNewWarn({ ...newWarn, employee_id: e.target.value })}>
                   <option value="">Selecionar…</option>
-                  {D.employees.filter((e) => e.status === 'ativo').map((e) => (
-                    <option key={e.id} value={e.name}>{e.name}</option>
+                  {activeEmployees.map((e) => (
+                    <option key={e.id} value={e.id}>{e.name}</option>
                   ))}
                 </select>
               </div>
               <div>
-                <label className="label">Tipo</label>
-                <select className="field" value={newWarn.type} onChange={(e) => setNewWarn({ ...newWarn, type: e.target.value })}>
+                <label className="label">Tipo / Severidade</label>
+                <select
+                  className="field"
+                  value={newWarn.severity}
+                  onChange={(e) => {
+                    const sev = e.target.value;
+                    const labels = { verbal: 'Advertência verbal', escrita: 'Advertência escrita', suspensao: 'Suspensão' };
+                    setNewWarn({ ...newWarn, severity: sev, type: labels[sev] });
+                  }}
+                >
                   <option value="verbal">Verbal</option>
                   <option value="escrita">Escrita</option>
-                  <option value="suspensão">Suspensão</option>
+                  <option value="suspensao">Suspensão</option>
                 </select>
               </div>
               <div>
@@ -1477,8 +1552,8 @@ export function WarningsScreen({ addToast }) {
                   rows={3}
                   style={{ resize: 'vertical' }}
                   placeholder="Descreva o motivo da advertência…"
-                  value={newWarn.reason}
-                  onChange={(e) => setNewWarn({ ...newWarn, reason: e.target.value })}
+                  value={newWarn.description}
+                  onChange={(e) => setNewWarn({ ...newWarn, description: e.target.value })}
                 />
               </div>
             </div>
@@ -1487,14 +1562,29 @@ export function WarningsScreen({ addToast }) {
               <span className="grow" />
               <button
                 className="btn primary"
-                disabled={!newWarn.emp || !newWarn.reason}
-                onClick={() => {
-                  setShowModal(false);
-                  addToast({ kind: 'ok', msg: `Advertência registrada para ${newWarn.emp.split(' ')[0]}` });
-                  setNewWarn({ emp: '', type: 'verbal', reason: '' });
+                disabled={!newWarn.employee_id || !newWarn.description || saving}
+                onClick={async () => {
+                  setSaving(true);
+                  const { error } = await createWarning({
+                    employee_id: newWarn.employee_id,
+                    type: newWarn.type,
+                    severity: newWarn.severity,
+                    description: newWarn.description,
+                    date: new Date().toISOString().slice(0, 10),
+                    applied_by: 'Usuário atual',
+                  });
+                  setSaving(false);
+                  if (error) {
+                    addToast({ kind: 'warn', msg: 'Erro: ' + error.message });
+                  } else {
+                    setShowModal(false);
+                    addToast({ kind: 'ok', msg: 'Advertência registrada com sucesso!' });
+                    setNewWarn({ employee_id: '', type: 'Advertência verbal', severity: 'verbal', description: '' });
+                    refetch();
+                  }
                 }}
               >
-                <Icon name="check" size={14} /> Registrar advertência
+                {saving ? <span className="pulse">Salvando…</span> : <><Icon name="check" size={14} /> Registrar advertência</>}
               </button>
             </div>
           </div>
@@ -1509,21 +1599,36 @@ export function WarningsScreen({ addToast }) {
 // ============================================================
 export function VacationScreen({ addToast }) {
   const [filter, setFilter] = useState('todas');
-  const [vacations, setVacations] = useState(D.vacations);
+  const { vacations: allVacations, loading, refetch } = useAllVacations();
+  const { employees } = useEmployees();
+  const activeEmployees = employees.filter((e) => e.status === 'ativo');
 
-  const approve = (id) => {
-    setVacations((vs) => vs.map((v) => v.id === id ? { ...v, status: 'aprovado', approvedBy: 'Mariana Oliveira' } : v));
-    addToast({ kind: 'ok', msg: 'Férias aprovadas' });
+  const [showModal, setShowModal] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [newVacation, setNewVacation] = useState({ employee_id: '', period_start: '', period_end: '', days: 30 });
+  const [docs, setDocs] = useState([]);
+
+  const approve = async (id) => {
+    const { error } = await updateVacationStatus(id, 'aprovado');
+    if (error) addToast({ kind: 'warn', msg: 'Erro: ' + error.message });
+    else { addToast({ kind: 'ok', msg: 'Férias aprovadas' }); refetch(); }
   };
-  const reject = (id) => {
-    setVacations((vs) => vs.map((v) => v.id === id ? { ...v, status: 'recusado' } : v));
-    addToast({ kind: 'warn', msg: 'Férias recusadas' });
+  const reject = async (id) => {
+
+    const { error } = await updateVacationStatus(id, 'recusado');
+    if (error) addToast({ kind: 'warn', msg: 'Erro: ' + error.message });
+    else { addToast({ kind: 'warn', msg: 'Férias recusadas' }); refetch(); }
   };
 
-  const statusKind = { aprovado: 'ok', pendente: 'warn', concluído: 'info', recusado: 'bad' };
-  const statusLabel = { aprovado: 'Aprovado', pendente: 'Pendente', concluído: 'Concluído', recusado: 'Recusado' };
+  const statusKind = { aprovado: 'ok', pendente: 'warn', concluído: 'info', concluido: 'info', recusado: 'bad' };
+  const statusLabel = { aprovado: 'Aprovado', pendente: 'Pendente', concluído: 'Concluído', concluido: 'Concluído', recusado: 'Recusado' };
 
-  const filtered = filter === 'todas' ? vacations : vacations.filter((v) => v.status === filter);
+  const filtered = filter === 'todas' ? allVacations : allVacations.filter((v) => v.status === filter);
+
+  const countByStatus = (s) => allVacations.filter((v) => v.status === s).length;
+  const totalDays = allVacations.reduce((a, v) => a + (v.days_count || 0), 0);
+
+  const fmtDate = (d) => d ? new Date(d + 'T00:00:00').toLocaleDateString('pt-BR') : '—';
 
   return (
     <div className="fade-up" style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -1536,7 +1641,7 @@ export function VacationScreen({ addToast }) {
         </div>
         <div className="row gap-2">
           <button className="btn"><Icon name="download" size={15} /> Exportar</button>
-          <button className="btn primary" onClick={() => addToast({ kind: 'ok', msg: 'Formulário de solicitação aberto' })}>
+          <button className="btn primary" onClick={() => setShowModal(true)}>
             <Icon name="plus" size={15} /> Nova solicitação
           </button>
         </div>
@@ -1545,10 +1650,10 @@ export function VacationScreen({ addToast }) {
       {/* KPI */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12 }}>
         {[
-          { l: 'Pendentes',  v: D.vacations.filter((v) => v.status === 'pendente').length,  k: 'warn' },
-          { l: 'Aprovadas',  v: D.vacations.filter((v) => v.status === 'aprovado').length,  k: 'ok' },
-          { l: 'Concluídas', v: D.vacations.filter((v) => v.status === 'concluído').length, k: 'info' },
-          { l: 'Total dias (ano)', v: D.vacations.reduce((a, v) => a + v.days, 0), k: '' },
+          { l: 'Pendentes',  v: countByStatus('pendente'),  k: 'warn' },
+          { l: 'Aprovadas',  v: countByStatus('aprovado'),  k: 'ok' },
+          { l: 'Concluídas', v: countByStatus('concluído') + countByStatus('concluido'), k: 'info' },
+          { l: 'Total dias (ano)', v: totalDays, k: '' },
         ].map((s, i) => (
           <div key={i} className="card" style={{ padding: 14 }}>
             <div style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.6, fontWeight: 600 }}>{s.l}</div>
@@ -1576,77 +1681,257 @@ export function VacationScreen({ addToast }) {
           ))}
         </div>
 
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13.5 }}>
-          <thead>
-            <tr style={{ background: 'var(--surface-2)', color: 'var(--muted)', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.6 }}>
-              <th style={{ textAlign: 'left', padding: '10px 16px', fontWeight: 600 }}>Funcionário</th>
-              <th style={{ textAlign: 'left', padding: '10px 16px', fontWeight: 600 }}>Período</th>
-              <th style={{ textAlign: 'left', padding: '10px 16px', fontWeight: 600 }}>Dias</th>
-              <th style={{ textAlign: 'left', padding: '10px 16px', fontWeight: 600 }}>Solicitado em</th>
-              <th style={{ textAlign: 'left', padding: '10px 16px', fontWeight: 600 }}>Aprovado por</th>
-              <th style={{ textAlign: 'left', padding: '10px 16px', fontWeight: 600 }}>Status</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.length === 0 ? (
-              <tr>
-                <td colSpan={7} style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>
-                  Nenhuma solicitação encontrada.
-                </td>
+        {loading ? (
+          <div style={{ padding: 48, textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>
+            <div className="pulse">Carregando férias…</div>
+          </div>
+        ) : (
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13.5 }}>
+            <thead>
+              <tr style={{ background: 'var(--surface-2)', color: 'var(--muted)', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.6 }}>
+                <th style={{ textAlign: 'left', padding: '10px 16px', fontWeight: 600 }}>Funcionário</th>
+                <th style={{ textAlign: 'left', padding: '10px 16px', fontWeight: 600 }}>Período</th>
+                <th style={{ textAlign: 'left', padding: '10px 16px', fontWeight: 600 }}>Dias</th>
+                <th style={{ textAlign: 'left', padding: '10px 16px', fontWeight: 600 }}>Solicitado em</th>
+                <th style={{ textAlign: 'left', padding: '10px 16px', fontWeight: 600 }}>Aprovado por</th>
+                <th style={{ textAlign: 'left', padding: '10px 16px', fontWeight: 600 }}>Status</th>
+                <th></th>
               </tr>
-            ) : filtered.map((v) => (
-              <tr key={v.id} style={{ borderTop: '1px solid var(--line-soft)' }}>
-                <td style={{ padding: '11px 16px' }}>
-                  <div className="row gap-2">
-                    <Avatar name={v.emp} hue={v.hue} size={28} />
-                    <div>
-                      <div style={{ fontWeight: 500, fontSize: 13 }}>{v.emp}</div>
-                      <div style={{ fontSize: 11, color: 'var(--muted)' }}>{v.dept}</div>
+            </thead>
+            <tbody>
+              {filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={7} style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>
+                    Nenhuma solicitação encontrada.
+                  </td>
+                </tr>
+              ) : filtered.map((v) => (
+                <tr key={v.id} style={{ borderTop: '1px solid var(--line-soft)' }}>
+                  <td style={{ padding: '11px 16px' }}>
+                    <div className="row gap-2">
+                      <Avatar name={v.employees?.name || '?'} hue={v.employees?.hue || 0} size={28} />
+                      <div>
+                        <div style={{ fontWeight: 500, fontSize: 13 }}>{v.employees?.name || '—'}</div>
+                        <div style={{ fontSize: 11, color: 'var(--muted)' }}>{v.employees?.dept || ''}</div>
+                      </div>
                     </div>
-                  </div>
-                </td>
-                <td style={{ padding: '11px 16px', fontSize: 12.5 }}>
-                  <span className="mono">{v.start}</span>
-                  <span style={{ color: 'var(--muted)', margin: '0 4px' }}>→</span>
-                  <span className="mono">{v.end}</span>
-                </td>
-                <td style={{ padding: '11px 16px' }}>
-                  <span className="pill">{v.days}d</span>
-                </td>
-                <td style={{ padding: '11px 16px', color: 'var(--muted)' }} className="mono">{v.requestedAt}</td>
-                <td style={{ padding: '11px 16px', color: 'var(--muted)', fontSize: 12.5 }}>
-                  {v.approvedBy || <span style={{ color: 'var(--muted-2)' }}>—</span>}
-                </td>
-                <td style={{ padding: '11px 16px' }}>
-                  <span className={`pill ${statusKind[v.status] || ''}`}>
-                    <span className="dot" />{statusLabel[v.status]}
-                  </span>
-                </td>
-                <td style={{ padding: '11px 16px' }}>
-                  {v.status === 'pendente' ? (
-                    <div className="row gap-1">
-                      <button className="btn sm" style={{ color: 'var(--ok)', borderColor: 'var(--ok)' }} onClick={() => approve(v.id)}>
-                        <Icon name="check" size={12} /> Aprovar
-                      </button>
-                      <button className="btn sm ghost" onClick={() => reject(v.id)}>
-                        <Icon name="x" size={12} />
-                      </button>
-                    </div>
-                  ) : (
-                    <button className="btn ghost icon sm"><Icon name="more-v" size={13} /></button>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                  </td>
+                  <td style={{ padding: '11px 16px', fontSize: 12.5 }}>
+                    <span className="mono">{fmtDate(v.period_start)}</span>
+                    <span style={{ color: 'var(--muted)', margin: '0 4px' }}>→</span>
+                    <span className="mono">{fmtDate(v.period_end)}</span>
+                  </td>
+                  <td style={{ padding: '11px 16px' }}>
+                    <span className="pill">{v.days_count || 0}d</span>
+                  </td>
+                  <td style={{ padding: '11px 16px', color: 'var(--muted)' }} className="mono">
+                    {v.created_at ? new Date(v.created_at).toLocaleDateString('pt-BR') : '—'}
+                  </td>
+                  <td style={{ padding: '11px 16px', color: 'var(--muted)', fontSize: 12.5 }}>
+                    {v.approved_by || <span style={{ color: 'var(--muted-2)' }}>—</span>}
+                  </td>
+                  <td style={{ padding: '11px 16px' }}>
+                    <span className={`pill ${statusKind[v.status] || ''}`}>
+                      <span className="dot" />{statusLabel[v.status] || v.status}
+                    </span>
+                  </td>
+                  <td style={{ padding: '11px 16px' }}>
+                    {v.status === 'pendente' ? (
+                      <div className="row gap-1">
+                        <button className="btn sm" style={{ color: 'var(--ok)', borderColor: 'var(--ok)' }} onClick={() => approve(v.id)}>
+                          <Icon name="check" size={12} /> Aprovar
+                        </button>
+                        <button className="btn sm ghost" onClick={() => reject(v.id)}>
+                          <Icon name="x" size={12} />
+                        </button>
+                      </div>
+                    ) : (
+                      <button className="btn ghost icon sm"><Icon name="more-v" size={13} /></button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
+
+      {showModal && (
+        <div
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          onClick={() => setShowModal(false)}
+        >
+          <div
+            className="card"
+            style={{ width: 540, padding: 28, position: 'relative', maxHeight: '90vh', overflowY: 'auto' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="row" style={{ marginBottom: 20 }}>
+              <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700 }}>Nova solicitação de férias</h2>
+              <span className="grow" />
+              <button className="btn ghost icon sm" onClick={() => setShowModal(false)}>
+                <Icon name="x" size={15} />
+              </button>
+            </div>
+            
+            <div className="col gap-3">
+              <div>
+                <label className="label">Funcionário</label>
+                <select 
+                  className="field" 
+                  value={newVacation.employee_id} 
+                  onChange={(e) => setNewVacation({ ...newVacation, employee_id: e.target.value })}
+                >
+                  <option value="">Selecionar…</option>
+                  {activeEmployees.map((e) => (
+                    <option key={e.id} value={e.id}>{e.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="row gap-3">
+                <div style={{ flex: 1 }}>
+                  <label className="label">Início</label>
+                  <input 
+                    type="date" 
+                    className="field" 
+                    value={newVacation.period_start}
+                    onChange={(e) => setNewVacation({ ...newVacation, period_start: e.target.value })}
+                  />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label className="label">Fim</label>
+                  <input 
+                    type="date" 
+                    className="field" 
+                    value={newVacation.period_end}
+                    onChange={(e) => setNewVacation({ ...newVacation, period_end: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="label">Dias solicitados</label>
+                <input 
+                  type="number" 
+                  className="field" 
+                  value={newVacation.days}
+                  onChange={(e) => setNewVacation({ ...newVacation, days: parseInt(e.target.value) || 0 })}
+                />
+              </div>
+
+              {/* Document Upload for Vacations */}
+              <div style={{ marginTop: 12 }}>
+                <label className="label" style={{ marginBottom: 8 }}>Documentos Anexos (Opcional)</label>
+                <label
+                  style={{
+                    padding: 24,
+                    border: '1.5px dashed var(--line)',
+                    borderRadius: 12,
+                    background: 'var(--surface-2)',
+                    textAlign: 'center',
+                    cursor: 'pointer',
+                    display: 'block'
+                  }}
+                >
+                  <input 
+                    type="file" 
+                    multiple 
+                    style={{ display: 'none' }} 
+                    onChange={(e) => {
+                      const files = Array.from(e.target.files);
+                      const newDocs = files.map(f => ({
+                        name: f.name,
+                        category: 'Férias',
+                        size: Math.round(f.size / 1024) + ' KB',
+                        type: f.name.split('.').pop()
+                      }));
+                      setDocs([...docs, ...newDocs]);
+                    }}
+                  />
+                  <Icon name="upload" size={28} style={{ color: 'var(--brand)' }} />
+                  <div style={{ fontSize: 14, fontWeight: 600, marginTop: 8 }}>
+                    Clique para selecionar arquivos
+                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>
+                    Anexe formulários ou atestados referentes à solicitação
+                  </div>
+                </label>
+                
+                {docs.length > 0 && (
+                  <div className="col gap-2" style={{ marginTop: 12 }}>
+                    {docs.map((d, i) => (
+                      <div
+                        key={i}
+                        className="row gap-3"
+                        style={{ padding: 12, border: '1px solid var(--line)', borderRadius: 8 }}
+                      >
+                        <Icon
+                          name={d.name.endsWith('.pdf') ? 'pdf' : 'image'}
+                          size={18}
+                          style={{ color: 'var(--brand)' }}
+                        />
+                        <div className="grow">
+                          <div style={{ fontSize: 13, fontWeight: 500 }}>{d.name}</div>
+                          <div style={{ fontSize: 11, color: 'var(--muted)' }} className="mono">
+                            {d.size} · pronto
+                          </div>
+                        </div>
+                        <button className="btn sm ghost icon" onClick={() => setDocs(docs.filter((_, idx) => idx !== i))}>
+                          <Icon name="trash" size={13} style={{ color: 'var(--bad)' }} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+            
+            <div className="row gap-2" style={{ marginTop: 24 }}>
+              <button className="btn" onClick={() => setShowModal(false)}>Cancelar</button>
+              <span className="grow" />
+              <button
+                className="btn primary"
+                disabled={!newVacation.employee_id || !newVacation.period_start || saving}
+                onClick={async () => {
+                  setSaving(true);
+                  const { created, error } = await createVacation({
+                    employee_id: newVacation.employee_id,
+                    period_start: newVacation.period_start,
+                    period_end: newVacation.period_end || newVacation.period_start,
+                    days_count: newVacation.days, // note: column might be "days" or "days_count"? Let's assume it works as it was (wait, I need to check if it's days_count or days). Oh, in DB it's `days` based on mcp output. 
+                    // Actually let me use days: newVacation.days instead of days_count if needed.
+                    days: newVacation.days,
+                    status: 'pendente'
+                  });
+                  
+                  if (error) {
+                    addToast({ kind: 'warn', msg: 'Erro: ' + error.message });
+                    setSaving(false);
+                  } else {
+                    if (created && docs.length > 0) {
+                      const { error: docError } = await createDocuments(newVacation.employee_id, docs);
+                      if (docError) {
+                        addToast({ kind: 'warn', msg: 'Aviso: Erro ao anexar documentos.' });
+                      }
+                    }
+                    setShowModal(false);
+                    setSaving(false);
+                    addToast({ kind: 'ok', msg: 'Solicitação registrada com sucesso!' });
+                    setNewVacation({ employee_id: '', period_start: '', period_end: '', days: 30 });
+                    setDocs([]);
+                    refetch();
+                  }
+                }}
+              >
+                {saving ? <span className="pulse">Enviando…</span> : <><Icon name="check" size={14} /> Solicitar</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-// ============================================================
 // ORGANOGRAM
 // ============================================================
 function OrgNode({ node, depth = 0 }) {

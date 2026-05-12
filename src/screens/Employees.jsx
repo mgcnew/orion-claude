@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import Icon from '../components/Icon.jsx';
 import Avatar from '../components/Avatar.jsx';
-import { useEmployees, useEmployee, useEmployeeCounts, useEmployeeWarnings, useEmployeeVacations } from '../hooks/useEmployees.js';
+import { useEmployees, useEmployee, useEmployeeCounts, useEmployeeWarnings, useEmployeeVacations, useEmployeeDocuments, useEmployeeHistory, useEmployeeTimeEntries, clockIn, clockOut } from '../hooks/useEmployees.js';
 
 // ---- helpers shared across tabs ----
 const th = (w) => ({ textAlign: 'left', padding: '10px 14px', fontWeight: 600, width: w });
@@ -350,10 +350,14 @@ export function EmployeeProfile({ setRoute, employeeId }) {
   const { employee: emp, loading } = useEmployee(employeeId);
   const { warnings } = useEmployeeWarnings(employeeId);
   const { vacations } = useEmployeeVacations(employeeId);
+  const { documents } = useEmployeeDocuments(employeeId);
+  const { history } = useEmployeeHistory(employeeId);
+  const { timeEntries, refetch: refetchTimeEntries } = useEmployeeTimeEntries(employeeId);
+
   const tabs = [
     { id: 'dados', l: 'Dados pessoais', icon: 'user' },
     { id: 'prof', l: 'Profissionais', icon: 'briefcase' },
-    { id: 'docs', l: 'Documentos', icon: 'folder' },
+    { id: 'docs', l: 'Documentos', icon: 'folder', n: documents.length || null },
     { id: 'ponto', l: 'Controle de ponto', icon: 'clock' },
     { id: 'warn', l: 'Advertências', icon: 'alert', n: warnings.length || null },
     { id: 'pay', l: 'Holerites', icon: 'pdf' },
@@ -468,11 +472,15 @@ export function EmployeeProfile({ setRoute, employeeId }) {
                 const ms = Date.now() - new Date(emp.admission + 'T00:00:00').getTime();
                 const yrs = Math.floor(ms / (365.25 * 24 * 3600 * 1000));
                 const mos = Math.floor((ms % (365.25 * 24 * 3600 * 1000)) / (30.44 * 24 * 3600 * 1000));
-                return `${yrs} ano${yrs !== 1 ? 's' : ''} · ${mos} ${mos !== 1 ? 'meses' : 'mês'}`;
+                if (yrs === 0 && mos === 0) return 'Recém-contratado';
+                return `${yrs > 0 ? yrs + ' ano' + (yrs !== 1 ? 's' : '') : ''} ${yrs > 0 && mos > 0 ? '· ' : ''}${mos > 0 ? mos + ' ' + (mos !== 1 ? 'meses' : 'mês') : ''}`;
               })(), i: 'history' },
-            { l: 'Banco de horas', v: '+12h 30m', i: 'clock', k: 'ok' },
-            { l: 'Atestados (12m)', v: '0', i: 'doc' },
-            { l: 'Próximas férias', v: '—', i: 'umbrella' },
+            { l: 'Banco de horas', v: '—', i: 'clock' },
+            { l: 'Atestados', v: documents.filter(d => d.category === 'Atestados').length.toString(), i: 'doc' },
+            { l: 'Próximas férias', v: (() => {
+                const scheduled = vacations.find(v => v.status === 'agendado');
+                return scheduled ? new Date(scheduled.period_start + 'T00:00:00').toLocaleDateString('pt-BR').slice(0, 5) : '—';
+              })(), i: 'umbrella' },
             { l: 'Salário base', v: emp.salary ? emp.salary.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '—', i: 'chart' },
             { l: 'Avaliação 360º', v: '—', i: 'sparkle' },
           ].map((s, i) => (
@@ -549,12 +557,12 @@ export function EmployeeProfile({ setRoute, employeeId }) {
 
       {tab === 'dados' && <DadosPessoais emp={emp} />}
       {tab === 'prof' && <DadosProfissionais emp={emp} />}
-      {tab === 'docs' && <DocsTab employeeId={emp.id} />}
-      {tab === 'ponto' && <PontoTab />}
+      {tab === 'docs' && <DocsTab documents={documents} />}
+      {tab === 'ponto' && <PontoTab employeeId={emp.id} timeEntries={timeEntries} refetch={refetchTimeEntries} />}
       {tab === 'warn' && <WarnTab employeeId={emp.id} />}
-      {tab === 'pay' && <PayTab emp={emp} />}
+      {tab === 'pay' && <PayTab emp={emp} documents={documents} />}
       {tab === 'ferias' && <FeriasTab employeeId={emp.id} />}
-      {tab === 'hist' && <HistoryTab emp={emp} />}
+      {tab === 'hist' && <HistoryTab emp={emp} history={history} />}
     </div>
   );
 }
@@ -667,122 +675,118 @@ const DOC_CATEGORIES = [
   { name: 'Rescisão', icon: 'trash', color: '#DC2626' },
 ];
 
-function DocsTab({ employeeId }) {
+function DocsTab({ documents }) {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
-      {DOC_CATEGORIES.map((c, i) => (
-        <div key={i} className="card" style={{ padding: 16, cursor: 'pointer' }}>
-          <div className="row gap-2">
-            <div
-              style={{
-                width: 36,
-                height: 36,
-                borderRadius: 8,
-                background: c.color + '1f',
-                color: c.color,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexShrink: 0,
-              }}
-            >
-              <Icon name={c.icon} size={17} />
+      {DOC_CATEGORIES.map((c, i) => {
+        const count = documents.filter(d => d.category === c.name).length;
+        return (
+          <div key={i} className="card" style={{ padding: 16, cursor: 'pointer' }}>
+            <div className="row gap-2">
+              <div
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 8,
+                  background: c.color + '1f',
+                  color: c.color,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                }}
+              >
+                <Icon name={c.icon} size={17} />
+              </div>
+              <div className="grow">
+                <div style={{ fontSize: 13.5, fontWeight: 600 }}>{c.name}</div>
+                <div style={{ fontSize: 11.5, color: 'var(--muted)' }}>
+                  {count} arquivo{count !== 1 ? 's' : ''}
+                </div>
+              </div>
+              <button className="btn ghost icon sm">
+                <Icon name="more-v" size={13} />
+              </button>
             </div>
-            <div className="grow">
-              <div style={{ fontSize: 13.5, fontWeight: 600 }}>{c.name}</div>
-              <div style={{ fontSize: 11.5, color: 'var(--muted)' }}>0 arquivos</div>
-            </div>
-            <button className="btn ghost icon sm">
-              <Icon name="more-v" size={13} />
-            </button>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
 
-function PontoTab() {
+
+
+function PontoTab({ employeeId, timeEntries = [], refetch }) {
+  const [loadingAction, setLoadingAction] = useState(false);
+  
+  const today = new Date().toISOString().split('T')[0];
+  const todayEntry = timeEntries.find(e => e.date === today);
+  const clockedIn = todayEntry && todayEntry.time_in && !todayEntry.time_out;
+
+  const handlePonto = async () => {
+    setLoadingAction(true);
+    if (!clockedIn) {
+      await clockIn(employeeId);
+    } else {
+      await clockOut(employeeId, todayEntry.id);
+    }
+    if (refetch) refetch();
+    setLoadingAction(false);
+  };
+
   return (
-    <div className="card" style={{ padding: 22 }}>
-      <div className="row" style={{ marginBottom: 16 }}>
-        <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700 }}>Jornada — Maio / 2026</h3>
+    <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+      <div className="row gap-2" style={{ padding: '16px', borderBottom: '1px solid var(--line)' }}>
+        <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700 }}>Controle de ponto</h3>
         <span className="grow" />
-        <div className="row gap-2">
-          <span className="pill ok">+12h 30m banco de horas</span>
-          <button className="btn sm">
-            <Icon name="download" size={13} /> Espelho
-          </button>
-        </div>
+        <button 
+          className="btn primary" 
+          onClick={handlePonto} 
+          disabled={loadingAction || (todayEntry && todayEntry.time_in && todayEntry.time_out)}
+        >
+          <Icon name="clock" size={14} /> 
+          {loadingAction ? 'Registrando...' : clockedIn ? 'Registrar Saída' : 'Registrar Entrada'}
+        </button>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 6 }}>
-        {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map((d) => (
-          <div
-            key={d}
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+        <thead>
+          <tr
             style={{
-              fontSize: 11,
+              background: 'var(--surface-2)',
               color: 'var(--muted)',
-              textAlign: 'center',
-              padding: '6px 0',
-              fontWeight: 600,
+              fontSize: 11,
+              textTransform: 'uppercase',
+              letterSpacing: 0.6,
             }}
           >
-            {d}
-          </div>
-        ))}
-        {Array.from({ length: 35 }).map((_, i) => {
-          const day = i - 4;
-          const valid = day >= 1 && day <= 31;
-          const kind = !valid
-            ? 'x'
-            : day % 7 === 6 || day % 7 === 0
-            ? 'weekend'
-            : day === 9
-            ? 'today'
-            : day < 9
-            ? 'done'
-            : 'future';
-          const bg = {
-            done: 'var(--ok-bg)',
-            weekend: 'var(--surface-2)',
-            today: 'var(--brand)',
-            future: 'var(--surface-2)',
-            x: 'transparent',
-          }[kind];
-          const color = {
-            done: 'var(--ok)',
-            weekend: 'var(--muted-2)',
-            today: 'var(--brand-ink)',
-            future: 'var(--muted-2)',
-            x: 'transparent',
-          }[kind];
-          return (
-            <div
-              key={i}
-              style={{
-                aspectRatio: '1.4',
-                borderRadius: 6,
-                background: bg,
-                color,
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: 12,
-                fontWeight: kind === 'today' ? 700 : 500,
-                border: kind === 'today' ? 'none' : kind === 'x' ? 'none' : '1px solid var(--line)',
-              }}
-            >
-              {valid ? day : ''}
-              {kind === 'done' && (
-                <span className="mono" style={{ fontSize: 9, opacity: 0.8 }}>
-                  8h12
-                </span>
-              )}
-            </div>
-          );
-        })}
-      </div>
+            <th style={th()}>Data</th>
+            <th style={th()}>Entrada</th>
+            <th style={th()}>Saída</th>
+            <th style={th()}>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {timeEntries.length === 0 ? (
+            <tr>
+              <td colSpan={4} style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>
+                Nenhum registro de ponto encontrado.
+              </td>
+            </tr>
+          ) : (
+            timeEntries.map((entry) => (
+              <tr key={entry.id} style={{ borderTop: '1px solid var(--line-soft)' }}>
+                <td style={td()} className="mono">{new Date(entry.date + 'T00:00:00').toLocaleDateString('pt-BR')}</td>
+                <td style={td()} className="mono">{entry.time_in ? entry.time_in.slice(0, 5) : '—'}</td>
+                <td style={td()} className="mono">{entry.time_out ? entry.time_out.slice(0, 5) : '—'}</td>
+                <td style={td()}>
+                  <StatusPill status={entry.status} />
+                </td>
+              </tr>
+            ))
+          )}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -829,11 +833,8 @@ function WarnTab({ employeeId }) {
   );
 }
 
-function PayTab({ emp }) {
-  const gross = emp?.salary || 0;
-  const disc = gross * 0.2359;
-  const net = gross - disc;
-  const fmt = (v) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+function PayTab({ emp, documents = [] }) {
+  const holerites = documents.filter(d => d.category === 'Holerites');
   return (
     <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
@@ -847,28 +848,30 @@ function PayTab({ emp }) {
               letterSpacing: 0.6,
             }}
           >
-            <th style={th()}>Competência</th>
-            <th style={th()}>Bruto</th>
-            <th style={th()}>Descontos</th>
-            <th style={th()}>Líquido</th>
-            <th style={th()}>Status</th>
+            <th style={th()}>Competência / Arquivo</th>
+            <th style={th()}>Salário Base</th>
+            <th style={th()}>Data de Upload</th>
             <th style={th(80)}></th>
           </tr>
         </thead>
         <tbody>
-          {['Abril 2026', 'Março 2026', 'Fevereiro 2026', 'Janeiro 2026', '13º — 2025', 'Dezembro 2025'].map(
-            (m, i) => (
-              <tr key={i} style={{ borderTop: '1px solid var(--line-soft)' }}>
-                <td style={td()}><strong>{m}</strong></td>
-                <td style={td()} className="mono">{gross ? fmt(gross) : '—'}</td>
-                <td style={td()} className="mono">{gross ? fmt(disc) : '—'}</td>
-                <td style={td()} className="mono"><strong>{gross ? fmt(net) : '—'}</strong></td>
-                <td style={td()}><span className="pill ok">Disponível</span></td>
+          {holerites.length === 0 ? (
+            <tr>
+              <td colSpan={4} style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>
+                Nenhum holerite arquivado.
+              </td>
+            </tr>
+          ) : (
+            holerites.map((doc) => (
+              <tr key={doc.id} style={{ borderTop: '1px solid var(--line-soft)' }}>
+                <td style={td()}><strong>{doc.name}</strong></td>
+                <td style={td()} className="mono">{emp.salary ? emp.salary.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '—'}</td>
+                <td style={td()} className="mono">{new Date(doc.created_at).toLocaleDateString('pt-BR')}</td>
                 <td style={td()}>
-                  <button className="btn sm"><Icon name="download" size={13} /> PDF</button>
+                  <button className="btn sm"><Icon name="download" size={13} /> {doc.type.toUpperCase()}</button>
                 </td>
               </tr>
-            )
+            ))
           )}
         </tbody>
       </table>
@@ -918,13 +921,25 @@ function FeriasTab({ employeeId }) {
   );
 }
 
-function HistoryTab({ emp }) {
+function HistoryTab({ emp, history = [] }) {
   const admYear = emp?.admission ? emp.admission.slice(0, 4) : null;
-  const events = admYear ? [
-    { y: String(Number(admYear) + 2), t: 'Promoção (Pleno)', d: 'Progressão de carreira · Aumento salarial' },
-    { y: String(Number(admYear) + 1), t: 'Conclusão de treinamento obrigatório', d: '40h · Certificado emitido' },
-    { y: admYear, t: `Admissão — ${emp.company}`, d: `Cargo inicial: ${emp.role}`, k: 'ok' },
-  ] : [];
+  const events = [
+    ...history.map(h => ({
+      y: h.date.slice(0, 4),
+      fullDate: h.date,
+      t: h.title,
+      d: h.description,
+      k: h.type === 'promotion' ? 'brand' : h.type === 'salary_change' ? 'ok' : 'info'
+    })),
+    ...(admYear ? [{ 
+      y: admYear, 
+      fullDate: emp.admission,
+      t: `Admissão — ${emp.company}`, 
+      d: `Cargo inicial: ${emp.role}`, 
+      k: 'ok' 
+    }] : [])
+  ].sort((a, b) => new Date(b.fullDate) - new Date(a.fullDate));
+  
   return (
     <div className="card" style={{ padding: 22 }}>
       <h3 style={{ margin: '0 0 16px', fontSize: 14, fontWeight: 700 }}>

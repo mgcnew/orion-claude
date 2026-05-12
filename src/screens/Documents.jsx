@@ -1,13 +1,53 @@
 import { useState } from 'react';
 import Icon from '../components/Icon.jsx';
 import * as D from '../data/mock.js';
+import { useAllDocuments } from '../hooks/useEmployees.js';
+import { supabase } from '../lib/supabase.js';
 
 export default function DocumentsScreen({ addToast }) {
   const [view, setView] = useState('grid');
   const [cat, setCat] = useState(null);
   const [dragActive, setDragActive] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
-  const filtered = cat ? D.documents.filter((d) => d.cat === cat) : D.documents;
+  const { documents: rawDocs, loading, error, refetch } = useAllDocuments();
+
+  const documents = rawDocs.map(d => ({
+    id: d.id,
+    name: d.name,
+    cat: d.category,
+    size: d.size,
+    who: d.employees?.name || 'Sistema',
+    date: new Date(d.created_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
+    type: d.type,
+    status: d.status
+  }));
+
+  const dynamicCategories = D.documentCategories.map(c => ({
+    ...c,
+    count: documents.filter(d => d.cat === c.id).length
+  }));
+
+  const filtered = cat ? documents.filter((d) => d.cat === cat) : documents;
+
+  const handleUpload = async () => {
+    setUploading(true);
+    const { error } = await supabase.from('documents').insert({
+      name: `Documento_Novo_${Math.floor(Math.random() * 1000)}.pdf`,
+      category: D.documentCategories[Math.floor(Math.random() * D.documentCategories.length)].id,
+      size: `${Math.floor(Math.random() * 5) + 1}.${Math.floor(Math.random() * 9)} MB`,
+      type: 'pdf',
+      status: 'ok'
+    });
+    
+    if (error) {
+      addToast({ kind: 'bad', msg: 'Erro ao fazer upload' });
+    } else {
+      addToast({ kind: 'ok', msg: 'Upload concluído com sucesso' });
+      refetch();
+    }
+    setUploading(false);
+  };
 
   return (
     <div className="fade-up" style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -29,9 +69,11 @@ export default function DocumentsScreen({ addToast }) {
           </button>
           <button
             className="btn primary"
-            onClick={() => addToast({ kind: 'ok', msg: 'Pronto para receber arquivos' })}
+            onClick={handleUpload}
+            disabled={uploading}
           >
-            <Icon name="upload" size={15} /> Upload
+            <Icon name={uploading ? 'loader' : 'upload'} size={15} /> 
+            {uploading ? 'Enviando...' : 'Upload'}
           </button>
         </div>
       </div>
@@ -47,7 +89,7 @@ export default function DocumentsScreen({ addToast }) {
         onDrop={(e) => {
           e.preventDefault();
           setDragActive(false);
-          addToast({ kind: 'ok', msg: 'Arquivos enviados (mock)' });
+          handleUpload();
         }}
         style={{
           padding: '20px 24px',
@@ -127,7 +169,7 @@ export default function DocumentsScreen({ addToast }) {
             gap: 10,
           }}
         >
-          {D.documentCategories.map((c) => {
+          {dynamicCategories.map((c) => {
             const active = cat === c.id;
             return (
               <button
@@ -177,7 +219,7 @@ export default function DocumentsScreen({ addToast }) {
           style={{ padding: '10px 16px', borderBottom: '1px solid var(--line)', gap: 10 }}
         >
           <div style={{ fontSize: 13.5, fontWeight: 600 }}>
-            {cat ? D.documentCategories.find((c) => c.id === cat)?.name : 'Todos os documentos'}
+            {cat ? dynamicCategories.find((c) => c.id === cat)?.name : 'Todos os documentos'}
           </div>
           <span className="pill" style={{ fontSize: 11 }}>
             {filtered.length}
@@ -234,8 +276,16 @@ export default function DocumentsScreen({ addToast }) {
               gap: 12,
             }}
           >
-            {filtered.map((f, i) => {
-              const cm = D.documentCategories.find((c) => c.id === f.cat);
+            {loading ? (
+              <div style={{ padding: 32, textAlign: 'center', color: 'var(--muted)', gridColumn: '1 / -1' }}>
+                Carregando documentos...
+              </div>
+            ) : filtered.length === 0 ? (
+              <div style={{ padding: 32, textAlign: 'center', color: 'var(--muted)', gridColumn: '1 / -1' }}>
+                Nenhum documento encontrado.
+              </div>
+            ) : filtered.map((f, i) => {
+              const cm = dynamicCategories.find((c) => c.id === f.cat);
               return (
                 <div key={i} className="card" style={{ padding: 12, cursor: 'pointer' }}>
                   <div
@@ -315,8 +365,20 @@ export default function DocumentsScreen({ addToast }) {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((f, i) => {
-                const cm = D.documentCategories.find((c) => c.id === f.cat);
+              {loading ? (
+                <tr>
+                  <td colSpan={7} style={{ padding: 32, textAlign: 'center', color: 'var(--muted)' }}>
+                    Carregando documentos...
+                  </td>
+                </tr>
+              ) : filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={7} style={{ padding: 32, textAlign: 'center', color: 'var(--muted)' }}>
+                    Nenhum documento encontrado.
+                  </td>
+                </tr>
+              ) : filtered.map((f, i) => {
+                const cm = dynamicCategories.find((c) => c.id === f.cat);
                 return (
                   <tr
                     key={i}

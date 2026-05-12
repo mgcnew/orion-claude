@@ -1,13 +1,14 @@
+import { useState, useEffect } from 'react';
 import Icon from '../components/Icon.jsx';
 import Avatar from '../components/Avatar.jsx';
-import * as D from '../data/mock.js';
+import { supabase } from '../lib/supabase.js';
 
 function Sparkline({ data, color, height = 40, width = 120, fill = true }) {
-  const max = Math.max(...data),
-    min = Math.min(...data);
+  const max = Math.max(...data, 1),
+    min = Math.min(...data, 0);
   const range = max - min || 1;
   const points = data.map((v, i) => {
-    const x = (i / (data.length - 1)) * width;
+    const x = (i / (Math.max(data.length - 1, 1))) * width;
     const y = height - ((v - min) / range) * (height - 4) - 2;
     return [x, y];
   });
@@ -20,8 +21,8 @@ function Sparkline({ data, color, height = 40, width = 120, fill = true }) {
       {fill && <path d={area} fill={color} opacity=".12" />}
       <path d={path} fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
       <circle
-        cx={points[points.length - 1][0]}
-        cy={points[points.length - 1][1]}
+        cx={points[points.length - 1]?.[0] || 0}
+        cy={points[points.length - 1]?.[1] || 0}
         r="2.8"
         fill={color}
       />
@@ -80,7 +81,7 @@ function DonutChart({ segments, total, size = 140 }) {
     <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
       <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--line)" strokeWidth={stroke} />
       {segments.map((s, i) => {
-        const len = (s.v / total) * c;
+        const len = total > 0 ? (s.v / total) * c : 0;
         const off = -acc;
         acc += len;
         return (
@@ -115,9 +116,148 @@ function formatDatePtBR(date) {
   return `${days[date.getDay()]}, ${date.getDate()} de ${months[date.getMonth()]} de ${date.getFullYear()}`;
 }
 
+export function useDashboardData() {
+  const [data, setData] = useState({
+    counts: { ativo: 0, férias: 0, afastado: 0, desligado: 0 },
+    totalEmployees: 0,
+    pendingDocsCount: 0,
+    warningsCount: 0,
+    activities: [],
+    admissionsSeries: new Array(12).fill(0),
+    absencesSeries: new Array(12).fill(0),
+    upcoming: [],
+    alerts: []
+  });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchData() {
+      setLoading(true);
+
+      const today = new Date();
+      const currentMonth = today.getMonth();
+      const currentYear = today.getFullYear();
+
+      const [
+        { data: employees },
+        { data: documents },
+        { data: warnings },
+        { data: vacations },
+        { data: activities }
+      ] = await Promise.all([
+        supabase.from('employees').select('*'),
+        supabase.from('documents').select('*'),
+        supabase.from('employee_warnings').select('*, employees(name)'),
+        supabase.from('employee_vacations').select('*, employees(name)'),
+        supabase.from('activities').select('*').order('created_at', { ascending: false }).limit(10)
+      ]);
+
+      // Calculate employee counts
+      const statusCounts = { ativo: 0, férias: 0, afastado: 0, desligado: 0 };
+      employees?.forEach(e => {
+        if (statusCounts[e.status] !== undefined) {
+          statusCounts[e.status]++;
+        }
+      });
+      const totalEmployees = employees?.length || 0;
+
+      // Pending documents
+      const pendingDocs = documents?.filter(d => d.status === 'pendente' || d.status === 'warn') || [];
+      const pendingDocsCount = pendingDocs.length;
+
+      // Warnings this month
+      const warningsThisMonth = warnings?.filter(w => {
+        const d = new Date(w.date);
+        return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+      }) || [];
+      const warningsCount = warningsThisMonth.length;
+
+      // Admissions/Absences Series (last 12 months)
+      const admissionsSeries = new Array(12).fill(0);
+      const absencesSeries = new Array(12).fill(0);
+      for (let i = 0; i < 12; i++) {
+        const monthDate = new Date(currentYear, currentMonth - 11 + i, 1);
+        const m = monthDate.getMonth();
+        const y = monthDate.getFullYear();
+        
+        employees?.forEach(e => {
+          if (e.admission) {
+             const d = new Date(e.admission);
+             if (d.getMonth() === m && d.getFullYear() === y) {
+               admissionsSeries[i]++;
+             }
+          }
+          if (e.status === 'desligado' && e.updated_at) {
+             const d = new Date(e.updated_at);
+             if (d.getMonth() === m && d.getFullYear() === y) {
+               absencesSeries[i]++;
+             }
+          }
+        });
+      }
+
+      // Birthdays and Vacations (Upcoming 7 days)
+      const upcomingBirthdays = employees?.filter(e => {
+        if (!e.birth_date) return false;
+        const b = new Date(e.birth_date);
+        const bThisYear = new Date(currentYear, b.getMonth(), b.getDate());
+        // Handle if birthday already passed this year (check for next year)
+        if (bThisYear < today) bThisYear.setFullYear(currentYear + 1);
+        const diff = Math.ceil((bThisYear - today) / (1000 * 60 * 60 * 24));
+        return diff >= 0 && diff <= 30; // 30 days for better visibility
+      }).map(e => ({ who: e.name, date: `${new Date(e.birth_date).getDate()} ${['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'][new Date(e.birth_date).getMonth()]}`, kind: 'gift', sub: `${e.dept}` })) || [];
+
+      const upcomingVacations = vacations?.filter(v => {
+        if (!v.period_start) return false;
+        const start = new Date(v.period_start);
+        const diff = Math.ceil((start - today) / (1000 * 60 * 60 * 24));
+        return diff >= 0 && diff <= 30; // 30 days for better visibility
+      }).map(v => ({ who: v.employees?.name, date: `${new Date(v.period_start).getDate()} ${['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'][new Date(v.period_start).getMonth()]}`, kind: 'umbrella', sub: 'Férias programadas' })) || [];
+
+      // Alerts
+      const alerts = [];
+      if (pendingDocsCount > 0) {
+        alerts.push({ kind: 'warn', icon: 'doc', title: `${pendingDocsCount} documentos sem assinatura/pendentes`, sub: 'Aguardando ação' });
+      }
+      if (warningsCount > 0) {
+        alerts.push({ kind: 'bad', icon: 'alert', title: `${warningsCount} advertências recentes`, sub: 'Atenção necessária' });
+      }
+      const vacationsPending = vacations?.filter(v => v.status === 'pendente') || [];
+      if (vacationsPending.length > 0) {
+        alerts.push({ kind: 'info', icon: 'umbrella', title: `${vacationsPending.length} solicitações de férias`, sub: 'Aprovação pendente' });
+      }
+
+      setData({
+        counts: statusCounts,
+        totalEmployees,
+        pendingDocsCount,
+        warningsCount,
+        activities: activities || [],
+        admissionsSeries,
+        absencesSeries,
+        upcoming: [...upcomingBirthdays, ...upcomingVacations].slice(0, 5),
+        alerts
+      });
+      setLoading(false);
+    }
+    fetchData();
+  }, []);
+
+  return { data, loading };
+}
+
 export default function Dashboard({ setRoute, addToast }) {
+  const { data, loading } = useDashboardData();
   const today = new Date();
-  const months = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+  
+  // Last 12 months array for chart labels
+  const currentMonth = today.getMonth();
+  const allMonths = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+  const months = [];
+  for (let i = 0; i < 12; i++) {
+    months.push(allMonths[(currentMonth - 11 + i + 12) % 12]);
+  }
+
   const activityIcon = {
     upload: 'upload',
     system: 'sparkle',
@@ -126,7 +266,21 @@ export default function Dashboard({ setRoute, addToast }) {
     alert: 'alert',
     doc: 'doc',
     check: 'check',
+    other: 'sparkle'
   };
+
+  if (loading) {
+    return (
+      <div style={{ padding: 40, display: 'flex', justifyContent: 'center' }}>
+        <div className="spinner"></div>
+      </div>
+    );
+  }
+
+  const actPercent = data.totalEmployees > 0 ? ((data.counts.ativo / data.totalEmployees) * 100).toFixed(1) : '0';
+  const ferPercent = data.totalEmployees > 0 ? ((data.counts.férias / data.totalEmployees) * 100).toFixed(1) : '0';
+  const afaPercent = data.totalEmployees > 0 ? ((data.counts.afastado / data.totalEmployees) * 100).toFixed(1) : '0';
+  const desPercent = data.totalEmployees > 0 ? ((data.counts.desligado / data.totalEmployees) * 100).toFixed(1) : '0';
 
   return (
     <div className="fade-up" style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -137,17 +291,14 @@ export default function Dashboard({ setRoute, addToast }) {
             {formatDatePtBR(today)}
           </div>
           <h1 style={{ fontSize: 24, fontWeight: 700, letterSpacing: -0.5, margin: '0 0 4px' }}>
-            Bom dia, Mariana 👋
+            Bom dia 👋
           </h1>
           <p style={{ fontSize: 13.5, color: 'var(--muted)', margin: 0 }}>
-            Você tem <strong style={{ color: 'var(--ink-soft)' }}>4 itens</strong> aguardando ação e{' '}
-            <strong style={{ color: 'var(--ink-soft)' }}>12 documentos</strong> para revisar hoje.
+            Você tem <strong style={{ color: 'var(--ink-soft)' }}>{data.alerts.length} alertas</strong> aguardando ação e{' '}
+            <strong style={{ color: 'var(--ink-soft)' }}>{data.pendingDocsCount} documentos</strong> para revisar hoje.
           </p>
         </div>
         <div className="row gap-2" style={{ flexWrap: 'wrap' }}>
-          <button className="btn">
-            <Icon name="download" size={15} /> Exportar
-          </button>
           <button className="btn" onClick={() => setRoute('reports')}>
             <Icon name="chart" size={15} /> Relatórios
           </button>
@@ -162,37 +313,37 @@ export default function Dashboard({ setRoute, addToast }) {
         <StatCard
           icon="users"
           label="Funcionários ativos"
-          value="248"
-          delta="+12 este mês"
+          value={data.counts.ativo}
+          delta={``}
           deltaKind="ok"
-          series={[230, 232, 235, 238, 240, 242, 244, 245, 246, 247, 248, 248]}
+          series={data.admissionsSeries.length > 0 ? data.admissionsSeries : [0,0,0,0,0,0]}
         />
         <StatCard
           icon="doc"
           label="Documentos pendentes"
-          value="34"
-          delta="+8 hoje"
+          value={data.pendingDocsCount}
+          delta={``}
           deltaKind="warn"
           accent="var(--warn)"
-          series={[20, 22, 21, 25, 28, 26, 30, 29, 32, 31, 34, 34]}
+          series={[0,0,0,data.pendingDocsCount, data.pendingDocsCount+1, data.pendingDocsCount]}
         />
         <StatCard
           icon="alert"
           label="Advertências (mês)"
-          value="07"
-          delta="-2 vs abril"
+          value={data.warningsCount}
+          delta={``}
           deltaKind="ok"
           accent="var(--bad)"
-          series={[12, 11, 10, 9, 9, 8, 8, 7, 7, 7, 7, 7]}
+          series={[0,0,0,0,0,data.warningsCount]}
         />
         <StatCard
           icon="clock"
           label="Horas extras (mês)"
-          value="412h"
-          delta="+18%"
+          value={"--"}
+          delta={``}
           deltaKind="info"
           accent="var(--info)"
-          series={[280, 290, 310, 320, 340, 360, 370, 380, 395, 400, 408, 412]}
+          series={[0,0,0,0,0,0]}
         />
       </div>
 
@@ -206,7 +357,7 @@ export default function Dashboard({ setRoute, addToast }) {
                 <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>
                   Admissões e desligamentos
                 </h3>
-                <span className="pill brand">2026</span>
+                <span className="pill brand">{today.getFullYear()}</span>
               </div>
               <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
                 Comparativo dos últimos 12 meses
@@ -233,9 +384,9 @@ export default function Dashboard({ setRoute, addToast }) {
             </div>
           </div>
           <div style={{ height: 220, display: 'flex', alignItems: 'flex-end', gap: 10, padding: '0 4px' }}>
-            {D.admissionsSeries.map((v, i) => {
-              const out = D.absencesSeries[i];
-              const max = Math.max(...D.admissionsSeries, ...D.absencesSeries);
+            {data.admissionsSeries.map((v, i) => {
+              const out = data.absencesSeries[i];
+              const max = Math.max(...data.admissionsSeries, ...data.absencesSeries, 1);
               return (
                 <div
                   key={i}
@@ -294,19 +445,19 @@ export default function Dashboard({ setRoute, addToast }) {
           <div className="row gap-4" style={{ alignItems: 'center' }}>
             <DonutChart
               segments={[
-                { v: 218, color: 'var(--brand)', label: 'Ativos' },
-                { v: 14, color: 'var(--info)', label: 'Férias' },
-                { v: 8, color: 'var(--warn)', label: 'Afastados' },
-                { v: 8, color: 'var(--muted-2)', label: 'Desligados (90d)' },
+                { v: data.counts.ativo, color: 'var(--brand)', label: 'Ativos' },
+                { v: data.counts.férias, color: 'var(--info)', label: 'Férias' },
+                { v: data.counts.afastado, color: 'var(--warn)', label: 'Afastados' },
+                { v: data.counts.desligado, color: 'var(--muted-2)', label: 'Desligados' },
               ]}
-              total={248}
+              total={data.totalEmployees}
             />
             <div className="col gap-2" style={{ flex: 1 }}>
               {[
-                { c: 'var(--brand)', l: 'Ativos', v: 218, p: '87,9%' },
-                { c: 'var(--info)', l: 'Férias', v: 14, p: '5,6%' },
-                { c: 'var(--warn)', l: 'Afastados', v: 8, p: '3,2%' },
-                { c: 'var(--muted-2)', l: 'Desligados', v: 8, p: '3,2%' },
+                { c: 'var(--brand)', l: 'Ativos', v: data.counts.ativo, p: `${actPercent}%` },
+                { c: 'var(--info)', l: 'Férias', v: data.counts.férias, p: `${ferPercent}%` },
+                { c: 'var(--warn)', l: 'Afastados', v: data.counts.afastado, p: `${afaPercent}%` },
+                { c: 'var(--muted-2)', l: 'Desligados', v: data.counts.desligado, p: `${desPercent}%` },
               ].map((s, i) => (
                 <div key={i} className="row gap-2" style={{ fontSize: 12.5 }}>
                   <span style={{ width: 8, height: 8, borderRadius: 2, background: s.c }} />
@@ -337,34 +488,39 @@ export default function Dashboard({ setRoute, addToast }) {
             <button className="btn ghost sm">Ver tudo</button>
           </div>
           <div className="col gap-3">
-            {D.activities.slice(0, 6).map((a, i) => (
-              <div key={i} className="row gap-3" style={{ alignItems: 'flex-start' }}>
-                <div
-                  style={{
-                    width: 30,
-                    height: 30,
-                    borderRadius: 8,
-                    background: 'var(--surface-2)',
-                    border: '1px solid var(--line)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: 'var(--muted)',
-                    flexShrink: 0,
-                  }}
-                >
-                  <Icon name={activityIcon[a.kind]} size={14} />
-                </div>
-                <div className="grow" style={{ fontSize: 12.5, lineHeight: 1.5 }}>
-                  <strong style={{ fontWeight: 600 }}>{a.who}</strong>{' '}
-                  <span style={{ color: 'var(--muted)' }}>{a.what}</span>{' '}
-                  <strong style={{ fontWeight: 600 }}>{a.where}</strong>
-                  <div style={{ fontSize: 11, color: 'var(--muted-2)', marginTop: 2 }}>
-                    {a.when}
+            {data.activities.length === 0 && <div style={{ fontSize: 12.5, color: 'var(--muted)' }}>Nenhuma atividade recente.</div>}
+            {data.activities.slice(0, 6).map((a, i) => {
+               const date = new Date(a.created_at);
+               const timeStr = date.toLocaleDateString() === today.toLocaleDateString() ? date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : date.toLocaleDateString();
+               return (
+                <div key={i} className="row gap-3" style={{ alignItems: 'flex-start' }}>
+                  <div
+                    style={{
+                      width: 30,
+                      height: 30,
+                      borderRadius: 8,
+                      background: 'var(--surface-2)',
+                      border: '1px solid var(--line)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: 'var(--muted)',
+                      flexShrink: 0,
+                    }}
+                  >
+                    <Icon name={activityIcon[a.kind] || 'sparkle'} size={14} />
+                  </div>
+                  <div className="grow" style={{ fontSize: 12.5, lineHeight: 1.5 }}>
+                    <strong style={{ fontWeight: 600 }}>{a.who}</strong>{' '}
+                    <span style={{ color: 'var(--muted)' }}>{a.what}</span>{' '}
+                    {a.where_ref && <strong style={{ fontWeight: 600 }}>{a.where_ref}</strong>}
+                    <div style={{ fontSize: 11, color: 'var(--muted-2)', marginTop: 2 }}>
+                      {timeStr}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+               );
+            })}
           </div>
         </div>
 
@@ -383,14 +539,11 @@ export default function Dashboard({ setRoute, addToast }) {
               marginBottom: 8,
             }}
           >
-            Próximos 7 dias
+            Próximos 30 dias
           </div>
           <div className="col gap-2" style={{ marginBottom: 16 }}>
-            {[
-              { who: 'Beatriz Almeida', date: '12 mai', kind: 'gift', sub: '33 anos · Operações' },
-              { who: 'Henrique Tavares', date: '14 mai', kind: 'gift', sub: '29 anos · Tecnologia' },
-              { who: 'Camila Rocha', date: '15–28 mai', kind: 'umbrella', sub: 'Férias programadas' },
-            ].map((it, i) => (
+            {data.upcoming.length === 0 && <div style={{ fontSize: 12.5, color: 'var(--muted)' }}>Sem registros próximos.</div>}
+            {data.upcoming.map((it, i) => (
               <div
                 key={i}
                 className="row gap-3"
@@ -420,15 +573,11 @@ export default function Dashboard({ setRoute, addToast }) {
           <div className="row" style={{ marginBottom: 16 }}>
             <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>Alertas importantes</h3>
             <span className="grow" />
-            <span className="pill bad">4</span>
+            <span className="pill bad">{data.alerts.length}</span>
           </div>
           <div className="col gap-2">
-            {[
-              { kind: 'bad', icon: 'alert', title: '4 contratos vencem em 7 dias', sub: 'Henrique Tavares + 3 outros' },
-              { kind: 'warn', icon: 'clock', title: 'Banco de horas excedido', sub: 'Diego Pacheco · 38h acumuladas' },
-              { kind: 'info', icon: 'umbrella', title: 'Período de férias bloqueado', sub: 'Beatriz A. — aprovação pendente' },
-              { kind: 'warn', icon: 'doc', title: '12 documentos sem assinatura', sub: 'Aguardando RH' },
-            ].map((a, i) => (
+            {data.alerts.length === 0 && <div style={{ fontSize: 12.5, color: 'var(--muted)' }}>Tudo tranquilo por aqui.</div>}
+            {data.alerts.map((a, i) => (
               <div
                 key={i}
                 className="row gap-3"
@@ -489,7 +638,9 @@ export default function Dashboard({ setRoute, addToast }) {
               i: 'clock',
               l: 'Registrar ponto',
               r: 'time',
-              action: () => addToast({ kind: 'ok', msg: 'Ponto registrado às 09:42' }),
+              action: () => {
+                setRoute('time');
+              },
             },
             { i: 'umbrella', l: 'Aprovar férias', r: 'rh-vacation' },
             { i: 'chart', l: 'Gerar relatório', r: 'reports' },
@@ -509,3 +660,4 @@ export default function Dashboard({ setRoute, addToast }) {
     </div>
   );
 }
+
