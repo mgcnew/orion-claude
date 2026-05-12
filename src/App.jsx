@@ -14,8 +14,8 @@ import Dashboard from './screens/Dashboard.jsx';
 import { EmployeesList, EmployeeProfile } from './screens/Employees.jsx';
 import DocumentsScreen from './screens/Documents.jsx';
 import JusticeScreen from './screens/Justice.jsx';
+import { TimeScreen } from './screens/Time.jsx';
 import {
-  TimeScreen,
   PermissionsScreen, // eslint-disable-line no-unused-vars
   AuditScreen,
   ReportsScreen,

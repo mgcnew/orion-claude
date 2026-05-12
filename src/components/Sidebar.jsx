@@ -27,13 +27,6 @@ const NAV = [
     id: 'time',
     label: 'Controle de ponto',
     icon: 'clock',
-    sub: [
-      { id: 'time', label: 'Jornada' },
-      { id: 'time-overtime', label: 'Horas extras' },
-      { id: 'time-bank', label: 'Banco de horas' },
-      { id: 'time-shift', label: 'Escalas' },
-      { id: 'time-absence', label: 'Faltas' },
-    ],
   },
   {
     id: 'rh',
