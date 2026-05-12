@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import Icon from '../components/Icon.jsx';
 import { useAllDocuments, useEmployees } from '../hooks/useEmployees.js';
 import { supabase } from '../lib/supabase.js';
@@ -332,15 +333,89 @@ function AddDocModal({ onClose, onSaved, employees = [] }) {
   );
 }
 
+// ============================================================
+// PAINEL DE FILTROS
+// ============================================================
+function DocFilterPanel({ filters, onChange, onClear, anchorRect, onClose, docCounts }) {
+  const ref = useRef();
+
+  useEffect(() => {
+    const h = (e) => { if (ref.current && !ref.current.contains(e.target)) onClose(); };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, [onClose]);
+
+  if (!anchorRect) return null;
+  const top  = anchorRect.bottom + 6;
+  const left = Math.max(8, anchorRect.right - 320);
+
+  return createPortal(
+    <div ref={ref} style={{
+      position: 'fixed', top, left, width: 320,
+      background: 'var(--surface)', border: '1px solid var(--line)',
+      borderRadius: 10, boxShadow: '0 8px 32px rgba(0,0,0,.15)',
+      zIndex: 500, padding: 16, display: 'flex', flexDirection: 'column', gap: 16,
+    }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <span style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.6, color: 'var(--muted)' }}>Filtros</span>
+        <button className="btn ghost sm" style={{ fontSize: 11, padding: '2px 8px' }} onClick={onClear}>Limpar</button>
+      </div>
+
+      {/* Categorias */}
+      <div>
+        <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--muted)', marginBottom: 8 }}>Categoria</div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {CATEGORIES.map(c => (
+            <button
+              key={c.id}
+              onClick={() => onChange('cat', filters.cat === c.id ? null : c.id)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 5,
+                border: `1px solid ${filters.cat === c.id ? c.color : 'var(--line)'}`,
+                background: filters.cat === c.id ? c.color + '18' : 'transparent',
+                color: filters.cat === c.id ? c.color : 'var(--ink)',
+                borderRadius: 20, padding: '4px 10px', fontSize: 11.5, fontWeight: 500, cursor: 'pointer',
+              }}
+            >
+              <Icon name={c.icon} size={11} />
+              {c.name}
+              {docCounts[c.id] > 0 && <span style={{ color: 'var(--muted)', fontSize: 10 }}>{docCounts[c.id]}</span>}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Data */}
+      <div>
+        <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--muted)', marginBottom: 8 }}>Data do documento</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div>
+            <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>De</label>
+            <DateInput value={filters.dateFrom} onChange={e => onChange('dateFrom', e.target.value)} />
+          </div>
+          <div>
+            <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Até</label>
+            <DateInput value={filters.dateTo} onChange={e => onChange('dateTo', e.target.value)} />
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 export default function DocumentsScreen({ addToast }) {
-  const [tab, setTab]           = useState('all');
-  const [cat, setCat]           = useState(null);
-  const [view, setView]         = useState('list');
-  const [search, setSearch]     = useState('');
+  const [filters, setFilters] = useState({ cat: null, dateFrom: '', dateTo: '' });
+  const [view, setView]       = useState('list');
+  const [search, setSearch]   = useState('');
   const [dragOver, setDragOver] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [selected, setSelected] = useState(new Set());
   const [showAddModal, setShowAddModal] = useState(false);
+  const [filterOpen, setFilterOpen]     = useState(false);
+  const [filterRect, setFilterRect]     = useState(null);
+  const filterBtnRef = useRef();
 
   const { documents: raw, loading, error, refetch } = useAllDocuments();
   const { employees } = useEmployees();
@@ -354,27 +429,38 @@ export default function DocumentsScreen({ addToast }) {
     date: d.doc_date
       ? new Date(d.doc_date + 'T00:00:00').toLocaleDateString('pt-BR')
       : new Date(d.created_at).toLocaleDateString('pt-BR'),
+    isoDate: d.doc_date || d.created_at?.slice(0, 10) || '',
     type: d.type || 'pdf',
     status: d.status || 'ok',
     file_url: d.file_url,
   }));
 
-  const catCounts = CATEGORIES.reduce((acc, c) => {
+  const docCounts = CATEGORIES.reduce((acc, c) => {
     acc[c.id] = docs.filter(d => d.cat === c.id).length;
     return acc;
   }, {});
 
-  const pending = docs.filter(d => d.status === 'pending' || d.status === 'warn');
-  const sign    = docs.filter(d => d.status === 'sign');
-
   const filtered = docs.filter(d => {
-    if (tab === 'pending' && d.status !== 'pending' && d.status !== 'warn') return false;
-    if (tab === 'sign'    && d.status !== 'sign')    return false;
-    if (cat && d.cat !== cat) return false;
+    if (filters.cat && d.cat !== filters.cat) return false;
+    if (filters.dateFrom && d.isoDate < filters.dateFrom) return false;
+    if (filters.dateTo   && d.isoDate > filters.dateTo)   return false;
     if (search && !d.name.toLowerCase().includes(search.toLowerCase()) &&
         !d.who.toLowerCase().includes(search.toLowerCase())) return false;
     return true;
   });
+
+  const activeFilterCount = [
+    !!filters.cat,
+    !!filters.dateFrom,
+    !!filters.dateTo,
+  ].filter(Boolean).length;
+
+  const toggleFilter = () => {
+    if (!filterOpen) setFilterRect(filterBtnRef.current?.getBoundingClientRect() ?? null);
+    setFilterOpen(v => !v);
+  };
+  const handleFilterChange = (key, val) => setFilters(f => ({ ...f, [key]: val }));
+  const clearFilters = () => setFilters({ cat: null, dateFrom: '', dateTo: '' });
 
   const handleDelete = useCallback(async () => {
     if (!selected.size) return;
@@ -383,18 +469,8 @@ export default function DocumentsScreen({ addToast }) {
     const { error: delErr } = await supabase.from('documents').delete().in('id', ids);
     setDeleting(false);
     if (delErr) addToast({ kind: 'bad', msg: 'Erro ao excluir: ' + delErr.message });
-    else {
-      addToast({ kind: 'ok', msg: `${ids.length} documento(s) excluído(s)` });
-      setSelected(new Set());
-      refetch();
-    }
+    else { addToast({ kind: 'ok', msg: `${ids.length} documento(s) excluído(s)` }); setSelected(new Set()); refetch(); }
   }, [selected, addToast, refetch]);
-
-  const onDrop = (e) => {
-    e.preventDefault();
-    setDragOver(false);
-    setShowAddModal(true);
-  };
 
   const toggleSelect = (id) => {
     const s = new Set(selected);
@@ -402,125 +478,39 @@ export default function DocumentsScreen({ addToast }) {
     setSelected(s);
   };
 
-  const activeCatMeta = CATEGORIES.find(c => c.id === cat);
-
   return (
     <div
-      style={{ display: 'flex', height: '100%', overflow: 'hidden', position: 'relative' }}
+      className="fade-up"
+      style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16, height: '100%', boxSizing: 'border-box', position: 'relative' }}
       onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
       onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) setDragOver(false); }}
-      onDrop={onDrop}
+      onDrop={(e) => { e.preventDefault(); setDragOver(false); setShowAddModal(true); }}
     >
       {/* Drag overlay */}
       {dragOver && (
-        <div style={{
-          position: 'absolute', inset: 0, zIndex: 50,
-          background: 'var(--brand-tint)', border: '2px dashed var(--brand)',
-          borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center',
-          flexDirection: 'column', gap: 10, backdropFilter: 'blur(2px)',
-        }}>
+        <div style={{ position: 'absolute', inset: 0, zIndex: 50, background: 'var(--brand-tint)', border: '2px dashed var(--brand)', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 10, backdropFilter: 'blur(2px)' }}>
           <Icon name="upload" size={40} style={{ color: 'var(--brand)' }} />
           <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--brand)' }}>Solte para adicionar documento</div>
           <div style={{ fontSize: 13, color: 'var(--muted)' }}>PDF, JPG, PNG, DOCX até 20 MB</div>
         </div>
       )}
 
-      {/* Sidebar */}
-      <aside style={{
-        width: 220, flexShrink: 0, borderRight: '1px solid var(--line)',
-        background: 'var(--surface)', display: 'flex', flexDirection: 'column',
-        overflowY: 'auto', padding: '16px 0',
-      }}>
-        <div style={{ padding: '0 14px 12px', fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.8 }}>
-          Documentos
+      {/* Page header */}
+      <div className="row" style={{ gap: 12, flexWrap: 'wrap' }}>
+        <div className="grow">
+          <h1 style={{ margin: '0 0 4px', fontSize: 22, fontWeight: 700, letterSpacing: -0.4 }}>Documentos</h1>
+          <p style={{ margin: 0, fontSize: 13, color: 'var(--muted)' }}>Contratos, holerites, atestados e toda a documentação da equipe.</p>
         </div>
+        <button className="btn primary" onClick={() => setShowAddModal(true)}>
+          <Icon name="plus" size={15} /> Novo documento
+        </button>
+      </div>
 
-        {[
-          { id: 'all',     label: 'Todos',              icon: 'folder', n: docs.length },
-          { id: 'pending', label: 'Pendentes',          icon: 'alert',  n: pending.length, accent: pending.length > 0 },
-          { id: 'sign',    label: 'Aguard. assinatura', icon: 'edit',   n: sign.length,    accent: sign.length > 0 },
-        ].map(item => (
-          <button
-            key={item.id}
-            onClick={() => { setTab(item.id); setCat(null); }}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 9, padding: '7px 14px',
-              border: 'none', background: tab === item.id && !cat ? 'var(--hover)' : 'transparent',
-              borderRadius: 0, cursor: 'pointer', width: '100%', textAlign: 'left',
-              color: tab === item.id && !cat ? 'var(--ink)' : 'var(--muted)',
-              fontSize: 13.5, fontWeight: tab === item.id && !cat ? 600 : 400,
-            }}
-          >
-            <Icon name={item.icon} size={14} style={{ flexShrink: 0 }} />
-            <span style={{ flex: 1 }}>{item.label}</span>
-            {item.n > 0 && (
-              <span style={{
-                fontSize: 11, fontWeight: 600, minWidth: 20, textAlign: 'center',
-                padding: '1px 5px', borderRadius: 10,
-                background: item.accent ? 'var(--warn-bg, #fff3cd)' : 'var(--surface-2)',
-                color: item.accent ? 'var(--warn)' : 'var(--muted)',
-              }}>{item.n}</span>
-            )}
-          </button>
-        ))}
+      {/* Card with toolbar + table */}
+      <div className="card" style={{ padding: 0, overflow: 'hidden', flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
 
-        <div style={{ height: 1, background: 'var(--line)', margin: '12px 14px' }} />
-
-        <div style={{ padding: '0 14px 8px', fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.8 }}>
-          Categorias
-        </div>
-
-        {CATEGORIES.map(c => (
-          <button
-            key={c.id}
-            onClick={() => { setCat(cat === c.id ? null : c.id); setTab('all'); }}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 9, padding: '7px 14px',
-              border: 'none', background: cat === c.id ? c.color + '14' : 'transparent',
-              borderRadius: 0, cursor: 'pointer', width: '100%', textAlign: 'left',
-              color: cat === c.id ? c.color : 'var(--muted)',
-              fontSize: 13, fontWeight: cat === c.id ? 600 : 400,
-            }}
-          >
-            <span style={{ width: 6, height: 6, borderRadius: '50%', flexShrink: 0, background: cat === c.id ? c.color : 'var(--muted-2)' }} />
-            <span style={{ flex: 1 }}>{c.name}</span>
-            <span style={{ fontSize: 11, color: 'var(--muted-2)' }}>{catCounts[c.id] || 0}</span>
-          </button>
-        ))}
-
-        <div style={{ flex: 1 }} />
-
-        <div style={{ padding: '12px 14px 0' }}>
-          <button
-            className="btn primary"
-            style={{ width: '100%', justifyContent: 'center' }}
-            onClick={() => setShowAddModal(true)}
-          >
-            <Icon name="plus" size={14} /> Novo documento
-          </button>
-          <div style={{ fontSize: 11, color: 'var(--muted)', textAlign: 'center', marginTop: 6 }}>
-            ou arraste para a tela
-          </div>
-        </div>
-      </aside>
-
-      {/* Main content */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden' }}>
-
-        {/* Header */}
-        <div style={{
-          padding: '14px 20px', borderBottom: '1px solid var(--line)',
-          background: 'var(--surface)', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0,
-        }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 15, fontWeight: 700 }}>
-              {cat ? activeCatMeta?.name : tab === 'pending' ? 'Pendentes' : tab === 'sign' ? 'Aguardando assinatura' : 'Todos os documentos'}
-            </div>
-            <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 1 }}>
-              {filtered.length} {filtered.length === 1 ? 'arquivo' : 'arquivos'}
-            </div>
-          </div>
-
+        {/* Toolbar */}
+        <div className="row" style={{ padding: '8px 16px', borderBottom: '1px solid var(--line)', gap: 8, flexShrink: 0 }}>
           <div style={{ position: 'relative' }}>
             <Icon name="search" size={13} style={{ position: 'absolute', left: 9, top: 10, color: 'var(--muted)' }} />
             <input
@@ -528,44 +518,72 @@ export default function DocumentsScreen({ addToast }) {
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="Buscar por nome ou funcionário…"
-              style={{ width: 240, paddingLeft: 30, height: 34, fontSize: 13 }}
+              style={{ width: 260, paddingLeft: 30, height: 34, fontSize: 13 }}
             />
           </div>
+          <span style={{ fontSize: 12, color: 'var(--muted)', alignSelf: 'center', marginLeft: 4 }}>
+            {filtered.length} {filtered.length === 1 ? 'arquivo' : 'arquivos'}
+          </span>
+          <span className="grow" />
 
+          {/* Filtros */}
+          <button
+            ref={filterBtnRef}
+            className="btn sm"
+            onClick={toggleFilter}
+            style={{ background: activeFilterCount > 0 ? 'var(--brand-tint)' : undefined, color: activeFilterCount > 0 ? 'var(--brand)' : undefined, borderColor: activeFilterCount > 0 ? 'var(--brand)' : undefined }}
+          >
+            <Icon name="filter" size={13} /> Filtros
+            {activeFilterCount > 0 && (
+              <span style={{ background: 'var(--brand)', color: 'var(--brand-ink)', borderRadius: 20, fontSize: 10, fontWeight: 700, padding: '1px 6px', marginLeft: 4 }}>
+                {activeFilterCount}
+              </span>
+            )}
+          </button>
+
+          {/* View toggle */}
           <div style={{ display: 'flex', border: '1px solid var(--line)', borderRadius: 7, overflow: 'hidden' }}>
             {[['list','dashboard'],['grid','folder']].map(([v, icon]) => (
-              <button
-                key={v}
-                onClick={() => setView(v)}
-                style={{ border: 'none', padding: '6px 9px', cursor: 'pointer', background: view === v ? 'var(--hover)' : 'transparent', color: 'var(--ink)' }}
-              >
+              <button key={v} onClick={() => setView(v)} style={{ border: 'none', padding: '6px 9px', cursor: 'pointer', background: view === v ? 'var(--hover)' : 'transparent', color: 'var(--ink)' }}>
                 <Icon name={icon} size={13} />
               </button>
             ))}
           </div>
         </div>
 
+        {/* Active category chip */}
+        {filters.cat && (() => {
+          const cm = CATEGORIES.find(c => c.id === filters.cat);
+          return (
+            <div style={{ padding: '6px 16px', borderBottom: '1px solid var(--line)', display: 'flex', alignItems: 'center', gap: 8, background: cm.color + '0c', flexShrink: 0 }}>
+              <span style={{ fontSize: 12, color: 'var(--muted)' }}>Filtrando por:</span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: cm.color + '18', color: cm.color, borderRadius: 20, padding: '3px 10px', fontSize: 12, fontWeight: 600 }}>
+                <Icon name={cm.icon} size={11} /> {cm.name}
+              </span>
+              <button className="btn ghost icon sm" style={{ width: 20, height: 20, padding: 0 }} onClick={() => handleFilterChange('cat', null)}>
+                <Icon name="x" size={11} />
+              </button>
+            </div>
+          );
+        })()}
+
         {/* Selection bar */}
         {selected.size > 0 && (
-          <div style={{ padding: '8px 20px', background: 'var(--brand-tint)', borderBottom: '1px solid var(--line)', display: 'flex', alignItems: 'center', gap: 10, fontSize: 13 }}>
+          <div style={{ padding: '8px 16px', background: 'var(--brand-tint)', borderBottom: '1px solid var(--line)', display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, flexShrink: 0 }}>
             <strong>{selected.size} selecionados</strong>
-            <span style={{ flex: 1 }} />
+            <span className="grow" />
             <button className="btn sm"><Icon name="download" size={13} /> Baixar</button>
             <button className="btn sm" style={{ color: 'var(--bad)', borderColor: 'var(--bad)' }} onClick={handleDelete} disabled={deleting}>
               <Icon name="trash" size={13} /> {deleting ? 'Excluindo…' : 'Excluir'}
             </button>
-            <button className="btn ghost sm icon" onClick={() => setSelected(new Set())}>
-              <Icon name="x" size={13} />
-            </button>
+            <button className="btn ghost sm icon" onClick={() => setSelected(new Set())}><Icon name="x" size={13} /></button>
           </div>
         )}
 
         {/* Content */}
         <div style={{ flex: 1, overflowY: 'auto' }}>
           {loading ? (
-            <div style={{ padding: 48, textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>
-              <div className="pulse">Carregando documentos…</div>
-            </div>
+            <div style={{ padding: 48, textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}><div className="pulse">Carregando documentos…</div></div>
           ) : error ? (
             <div style={{ padding: 48, textAlign: 'center', color: 'var(--bad)', fontSize: 13 }}>
               <Icon name="alert" size={28} style={{ opacity: 0.5, marginBottom: 10 }} />
@@ -577,7 +595,7 @@ export default function DocumentsScreen({ addToast }) {
             <div style={{ padding: 64, textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>
               <Icon name="folder" size={32} style={{ opacity: 0.3, marginBottom: 12 }} />
               <div style={{ fontWeight: 600, marginBottom: 4 }}>Nenhum documento</div>
-              <div style={{ fontSize: 12 }}>{search ? 'Tente outro termo de busca' : 'Clique em "Novo documento" para começar'}</div>
+              <div style={{ fontSize: 12 }}>{search || activeFilterCount > 0 ? 'Tente ajustar os filtros' : 'Clique em "Novo documento" para começar'}</div>
             </div>
           ) : view === 'list' ? (
             <ListView docs={filtered} categories={CATEGORIES} selected={selected} onToggle={toggleSelect} />
@@ -586,6 +604,17 @@ export default function DocumentsScreen({ addToast }) {
           )}
         </div>
       </div>
+
+      {filterOpen && (
+        <DocFilterPanel
+          filters={filters}
+          onChange={handleFilterChange}
+          onClear={clearFilters}
+          anchorRect={filterRect}
+          onClose={() => setFilterOpen(false)}
+          docCounts={docCounts}
+        />
+      )}
 
       {showAddModal && (
         <AddDocModal
