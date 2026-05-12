@@ -68,7 +68,7 @@ function Logo({ collapsed }) {
   );
 }
 
-export default function Sidebar({ route, setRoute, collapsed, setCollapsed, userName, userEmail, onLogout }) {
+export default function Sidebar({ route, setRoute, collapsed, setCollapsed, userName, userEmail, isAdmin, onLogout }) {
   const [open, setOpen] = useState({
     employees: route.startsWith('employees'),
     documents: route.startsWith('documents'),
@@ -255,23 +255,26 @@ export default function Sidebar({ route, setRoute, collapsed, setCollapsed, user
           >
             <Avatar name={userName || 'U'} size={32} hue={215} />
             <div className="grow" style={{ minWidth: 0 }}>
-              <div
-                style={{
-                  fontSize: 12.5,
-                  fontWeight: 600,
-                  whiteSpace: 'nowrap',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                }}
-              >
-                {userName || 'Usuário'}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{
+                  fontSize: 12.5, fontWeight: 600,
+                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                }}>
+                  {userName || 'Usuário'}
+                </span>
+                {isAdmin && (
+                  <span style={{
+                    fontSize: 9.5, fontWeight: 700, letterSpacing: 0.4,
+                    background: 'var(--brand)', color: 'var(--brand-ink)',
+                    borderRadius: 4, padding: '1px 5px', flexShrink: 0,
+                  }}>
+                    ADM
+                  </span>
+                )}
               </div>
               <div style={{
-                fontSize: 11,
-                color: 'var(--muted)',
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
+                fontSize: 11, color: 'var(--muted)',
+                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
               }}>
                 {userEmail || ''}
               </div>

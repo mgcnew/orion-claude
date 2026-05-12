@@ -166,6 +166,10 @@ export default function App() {
     return <Dashboard setRoute={setRoute} addToast={addToast} />;
   };
 
+  const isAdmin = session?.user?.app_metadata?.role === 'admin';
+  const userName = session?.user?.user_metadata?.name || session?.user?.email?.split('@')[0] || 'Usuário';
+  const userEmail = session?.user?.email || '';
+
   return (
     <div
       style={{
@@ -180,8 +184,9 @@ export default function App() {
         setRoute={setRoute}
         collapsed={collapsed}
         setCollapsed={setCollapsed}
-        userName={session?.user?.user_metadata?.name || session?.user?.email?.split('@')[0] || 'Usuário'}
-        userEmail={session?.user?.email || ''}
+        userName={userName}
+        userEmail={userEmail}
+        isAdmin={isAdmin}
         onLogout={() => supabase.auth.signOut()}
       />
       <main
@@ -202,8 +207,9 @@ export default function App() {
           setTheme={(t) => setTweak('theme', t)}
           openCmd={() => setCmdOpen(true)}
           openNotif={() => setNotifOpen(!notifOpen)}
-          userName={session?.user?.user_metadata?.name || session?.user?.email?.split('@')[0] || ''}
-          userEmail={session?.user?.email || ''}
+          userName={userName}
+          userEmail={userEmail}
+          isAdmin={isAdmin}
           routeLabel={routeLabel}
         />
         <div style={{ flex: 1, overflowY: 'auto' }} key={route}>
