@@ -1,4 +1,4 @@
-import { useState, useEffect, Fragment } from 'react';
+import { useState, useEffect, Fragment, useMemo } from 'react';
 import Icon from '../components/Icon.jsx';
 import Avatar from '../components/Avatar.jsx';
 import * as D from '../data/mock.js';
@@ -11,6 +11,8 @@ import {
   updateVacationStatus,
   createDocuments,
   createVacation,
+  useAllDocuments,
+  useAllTimecards,
 } from '../hooks/useEmployees.js';
 
 // ============================================================
@@ -371,73 +373,632 @@ export function AuditScreen() {
 }
 
 // ============================================================
+// ============================================================
 // REPORTS
 // ============================================================
-export function ReportsScreen({ addToast }) {
+
+const REPORT_CATALOG = [
+  {
+    group: 'Pessoas',
+    color: 'var(--brand)',
+    items: [
+      {
+        id: 'headcount',
+        label: 'Headcount ativo',
+        icon: 'users',
+        desc: 'Lista completa de colaboradores com cargo, departamento e data de admissão.',
+        filters: ['empresa', 'departamento', 'status', 'admissao'],
+        columns: ['Nome', 'Cargo', 'Departamento', 'Empresa', 'Status', 'Admissão'],
+      },
+      {
+        id: 'turnover',
+        label: 'Desligamentos',
+        icon: 'logout',
+        desc: 'Colaboradores desligados no período, com motivo e data efetiva.',
+        filters: ['periodo', 'empresa', 'departamento'],
+        columns: ['Nome', 'Cargo', 'Departamento', 'Desligamento', 'Status'],
+      },
+      {
+        id: 'afastados',
+        label: 'Afastamentos',
+        icon: 'alert',
+        desc: 'Colaboradores afastados por tipo de licença e prazo de retorno.',
+        filters: ['periodo', 'empresa', 'departamento'],
+        columns: ['Nome', 'Cargo', 'Departamento', 'Status', 'Admissão'],
+      },
+    ],
+  },
+  {
+    group: 'Ponto',
+    color: 'var(--info)',
+    items: [
+      {
+        id: 'espelho',
+        label: 'Espelho de ponto',
+        icon: 'clock',
+        desc: 'Jornada diária consolidada por colaborador com horas trabalhadas, faltas e atrasos.',
+        filters: ['periodo', 'empresa', 'departamento', 'funcionario'],
+        columns: ['Funcionário', 'Mês/Ano', 'Horas trabalhadas', 'Faltas', 'Banco de horas'],
+      },
+      {
+        id: 'faltas',
+        label: 'Faltas e atrasos',
+        icon: 'alert',
+        desc: 'Ocorrências de falta e atraso agrupadas por colaborador no período.',
+        filters: ['periodo', 'empresa', 'departamento'],
+        columns: ['Funcionário', 'Mês/Ano', 'Horas trabalhadas', 'Faltas', 'Banco de horas'],
+      },
+    ],
+  },
+  {
+    group: 'RH',
+    color: '#7c3aed',
+    items: [
+      {
+        id: 'ferias',
+        label: 'Programação de férias',
+        icon: 'umbrella',
+        desc: 'Períodos aquisitivos, datas concedidas e status de aprovação.',
+        filters: ['periodo', 'empresa', 'departamento', 'status_ferias'],
+        columns: ['Funcionário', 'Departamento', 'Período início', 'Período fim', 'Dias', 'Status'],
+      },
+      {
+        id: 'advertencias',
+        label: 'Advertências',
+        icon: 'shield',
+        desc: 'Ocorrências disciplinares registradas por tipo e severidade.',
+        filters: ['periodo', 'empresa', 'departamento', 'severidade'],
+        columns: ['Funcionário', 'Departamento', 'Tipo', 'Severidade', 'Data', 'Aplicado por'],
+      },
+    ],
+  },
+  {
+    group: 'Documentos',
+    color: 'var(--warn)',
+    items: [
+      {
+        id: 'documentos',
+        label: 'Documentos por categoria',
+        icon: 'folder',
+        desc: 'Arquivos cadastrados agrupados por categoria e colaborador.',
+        filters: ['periodo', 'categoria_doc', 'empresa'],
+        columns: ['Arquivo', 'Categoria', 'Funcionário', 'Tipo', 'Data upload'],
+      },
+    ],
+  },
+  {
+    group: 'Financeiro',
+    color: 'var(--ok)',
+    items: [
+      {
+        id: 'folha',
+        label: 'Folha consolidada',
+        icon: 'chart',
+        desc: 'Resumo de salários por departamento e centro de custo.',
+        filters: ['empresa', 'departamento'],
+        columns: ['Nome', 'Cargo', 'Departamento', 'Empresa', 'Status', 'Admissão'],
+      },
+    ],
+  },
+];
+
+const ALL_REPORTS = REPORT_CATALOG.flatMap(g => g.items.map(r => ({ ...r, group: g.group, color: g.color })));
+
+const MONTHS_PT = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+
+function fmtDate(d) {
+  if (!d) return '—';
+  return new Date(d + 'T00:00:00').toLocaleDateString('pt-BR');
+}
+
+function ReportFilters({ report, filters, setFilters, employees, depts, companies }) {
+  const set = (k, v) => setFilters(f => ({ ...f, [k]: v }));
+  const has = (f) => report.filters.includes(f);
+
   return (
-    <div className="fade-up" style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <div>
-        <h1 style={{ margin: '0 0 4px', fontSize: 22, fontWeight: 700, letterSpacing: -0.4 }}>
-          Relatórios
-        </h1>
-        <p style={{ margin: 0, fontSize: 13, color: 'var(--muted)' }}>
-          Modelos prontos e relatórios personalizados — exporte em PDF, Excel ou ZIP.
-        </p>
-      </div>
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
-          gap: 14,
-        }}
-      >
-        {[
-          { i: 'users',   n: 'Funcionários ativos',  d: 'Lista completa com filtros por unidade e cargo',  c: 'var(--brand)' },
-          { i: 'doc',     n: 'Documentos pendentes', d: 'Itens sem assinatura ou vencidos',                c: 'var(--warn)' },
-          { i: 'clock',   n: 'Espelho de ponto',     d: 'Jornada e horas extras consolidadas',             c: 'var(--info)' },
-          { i: 'shield',  n: 'Jurídico',             d: 'Acordos, rescisões e processos abertos',          c: '#7c3aed' },
-          { i: 'history', n: 'Auditoria',            d: 'Acessos, edições e exportações',                  c: 'var(--muted)' },
-          { i: 'chart',   n: 'Folha consolidada',    d: 'Resumo mensal por centro de custo',               c: 'var(--ok)' },
-        ].map((r, i) => (
-          <div key={i} className="card" style={{ padding: 18 }}>
-            <div className="row gap-2" style={{ marginBottom: 12 }}>
-              <div
-                style={{
-                  width: 36,
-                  height: 36,
-                  borderRadius: 9,
-                  background: r.c + '1f',
-                  color: r.c,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <Icon name={r.i} size={17} />
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      {has('periodo') && (
+        <div>
+          <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.6, display: 'block', marginBottom: 6 }}>
+            Período
+          </label>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            <input type="date" className="field" value={filters.inicio || ''} onChange={e => set('inicio', e.target.value)} />
+            <input type="date" className="field" value={filters.fim || ''} onChange={e => set('fim', e.target.value)} />
+          </div>
+        </div>
+      )}
+
+      {has('admissao') && (
+        <div>
+          <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.6, display: 'block', marginBottom: 6 }}>
+            Admissão (intervalo)
+          </label>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            <input type="date" className="field" value={filters.admissao_ini || ''} onChange={e => set('admissao_ini', e.target.value)} />
+            <input type="date" className="field" value={filters.admissao_fim || ''} onChange={e => set('admissao_fim', e.target.value)} />
+          </div>
+        </div>
+      )}
+
+      {has('empresa') && (
+        <div>
+          <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.6, display: 'block', marginBottom: 6 }}>
+            Empresa
+          </label>
+          <select className="field" value={filters.empresa || ''} onChange={e => set('empresa', e.target.value)}>
+            <option value="">Todas</option>
+            {companies.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+      )}
+
+      {has('departamento') && (
+        <div>
+          <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.6, display: 'block', marginBottom: 6 }}>
+            Departamento
+          </label>
+          <select className="field" value={filters.departamento || ''} onChange={e => set('departamento', e.target.value)}>
+            <option value="">Todos</option>
+            {depts.map(d => <option key={d} value={d}>{d}</option>)}
+          </select>
+        </div>
+      )}
+
+      {has('status') && (
+        <div>
+          <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.6, display: 'block', marginBottom: 6 }}>
+            Status
+          </label>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {[['', 'Todos'], ['ativo', 'Ativo'], ['férias', 'Férias'], ['afastado', 'Afastado'], ['desligado', 'Desligado']].map(([v, l]) => (
+              <button key={v} onClick={() => set('status', v)} style={{
+                padding: '5px 12px', borderRadius: 20, border: '1px solid', fontSize: 12.5, cursor: 'pointer',
+                borderColor: (filters.status || '') === v ? 'var(--brand)' : 'var(--line)',
+                background: (filters.status || '') === v ? 'var(--brand-tint)' : 'var(--surface-2)',
+                color: (filters.status || '') === v ? 'var(--brand)' : 'var(--muted)',
+                fontWeight: (filters.status || '') === v ? 700 : 400,
+              }}>{l}</button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {has('funcionario') && (
+        <div>
+          <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.6, display: 'block', marginBottom: 6 }}>
+            Funcionário
+          </label>
+          <select className="field" value={filters.funcionario || ''} onChange={e => set('funcionario', e.target.value)}>
+            <option value="">Todos</option>
+            {employees.filter(e => e.status === 'ativo').map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+          </select>
+        </div>
+      )}
+
+      {has('status_ferias') && (
+        <div>
+          <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.6, display: 'block', marginBottom: 6 }}>
+            Status das férias
+          </label>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {[['', 'Todos'], ['agendado', 'Agendado'], ['em_aberto', 'Em curso'], ['concedido', 'Quitado']].map(([v, l]) => (
+              <button key={v} onClick={() => set('status_ferias', v)} style={{
+                padding: '5px 12px', borderRadius: 20, border: '1px solid', fontSize: 12.5, cursor: 'pointer',
+                borderColor: (filters.status_ferias || '') === v ? 'var(--brand)' : 'var(--line)',
+                background: (filters.status_ferias || '') === v ? 'var(--brand-tint)' : 'var(--surface-2)',
+                color: (filters.status_ferias || '') === v ? 'var(--brand)' : 'var(--muted)',
+                fontWeight: (filters.status_ferias || '') === v ? 700 : 400,
+              }}>{l}</button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {has('severidade') && (
+        <div>
+          <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.6, display: 'block', marginBottom: 6 }}>
+            Severidade
+          </label>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {[['', 'Todas'], ['verbal', 'Verbal'], ['escrita', 'Escrita'], ['suspensao', 'Suspensão']].map(([v, l]) => (
+              <button key={v} onClick={() => set('severidade', v)} style={{
+                padding: '5px 12px', borderRadius: 20, border: '1px solid', fontSize: 12.5, cursor: 'pointer',
+                borderColor: (filters.severidade || '') === v ? 'var(--brand)' : 'var(--line)',
+                background: (filters.severidade || '') === v ? 'var(--brand-tint)' : 'var(--surface-2)',
+                color: (filters.severidade || '') === v ? 'var(--brand)' : 'var(--muted)',
+                fontWeight: (filters.severidade || '') === v ? 700 : 400,
+              }}>{l}</button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {has('categoria_doc') && (
+        <div>
+          <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.6, display: 'block', marginBottom: 6 }}>
+            Categoria
+          </label>
+          <select className="field" value={filters.categoria_doc || ''} onChange={e => set('categoria_doc', e.target.value)}>
+            <option value="">Todas</option>
+            {['Admissão','Contratos','Holerites','Atestados','Treinamentos','Rescisão','Férias'].map(c => <option key={c}>{c}</option>)}
+          </select>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function useReportData(reportId, filters, employees, warnings, vacations, documents, timecards) {
+  return useMemo(() => {
+    const inPeriod = (dateStr) => {
+      if (!dateStr) return true;
+      const d = new Date(dateStr + 'T00:00:00');
+      if (filters.inicio && d < new Date(filters.inicio)) return false;
+      if (filters.fim && d > new Date(filters.fim + 'T23:59:59')) return false;
+      return true;
+    };
+
+    const filterEmp = (e) => {
+      if (filters.empresa && e.company !== filters.empresa) return false;
+      if (filters.departamento && e.dept !== filters.departamento) return false;
+      if (filters.status && e.status !== filters.status) return false;
+      if (filters.admissao_ini && e.admission && e.admission < filters.admissao_ini) return false;
+      if (filters.admissao_fim && e.admission && e.admission > filters.admissao_fim) return false;
+      return true;
+    };
+
+    switch (reportId) {
+      case 'headcount':
+        return employees.filter(e => e.status !== 'desligado' && filterEmp(e)).map(e => ({
+          cells: [e.name, e.role||'—', e.dept||'—', e.company||'—', e.status, fmtDate(e.admission)],
+        }));
+
+      case 'turnover':
+        return employees.filter(e => e.status === 'desligado' && filterEmp(e)).map(e => ({
+          cells: [e.name, e.role||'—', e.dept||'—', fmtDate(e.admission), e.status],
+        }));
+
+      case 'afastados':
+        return employees.filter(e => e.status === 'afastado' && filterEmp(e)).map(e => ({
+          cells: [e.name, e.role||'—', e.dept||'—', e.status, fmtDate(e.admission)],
+        }));
+
+      case 'espelho':
+      case 'faltas': {
+        let tcs = timecards;
+        if (filters.funcionario) tcs = tcs.filter(tc => tc.employee_id === filters.funcionario);
+        if (filters.inicio || filters.fim) {
+          tcs = tcs.filter(tc => {
+            const d = tc.month_year ? tc.month_year + '-01' : null;
+            return inPeriod(d);
+          });
+        }
+        return tcs.map(tc => {
+          const emp = employees.find(e => e.id === tc.employee_id);
+          if (filters.empresa && emp?.company !== filters.empresa) return null;
+          if (filters.departamento && emp?.dept !== filters.departamento) return null;
+          return {
+            cells: [emp?.name||'—', tc.month_year||'—', tc.worked_hours||'—', String(tc.absences||0), tc.overtime||'—'],
+          };
+        }).filter(Boolean);
+      }
+
+      case 'ferias':
+        return vacations.filter(v => {
+          if (filters.status_ferias && v.status !== filters.status_ferias) return false;
+          if (!inPeriod(v.period_start)) return false;
+          const emp = employees.find(e => e.id === v.employee_id);
+          if (filters.empresa && emp?.company !== filters.empresa) return false;
+          if (filters.departamento && emp?.dept !== filters.departamento) return false;
+          return true;
+        }).map(v => {
+          const emp = employees.find(e => e.id === v.employee_id);
+          const statusLabel = { concedido: 'Quitado', em_aberto: 'Em curso', agendado: 'Agendado', pendente: 'Pendente' };
+          return {
+            cells: [emp?.name||'—', emp?.dept||'—', fmtDate(v.period_start), fmtDate(v.period_end), String(v.days||0), statusLabel[v.status]||v.status],
+          };
+        });
+
+      case 'advertencias':
+        return warnings.filter(w => {
+          if (filters.severidade && w.severity !== filters.severidade) return false;
+          if (!inPeriod(w.date)) return false;
+          const emp = employees.find(e => e.id === w.employee_id);
+          if (filters.empresa && emp?.company !== filters.empresa) return false;
+          if (filters.departamento && emp?.dept !== filters.departamento) return false;
+          return true;
+        }).map(w => {
+          const emp = employees.find(e => e.id === w.employee_id);
+          const sevLabel = { verbal: 'Verbal', escrita: 'Escrita', suspensao: 'Suspensão' };
+          return {
+            cells: [emp?.name||'—', emp?.dept||'—', w.type||'—', sevLabel[w.severity]||'—', fmtDate(w.date), w.applied_by||'—'],
+          };
+        });
+
+      case 'documentos':
+        return documents.filter(doc => {
+          if (filters.categoria_doc && doc.category !== filters.categoria_doc) return false;
+          if (!inPeriod(doc.created_at?.slice(0,10))) return false;
+          const emp = employees.find(e => e.id === doc.employee_id);
+          if (filters.empresa && emp?.company !== filters.empresa) return false;
+          return true;
+        }).map(doc => {
+          const emp = employees.find(e => e.id === doc.employee_id);
+          return {
+            cells: [doc.name||'—', doc.category||'—', emp?.name||'—', (doc.type||'').toUpperCase(), doc.created_at ? new Date(doc.created_at).toLocaleDateString('pt-BR') : '—'],
+          };
+        });
+
+      case 'folha':
+        return employees.filter(e => e.salary && filterEmp(e)).map(e => ({
+          cells: [e.name, e.role||'—', e.dept||'—', e.company||'—', e.status, fmtDate(e.admission)],
+          highlight: !e.salary,
+        }));
+
+      default:
+        return [];
+    }
+  }, [reportId, filters, employees, warnings, vacations, documents, timecards]);
+}
+
+export function ReportsScreen({ addToast }) {
+  const [selectedId, setSelectedId]     = useState('headcount');
+  const [filters, setFilters]           = useState({});
+  const [history, setHistory]           = useState([]);
+  const [catalogOpen, setCatalogOpen]   = useState(true);
+  const [filtersOpen, setFiltersOpen]   = useState(true);
+
+  const { employees, loading: empLoading } = useEmployees();
+  const { warnings,  loading: warnLoading } = useAllWarnings();
+  const { vacations, loading: vacLoading  } = useAllVacations();
+  const { documents, loading: docLoading  } = useAllDocuments();
+  const { timecards, loading: tcLoading   } = useAllTimecards();
+
+  const loading = empLoading || warnLoading || vacLoading || docLoading || tcLoading;
+  const selected = ALL_REPORTS.find(r => r.id === selectedId);
+
+  const depts     = useMemo(() => [...new Set(employees.map(e => e.dept).filter(Boolean))].sort(), [employees]);
+  const companies = useMemo(() => [...new Set(employees.map(e => e.company).filter(Boolean))].sort(), [employees]);
+  const rows      = useReportData(selectedId, filters, employees, warnings, vacations, documents, timecards);
+
+  const handleExport = (format) => {
+    setHistory(h => [{
+      id: Date.now(), report: selected.label, format, rows: rows.length,
+      at: new Date().toLocaleString('pt-BR'),
+    }, ...h].slice(0, 8));
+    addToast({ kind: 'ok', msg: `${selected.label} exportado como ${format} (${rows.length} registros)` });
+  };
+
+  const selectReport = (id) => { setSelectedId(id); setFilters({}); };
+  const activeFiltersCount = Object.values(filters).filter(v => v).length;
+
+  return (
+    <div className="fade-up" style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
+
+      {/* ── Catálogo (toggle) ── */}
+      {catalogOpen && (
+        <div style={{
+          width: 220, flexShrink: 0,
+          borderRight: '1px solid var(--line)',
+          overflowY: 'auto',
+          display: 'flex', flexDirection: 'column',
+        }}>
+          <div style={{ padding: '14px 10px 6px', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 1, flex: 1, padding: '0 4px' }}>
+              Relatórios
+            </span>
+            <button className="btn ghost icon sm" onClick={() => setCatalogOpen(false)} title="Recolher">
+              <Icon name="panel-left" size={14} />
+            </button>
+          </div>
+          {REPORT_CATALOG.map(group => (
+            <div key={group.group}>
+              <div style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--muted-2)', textTransform: 'uppercase', letterSpacing: 1, padding: '10px 14px 4px' }}>
+                {group.group}
               </div>
-              <span className="grow" />
-              <span className="pill" style={{ fontSize: 10 }}>
-                PDF · XLSX · ZIP
-              </span>
+              {group.items.map(r => {
+                const active = r.id === selectedId;
+                return (
+                  <button key={r.id} onClick={() => selectReport(r.id)} style={{
+                    width: '100%', display: 'flex', alignItems: 'center', gap: 8,
+                    padding: '7px 10px', borderRadius: 7, border: 'none', margin: '0 4px', width: 'calc(100% - 8px)',
+                    background: active ? 'var(--brand-tint)' : 'transparent',
+                    color: active ? 'var(--brand)' : 'var(--ink-soft)',
+                    fontWeight: active ? 600 : 400, fontSize: 13, cursor: 'pointer', textAlign: 'left',
+                  }}
+                  onMouseEnter={e => { if (!active) e.currentTarget.style.background = 'var(--hover)'; }}
+                  onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent'; }}>
+                    <Icon name={r.icon} size={14} style={{ color: active ? 'var(--brand)' : group.color, flexShrink: 0 }} />
+                    <span style={{ lineHeight: 1.3 }}>{r.label}</span>
+                  </button>
+                );
+              })}
             </div>
-            <div style={{ fontSize: 14, fontWeight: 700 }}>{r.n}</div>
-            <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4, lineHeight: 1.5 }}>
-              {r.d}
-            </div>
-            <div className="row gap-2" style={{ marginTop: 14 }}>
-              <button className="btn sm grow" style={{ justifyContent: 'center' }}>
-                <Icon name="eye" size={13} /> Pré-visualizar
+          ))}
+        </div>
+      )}
+
+      {/* ── Área principal ── */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
+
+        {/* Barra de topo do relatório */}
+        <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+
+            {/* Botão reabrir catálogo */}
+            {!catalogOpen && (
+              <button className="btn ghost icon sm" onClick={() => setCatalogOpen(true)} title="Abrir catálogo">
+                <Icon name="panel-left" size={14} />
               </button>
+            )}
+
+            {/* Info do relatório */}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.7 }}>
+                  {selected?.group} /
+                </span>
+                <h1 style={{ margin: 0, fontSize: 17, fontWeight: 700, letterSpacing: -0.3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {selected?.label}
+                </h1>
+              </div>
+              <p style={{ margin: '2px 0 0', fontSize: 12.5, color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {selected?.desc}
+              </p>
+            </div>
+
+            {/* Ações */}
+            <div style={{ display: 'flex', gap: 6, flexShrink: 0, flexWrap: 'wrap' }}>
               <button
-                className="btn sm primary grow"
-                style={{ justifyContent: 'center' }}
-                onClick={() => addToast({ kind: 'ok', msg: r.n + ' gerado' })}
+                className="btn sm"
+                onClick={() => setFiltersOpen(o => !o)}
+                style={{ position: 'relative' }}
               >
-                <Icon name="download" size={13} /> Gerar
+                <Icon name="filter" size={13} />
+                Filtros
+                {activeFiltersCount > 0 && (
+                  <span style={{
+                    position: 'absolute', top: -4, right: -4,
+                    background: 'var(--brand)', color: '#fff',
+                    fontSize: 9, fontWeight: 700, borderRadius: 10,
+                    padding: '1px 5px', lineHeight: 1.4,
+                  }}>{activeFiltersCount}</span>
+                )}
               </button>
+              {activeFiltersCount > 0 && (
+                <button className="btn sm ghost" onClick={() => setFilters({})}>
+                  Limpar filtros
+                </button>
+              )}
+              {rows.length > 0 && (
+                <>
+                  <button className="btn sm" onClick={() => handleExport('XLSX')}>
+                    <Icon name="download" size={13} /> XLSX
+                  </button>
+                  <button className="btn sm" onClick={() => handleExport('CSV')}>
+                    <Icon name="download" size={13} /> CSV
+                  </button>
+                  <button className="btn sm primary" onClick={() => handleExport('PDF')}>
+                    <Icon name="pdf" size={13} /> PDF
+                  </button>
+                </>
+              )}
             </div>
           </div>
-        ))}
+
+          {/* Histórico inline (compacto) */}
+          {history.length > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--muted-2)', textTransform: 'uppercase', letterSpacing: 0.6, flexShrink: 0 }}>
+                Recentes:
+              </span>
+              {history.slice(0, 5).map(h => (
+                <span key={h.id} className="pill" style={{ fontSize: 10.5, gap: 4 }}>
+                  <Icon name="download" size={9} />
+                  {h.report} · {h.format} · {h.rows}reg
+                </span>
+              ))}
+              <button className="btn ghost sm icon" onClick={() => setHistory([])}>
+                <Icon name="x" size={11} />
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Corpo: filtros (drawer lateral) + tabela */}
+        <div style={{ flex: 1, display: 'flex', overflow: 'hidden', minHeight: 0 }}>
+
+          {/* Painel de filtros (recolhível) */}
+          {filtersOpen && (
+            <div style={{
+              width: 220, flexShrink: 0,
+              borderRight: '1px solid var(--line)',
+              overflowY: 'auto', padding: '16px 14px',
+              display: 'flex', flexDirection: 'column', gap: 0,
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', marginBottom: 14 }}>
+                <span style={{ fontSize: 12.5, fontWeight: 700, flex: 1 }}>Filtros</span>
+                <button className="btn ghost icon sm" onClick={() => setFiltersOpen(false)}>
+                  <Icon name="x" size={13} />
+                </button>
+              </div>
+              <ReportFilters
+                report={selected}
+                filters={filters}
+                setFilters={setFilters}
+                employees={employees}
+                depts={depts}
+                companies={companies}
+              />
+            </div>
+          )}
+
+          {/* Tabela de dados */}
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
+
+            {/* Barra de resultado */}
+            <div style={{
+              padding: '10px 16px', borderBottom: '1px solid var(--line)',
+              flexShrink: 0, display: 'flex', alignItems: 'center', gap: 10,
+              background: 'var(--surface-2)',
+            }}>
+              {loading ? (
+                <span className="pulse" style={{ fontSize: 12.5, color: 'var(--muted)' }}>Carregando dados…</span>
+              ) : (
+                <span style={{ fontSize: 12.5, color: 'var(--muted)' }}>
+                  <strong style={{ color: 'var(--ink)' }}>{rows.length}</strong> registro{rows.length !== 1 ? 's' : ''}
+                  {activeFiltersCount > 0 && (
+                    <span> · {activeFiltersCount} filtro{activeFiltersCount !== 1 ? 's' : ''} ativo{activeFiltersCount !== 1 ? 's' : ''}</span>
+                  )}
+                </span>
+              )}
+            </div>
+
+            {/* Dados */}
+            <div style={{ flex: 1, overflowY: 'auto', overflowX: 'auto', minHeight: 0 }}>
+              {loading ? (
+                <div style={{ padding: 48, textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>
+                  <div className="pulse">Carregando…</div>
+                </div>
+              ) : rows.length === 0 ? (
+                <div style={{ padding: 64, textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>
+                  <Icon name="folder" size={32} style={{ opacity: 0.2, display: 'block', margin: '0 auto 12px' }} />
+                  Nenhum registro encontrado com os filtros aplicados.
+                </div>
+              ) : (
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 480 }}>
+                  <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
+                    <tr style={{ background: 'var(--surface-2)', color: 'var(--muted)', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.6 }}>
+                      <th style={{ padding: '9px 14px', textAlign: 'left', fontWeight: 600, width: 36, color: 'var(--muted-2)' }}>#</th>
+                      {selected.columns.map(col => (
+                        <th key={col} style={{ padding: '9px 14px', textAlign: 'left', fontWeight: 600, whiteSpace: 'nowrap' }}>{col}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((row, i) => (
+                      <tr key={i} style={{ borderTop: '1px solid var(--line-soft)' }}
+                        onMouseEnter={e => e.currentTarget.style.background = 'var(--hover)'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                      >
+                        <td style={{ padding: '9px 14px', color: 'var(--muted-2)', fontSize: 11, fontFamily: 'monospace' }}>{i + 1}</td>
+                        {row.cells.map((cell, ci) => (
+                          <td key={ci} style={{ padding: '9px 14px', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {ci === 0
+                              ? <span style={{ fontWeight: 600 }}>{cell}</span>
+                              : <span style={{ color: 'var(--ink-soft)' }}>{cell}</span>
+                            }
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
