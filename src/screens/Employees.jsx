@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import Icon from '../components/Icon.jsx';
 import Avatar from '../components/Avatar.jsx';
 import { useEmployees, useEmployee, useEmployeeCounts, useEmployeeWarnings, useEmployeeVacations, useEmployeeDocuments, useEmployeeHistory, useEmployeeTimeEntries, clockIn, clockOut, createEmployee, updateEmployee, updateEmployeeStatus, createDocuments, useCompanies } from '../hooks/useEmployees.js';
@@ -664,51 +665,81 @@ function StatusPill({ status }) {
 // ============================================================
 function RowMenu({ emp, onProfile, onAfastar, onDesligar, onReativar }) {
   const [open, setOpen] = useState(false);
-  const ref = useRef();
+  const [rect, setRect] = useState(null);
+  const btnRef = useRef();
+  const menuRef = useRef();
+
   useEffect(() => {
-    const h = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    if (!open) return;
+    const h = (e) => {
+      if (!menuRef.current?.contains(e.target) && !btnRef.current?.contains(e.target))
+        setOpen(false);
+    };
     document.addEventListener('mousedown', h);
     return () => document.removeEventListener('mousedown', h);
-  }, []);
+  }, [open]);
+
+  const handleToggle = (e) => {
+    e.stopPropagation();
+    if (!open) setRect(btnRef.current.getBoundingClientRect());
+    setOpen(o => !o);
+  };
+
   const isOff = emp.status === 'desligado' || emp.status === 'afastado';
   const actions = [
-    { label: 'Ver perfil', icon: 'user', fn: onProfile },
+    { label: 'Ver perfil',            icon: 'user',  fn: onProfile },
     null,
-    ...(isOff ? [{ label: 'Reativar', icon: 'check', fn: onReativar }] : []),
+    ...(isOff  ? [{ label: 'Reativar',              icon: 'check', fn: onReativar }] : []),
     ...(!isOff ? [{ label: 'Registrar afastamento', icon: 'alert', fn: onAfastar, color: '#ca8a04' }] : []),
     { label: 'Desligar', icon: 'trash', fn: onDesligar, color: '#dc2626' },
   ].filter(Boolean);
 
+  // Posição: abre abaixo do botão; se não couber, abre acima
+  const menuHeight = actions.length * 41 + 8;
+  const spaceBelow  = rect ? window.innerHeight - rect.bottom : 999;
+  const top  = rect
+    ? (spaceBelow >= menuHeight ? rect.bottom + 4 : rect.top - menuHeight - 4)
+    : 0;
+  const right = rect ? window.innerWidth - rect.right : 0;
+
   return (
-    <div ref={ref} style={{ position: 'relative' }}>
-      <button className="btn ghost icon sm" onClick={e => { e.stopPropagation(); setOpen(o => !o); }}>
+    <div ref={btnRef}>
+      <button className="btn ghost icon sm" onClick={handleToggle}>
         <Icon name="more-v" size={14} />
       </button>
-      {open && (
-        <div style={{
-          position: 'absolute', right: 0, top: '100%', marginTop: 4, zIndex: 100,
-          background: 'var(--surface)', border: '1px solid var(--line)',
-          borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,.12)',
-          minWidth: 210, overflow: 'hidden',
-        }}>
+      {open && rect && createPortal(
+        <div
+          ref={menuRef}
+          style={{
+            position: 'fixed', top, right, zIndex: 9999,
+            background: 'var(--surface)', border: '1px solid var(--line)',
+            borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,.14)',
+            minWidth: 210, overflow: 'hidden',
+          }}
+        >
           {actions.map((a, i) =>
             a === null ? (
               <div key={i} style={{ height: 1, background: 'var(--line)', margin: '2px 0' }} />
             ) : (
-              <button key={a.label} onClick={e => { e.stopPropagation(); setOpen(false); a.fn(); }} style={{
-                display: 'flex', alignItems: 'center', gap: 9,
-                width: '100%', padding: '10px 14px', border: 'none',
-                background: 'transparent', cursor: 'pointer', fontSize: 13.5,
-                color: a.color || 'var(--ink)', textAlign: 'left',
-              }}
-              onMouseEnter={e => e.currentTarget.style.background = 'var(--hover)'}
-              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+              <button
+                key={a.label}
+                onClick={e => { e.stopPropagation(); setOpen(false); a.fn(); }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 9,
+                  width: '100%', padding: '10px 14px', border: 'none',
+                  background: 'transparent', cursor: 'pointer', fontSize: 13.5,
+                  color: a.color || 'var(--ink)', textAlign: 'left',
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = 'var(--hover)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+              >
                 <Icon name={a.icon} size={14} style={{ color: a.color || 'var(--brand)' }} />
                 {a.label}
               </button>
             )
           )}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
