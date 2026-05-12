@@ -405,7 +405,7 @@ function DocFilterPanel({ filters, onChange, onClear, anchorRect, onClose, docCo
   );
 }
 
-export default function DocumentsScreen({ addToast }) {
+export default function DocumentsScreen({ addToast, activeCompany }) {
   const [filters, setFilters] = useState({ cat: null, dateFrom: '', dateTo: '' });
   const [view, setView]       = useState('list');
   const [search, setSearch]   = useState('');
@@ -418,22 +418,24 @@ export default function DocumentsScreen({ addToast }) {
   const filterBtnRef = useRef();
 
   const { documents: raw, loading, error, refetch } = useAllDocuments();
-  const { employees } = useEmployees();
+  const { employees } = useEmployees({ companyId: activeCompany?.id });
 
-  const docs = raw.map(d => ({
-    id: d.id,
-    name: d.name,
-    cat: d.category,
-    size: d.size,
-    who: d.employees?.name || 'Empresa',
-    date: d.doc_date
-      ? new Date(d.doc_date + 'T00:00:00').toLocaleDateString('pt-BR')
-      : new Date(d.created_at).toLocaleDateString('pt-BR'),
-    isoDate: d.doc_date || d.created_at?.slice(0, 10) || '',
-    type: d.type || 'pdf',
-    status: d.status || 'ok',
-    file_url: d.file_url,
-  }));
+  const docs = raw
+    .filter(d => !activeCompany || d.employees?.company_id === activeCompany.id || (!d.employee_id))
+    .map(d => ({
+      id: d.id,
+      name: d.name,
+      cat: d.category,
+      size: d.size,
+      who: d.employees?.name || 'Empresa',
+      date: d.doc_date
+        ? new Date(d.doc_date + 'T00:00:00').toLocaleDateString('pt-BR')
+        : new Date(d.created_at).toLocaleDateString('pt-BR'),
+      isoDate: d.doc_date || d.created_at?.slice(0, 10) || '',
+      type: d.type || 'pdf',
+      status: d.status || 'ok',
+      file_url: d.file_url,
+    }));
 
   const docCounts = CATEGORIES.reduce((acc, c) => {
     acc[c.id] = docs.filter(d => d.cat === c.id).length;

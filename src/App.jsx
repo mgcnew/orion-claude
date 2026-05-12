@@ -147,7 +147,7 @@ export default function App() {
     if (route === 'employees') return <EmployeesList setRoute={setRoute} setRouteParam={setRouteParam} setRouteLabel={setRouteLabel} companyId={activeCompany?.id} />;
     if (route === 'employees-profile') return <EmployeeProfile setRoute={setRoute} employeeId={routeParam} />;
     if (route.startsWith('documents'))
-      return <DocumentsScreen addToast={addToast} />;
+      return <DocumentsScreen addToast={addToast} activeCompany={activeCompany} />;
     if (route.startsWith('time')) return <TimeScreen addToast={addToast} />;
     if (route === 'permissions' || route === 'settings-permissions')
       return (

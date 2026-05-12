@@ -261,7 +261,7 @@ export function useAllDocuments() {
     setError(null);
     const { data, error: err } = await supabase
       .from('documents')
-      .select('*, employees(id, name)')
+      .select('*, employees(id, name, company_id)')
       .order('created_at', { ascending: false });
 
     if (err) setError(err.message);

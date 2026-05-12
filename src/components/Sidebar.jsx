@@ -142,7 +142,7 @@ export default function Sidebar({ route, setRoute, collapsed, setCollapsed, user
                 WebkitAppearance: 'none',
               }}
             >
-              {isAdmin && <option value="">Todas as empresas</option>}
+              <option value="">Todas as empresas</option>
               {companies.map((c) => (
                 <option key={c.id} value={c.id}>{c.name}</option>
               ))}
