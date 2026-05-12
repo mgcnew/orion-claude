@@ -1419,7 +1419,7 @@ function EmpresasTab({ addToast }) {
   const { companies, loading, refetch } = useCompanies();
   const [showNew, setShowNew] = useState(false);
   const [editTarget, setEditTarget] = useState(null);
-  const BLANK_FORM = { name: '', slug: '', address: '', number: '', logo_url: '' };
+  const BLANK_FORM = { name: '', slug: '', address: '', number: '', logo_url: '', cnpj: '', email: '', phone: '' };
   const [form, setForm] = useState(BLANK_FORM);
   const [logoFile, setLogoFile] = useState(null);
   const [logoPreview, setLogoPreview] = useState(null);
@@ -1446,6 +1446,9 @@ function EmpresasTab({ addToast }) {
       address: c.address || '',
       number: c.number || '',
       logo_url: c.logo_url || '',
+      cnpj: c.cnpj || '',
+      email: c.email || '',
+      phone: c.phone || '',
     });
     setLogoFile(null);
     setLogoPreview(c.logo_url || null);
@@ -1478,20 +1481,23 @@ function EmpresasTab({ addToast }) {
     try {
       const slug = form.slug.trim() || slugify(form.name.trim());
 
+      const contactFields = {
+        address: form.address.trim() || null,
+        number:  form.number.trim()  || null,
+        cnpj:    form.cnpj.trim()    || null,
+        email:   form.email.trim()   || null,
+        phone:   form.phone.trim()   || null,
+      };
+
       if (editTarget) {
         const logo_url = await uploadLogo(editTarget.id);
         const { error } = await updateCompany(editTarget.id, {
-          name: form.name.trim(), slug,
-          address: form.address.trim() || null,
-          number: form.number.trim() || null,
-          logo_url,
+          name: form.name.trim(), slug, logo_url, ...contactFields,
         });
         if (error) throw error;
       } else {
         const { created, error } = await createCompany({
-          name: form.name.trim(), slug,
-          address: form.address.trim() || null,
-          number: form.number.trim() || null,
+          name: form.name.trim(), slug, ...contactFields,
         });
         if (error) throw error;
         if (logoFile && created) {
@@ -1706,6 +1712,22 @@ function EmpresasTab({ addToast }) {
                 </div>
               </div>
 
+              {/* CNPJ, Email, Telefone */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <div>
+                  <label className="label">CNPJ</label>
+                  <input className="field" value={form.cnpj} onChange={(e) => set('cnpj', e.target.value)} placeholder="00.000.000/0001-00" />
+                </div>
+                <div>
+                  <label className="label">Telefone</label>
+                  <input className="field" value={form.phone} onChange={(e) => set('phone', e.target.value)} placeholder="+55 11 0000-0000" />
+                </div>
+                <div style={{ gridColumn: 'span 2' }}>
+                  <label className="label">E-mail corporativo</label>
+                  <input className="field" type="email" value={form.email} onChange={(e) => set('email', e.target.value)} placeholder="contato@empresa.com.br" />
+                </div>
+              </div>
+
               {/* Slug */}
               <div>
                 <label className="label">Identificador (slug)</label>
@@ -1739,13 +1761,12 @@ function EmpresasTab({ addToast }) {
 // SETTINGS (with Permissions as a tab)
 // ============================================================
 export function SettingsScreen({ initialTab, addToast, setRoute }) {
-  const [tab, setTab] = useState(initialTab || 'geral');
+  const [tab, setTab] = useState(initialTab || 'empresas');
   useEffect(() => {
     if (initialTab) setTab(initialTab);
   }, [initialTab]);
 
   const tabs = [
-    { id: 'geral',      l: 'Geral',       i: 'settings' },
     { id: 'empresas',   l: 'Empresas',    i: 'building' },
     { id: 'aparencia',  l: 'Aparência',   i: 'sparkle' },
     { id: 'seguranca',  l: 'Segurança',   i: 'shield' },
@@ -1804,39 +1825,6 @@ export function SettingsScreen({ initialTab, addToast, setRoute }) {
       </div>
 
       {tab === 'empresas' && <EmpresasTab addToast={addToast} />}
-
-      {tab === 'geral' && (
-        <div className="col gap-4">
-          <div className="card" style={{ padding: 24 }}>
-            <h3 style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 700 }}>Organização</h3>
-            <p style={{ margin: '0 0 18px', fontSize: 12.5, color: 'var(--muted)' }}>
-              Dados da empresa exibidos em documentos e comunicações.
-            </p>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-              <div>
-                <label className="label">Razão social</label>
-                <input className="field" defaultValue="Orion Gestão LTDA." />
-              </div>
-              <div>
-                <label className="label">CNPJ</label>
-                <input className="field" defaultValue="12.345.678/0001-90" />
-              </div>
-              <div>
-                <label className="label">E-mail corporativo</label>
-                <input className="field" defaultValue="contato@orion.com.br" />
-              </div>
-              <div>
-                <label className="label">Telefone</label>
-                <input className="field" defaultValue="+55 11 4000-0000" />
-              </div>
-              <div style={{ gridColumn: 'span 2' }}>
-                <label className="label">Endereço</label>
-                <input className="field" defaultValue="Av. Paulista, 1000 — São Paulo/SP" />
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {tab === 'aparencia' && (
         <div className="card" style={{ padding: 24 }}>
