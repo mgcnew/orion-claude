@@ -393,6 +393,39 @@ export function useEmployeeHistory(employeeId) {
   return { history, loading };
 }
 
+// Entradas de ponto de um mês (por funcionário ou todos)
+export function useMonthEntries(employeeId, monthYear) {
+  const [entries, setEntries] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetch = useCallback(() => {
+    if (!monthYear) return;
+    setLoading(true);
+    const [y, m] = monthYear.split('-').map(Number);
+    const lastDay = new Date(y, m, 0).getDate();
+    let q = supabase
+      .from('time_entries')
+      .select('*, employees(id, name, hue, dept)')
+      .gte('date', `${monthYear}-01`)
+      .lte('date', `${monthYear}-${String(lastDay).padStart(2, '0')}`)
+      .order('date');
+    if (employeeId) q = q.eq('employee_id', employeeId);
+    q.then(({ data }) => { setEntries(data ?? []); setLoading(false); });
+  }, [employeeId, monthYear]);
+
+  useEffect(() => { fetch(); }, [fetch]);
+  return { entries, loading, refetch: fetch };
+}
+
+export async function createTimeEntry(data) {
+  const { data: created, error } = await supabase
+    .from('time_entries')
+    .insert(data)
+    .select()
+    .single();
+  return { created, error };
+}
+
 // Ponto de um funcionário
 export function useEmployeeTimeEntries(employeeId) {
   const [timeEntries, setTimeEntries] = useState([]);

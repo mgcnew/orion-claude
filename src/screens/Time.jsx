@@ -1,7 +1,7 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import Icon from '../components/Icon.jsx';
 import Avatar from '../components/Avatar.jsx';
-import { useEmployees, useAllTimecards, createTimecard } from '../hooks/useEmployees.js';
+import { useEmployees, useMonthEntries, createTimeEntry } from '../hooks/useEmployees.js';
 
 // ── helpers ──────────────────────────────────────────────────
 const MONTHS_PT = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
@@ -22,31 +22,63 @@ function firstDayOfWeek(ym) {
   return new Date(y, m - 1, 1).getDay();
 }
 
-// Gera dias fictícios de ponto baseados no mês selecionado
-function generateDayStatuses(ym, empId) {
-  if (!empId) return {};
+function parseTimeToMinutes(t) {
+  if (!t) return null;
+  const [h, m] = t.split(':').map(Number);
+  return h * 60 + (m || 0);
+}
+
+function minutesToHM(mins) {
+  if (!mins || mins <= 0) return '0h00';
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return `${h}h${String(m).padStart(2, '0')}`;
+}
+
+function fmtDate(iso) {
+  if (!iso) return '—';
+  const [y, m, d] = iso.split('-');
+  return `${d}/${m}/${y}`;
+}
+
+// Constrói mapa dia → status a partir das entradas reais
+function buildDayStatuses(entries, ym) {
   const total = daysInMonth(ym);
-  const [y, m] = ym.split('-').map(Number);
-  const result = {};
+  const [y, mo] = ym.split('-').map(Number);
   const today = new Date();
+  today.setHours(23, 59, 59, 999);
+
+  const entryByDay = {};
+  entries.forEach(e => {
+    const day = parseInt(e.date.split('-')[2], 10);
+    entryByDay[day] = e;
+  });
+
+  const result = {};
   for (let d = 1; d <= total; d++) {
-    const date = new Date(y, m - 1, d);
-    if (date > today) continue;
+    const date = new Date(y, mo - 1, d);
     const dow = date.getDay();
-    if (dow === 0 || dow === 6) { result[d] = 'weekend'; continue; }
-    const seed = (empId.charCodeAt(0) + d) % 10;
-    if (seed === 0) result[d] = 'falta';
-    else if (seed === 1) result[d] = 'atraso';
-    else result[d] = 'ok';
+    if (dow === 0 || dow === 6) { result[d] = { status: 'weekend', entry: null }; continue; }
+    if (date > today) continue;
+    const entry = entryByDay[d];
+    if (!entry) {
+      result[d] = { status: 'sem_registro', entry: null };
+    } else {
+      result[d] = { status: entry.status || 'presente', entry };
+    }
   }
   return result;
 }
 
 const STATUS_COLOR = {
-  ok:      { bg: 'var(--ok-bg,#dcfce7)',   color: 'var(--ok)',   label: 'Normal'   },
-  falta:   { bg: '#fee2e2',                color: '#dc2626',     label: 'Falta'    },
-  atraso:  { bg: '#fef9c3',                color: '#ca8a04',     label: 'Atraso'   },
-  weekend: { bg: 'var(--surface-2)',        color: 'var(--muted-2)', label: ''     },
+  presente:     { bg: 'var(--ok-bg,#dcfce7)', color: 'var(--ok)',   label: 'Normal'    },
+  ok:           { bg: 'var(--ok-bg,#dcfce7)', color: 'var(--ok)',   label: 'Normal'    },
+  ajuste:       { bg: 'var(--ok-bg,#dcfce7)', color: 'var(--ok)',   label: 'Ajuste'    },
+  falta:        { bg: '#fee2e2',              color: '#dc2626',      label: 'Falta'     },
+  atraso:       { bg: '#fef9c3',              color: '#ca8a04',      label: 'Atraso'    },
+  hora_extra:   { bg: '#ede9fe',              color: '#7c3aed',      label: 'Extra'     },
+  sem_registro: { bg: 'var(--surface-2)',     color: 'var(--muted-2)', label: ''        },
+  weekend:      { bg: 'var(--surface-2)',     color: 'var(--muted-2)', label: ''        },
 };
 
 // ── Modal base ────────────────────────────────────────────────
@@ -55,10 +87,7 @@ function Modal({ title, onClose, children, width = 480 }) {
     const esc = (e) => e.key === 'Escape' && onClose();
     window.addEventListener('keydown', esc);
     document.body.style.overflow = 'hidden';
-    return () => {
-      window.removeEventListener('keydown', esc);
-      document.body.style.overflow = '';
-    };
+    return () => { window.removeEventListener('keydown', esc); document.body.style.overflow = ''; };
   }, [onClose]);
 
   return (
@@ -66,22 +95,16 @@ function Modal({ title, onClose, children, width = 480 }) {
       position: 'fixed', inset: 0, zIndex: 200,
       background: 'rgba(0,0,0,.45)', backdropFilter: 'blur(3px)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      padding: 'clamp(8px, 2vw, 24px)',
-      overflowY: 'auto',
+      padding: 'clamp(8px, 2vw, 24px)', overflowY: 'auto',
     }} onClick={onClose}>
       <div style={{
         width: '100%', maxWidth: width,
         background: 'var(--surface)', borderRadius: 14,
         boxShadow: '0 24px 64px rgba(0,0,0,.22)',
-        overflow: 'hidden',
-        maxHeight: 'calc(100vh - 32px)',
-        display: 'flex', flexDirection: 'column',
-        margin: 'auto',
+        overflow: 'hidden', maxHeight: 'calc(100vh - 32px)',
+        display: 'flex', flexDirection: 'column', margin: 'auto',
       }} onClick={e => e.stopPropagation()}>
-        <div style={{
-          padding: '16px 20px', borderBottom: '1px solid var(--line)',
-          display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0,
-        }}>
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--line)', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
           <div style={{ flex: 1, fontSize: 15, fontWeight: 700, minWidth: 0 }}>{title}</div>
           <button className="btn ghost icon sm" onClick={onClose}><Icon name="x" size={15} /></button>
         </div>
@@ -104,25 +127,43 @@ function FieldRow({ label, children }) {
 
 // ── Modais específicos ────────────────────────────────────────
 function FaltaModal({ employees, onClose, onSave }) {
-  const [form, setForm] = useState({ employee_id: '', date: new Date().toISOString().slice(0,10), tipo: 'injustificada', motivo: '' });
+  const [form, setForm] = useState({ employee_id: '', date: new Date().toISOString().slice(0,10), tipo: 'injustificada', notes: '' });
+  const [saving, setSaving] = useState(false);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  const handleSave = async () => {
+    if (!form.employee_id || !form.date) return;
+    setSaving(true);
+    const { error } = await createTimeEntry({
+      employee_id: form.employee_id,
+      date: form.date,
+      status: 'falta',
+      tipo: form.tipo,
+      notes: form.notes || null,
+    });
+    setSaving(false);
+    if (error) { alert('Erro: ' + error.message); return; }
+    onSave();
+    onClose();
+  };
+
   return (
     <Modal title="Registrar falta" onClose={onClose}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <FieldRow label="Funcionário">
+        <FieldRow label="Funcionário *">
           <select className="field" value={form.employee_id} onChange={e => set('employee_id', e.target.value)}>
             <option value="">Selecione…</option>
             {employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
           </select>
         </FieldRow>
-        <FieldRow label="Data">
+        <FieldRow label="Data *">
           <input type="date" className="field" value={form.date} onChange={e => set('date', e.target.value)} />
         </FieldRow>
         <FieldRow label="Tipo">
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 8 }}>
             {['justificada','injustificada'].map(t => (
               <button key={t} onClick={() => set('tipo', t)} style={{
-                flex: '1 1 120px', padding: '8px 0', borderRadius: 8, border: '1px solid',
+                flex: 1, padding: '8px 0', borderRadius: 8, border: '1px solid',
                 borderColor: form.tipo === t ? 'var(--brand)' : 'var(--line)',
                 background: form.tipo === t ? 'var(--brand-tint)' : 'var(--surface-2)',
                 color: form.tipo === t ? 'var(--brand)' : 'var(--muted)',
@@ -132,12 +173,14 @@ function FaltaModal({ employees, onClose, onSave }) {
           </div>
         </FieldRow>
         <FieldRow label="Motivo">
-          <textarea className="field" rows={3} placeholder="Descreva o motivo…" value={form.motivo}
-            onChange={e => set('motivo', e.target.value)} style={{ resize: 'vertical', minHeight: 72 }} />
+          <textarea className="field" rows={3} placeholder="Descreva o motivo…" value={form.notes}
+            onChange={e => set('notes', e.target.value)} style={{ resize: 'vertical', minHeight: 72 }} />
         </FieldRow>
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
           <button className="btn" onClick={onClose}>Cancelar</button>
-          <button className="btn primary" onClick={() => onSave(form)}>Registrar falta</button>
+          <button className="btn primary" onClick={handleSave} disabled={saving || !form.employee_id || !form.date}>
+            {saving ? 'Salvando…' : 'Registrar falta'}
+          </button>
         </div>
       </div>
     </Modal>
@@ -145,32 +188,52 @@ function FaltaModal({ employees, onClose, onSave }) {
 }
 
 function HoraExtraModal({ employees, onClose, onSave }) {
-  const [form, setForm] = useState({ employee_id: '', date: new Date().toISOString().slice(0,10), horas: '', motivo: '' });
+  const [form, setForm] = useState({ employee_id: '', date: new Date().toISOString().slice(0,10), extra_hours: '', notes: '' });
+  const [saving, setSaving] = useState(false);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  const handleSave = async () => {
+    if (!form.employee_id || !form.date || !form.extra_hours) return;
+    setSaving(true);
+    const { error } = await createTimeEntry({
+      employee_id: form.employee_id,
+      date: form.date,
+      status: 'hora_extra',
+      extra_hours: form.extra_hours,
+      notes: form.notes || null,
+    });
+    setSaving(false);
+    if (error) { alert('Erro: ' + error.message); return; }
+    onSave();
+    onClose();
+  };
+
   return (
     <Modal title="Lançar hora extra" onClose={onClose}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <FieldRow label="Funcionário">
+        <FieldRow label="Funcionário *">
           <select className="field" value={form.employee_id} onChange={e => set('employee_id', e.target.value)}>
             <option value="">Selecione…</option>
             {employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
           </select>
         </FieldRow>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12 }}>
-          <FieldRow label="Data">
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <FieldRow label="Data *">
             <input type="date" className="field" value={form.date} onChange={e => set('date', e.target.value)} />
           </FieldRow>
-          <FieldRow label="Quantidade (h)">
-            <input type="text" className="field" placeholder="Ex: 2h 30m" value={form.horas} onChange={e => set('horas', e.target.value)} />
+          <FieldRow label="Quantidade *">
+            <input type="text" className="field" placeholder="Ex: 2h30" value={form.extra_hours} onChange={e => set('extra_hours', e.target.value)} />
           </FieldRow>
         </div>
         <FieldRow label="Justificativa">
-          <textarea className="field" rows={3} placeholder="Motivo das horas extras…" value={form.motivo}
-            onChange={e => set('motivo', e.target.value)} style={{ resize: 'vertical', minHeight: 72 }} />
+          <textarea className="field" rows={3} placeholder="Motivo das horas extras…" value={form.notes}
+            onChange={e => set('notes', e.target.value)} style={{ resize: 'vertical', minHeight: 72 }} />
         </FieldRow>
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
           <button className="btn" onClick={onClose}>Cancelar</button>
-          <button className="btn primary" onClick={() => onSave(form)}>Lançar</button>
+          <button className="btn primary" onClick={handleSave} disabled={saving || !form.employee_id || !form.date || !form.extra_hours}>
+            {saving ? 'Salvando…' : 'Lançar'}
+          </button>
         </div>
       </div>
     </Modal>
@@ -178,91 +241,56 @@ function HoraExtraModal({ employees, onClose, onSave }) {
 }
 
 function AjusteModal({ employees, onClose, onSave }) {
-  const [form, setForm] = useState({ employee_id: '', date: new Date().toISOString().slice(0,10), entrada: '', saida: '', motivo: '' });
+  const [form, setForm] = useState({ employee_id: '', date: new Date().toISOString().slice(0,10), time_in: '', time_out: '', notes: '' });
+  const [saving, setSaving] = useState(false);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  const handleSave = async () => {
+    if (!form.employee_id || !form.date) return;
+    setSaving(true);
+    const { error } = await createTimeEntry({
+      employee_id: form.employee_id,
+      date: form.date,
+      time_in: form.time_in || null,
+      time_out: form.time_out || null,
+      status: 'ajuste',
+      notes: form.notes || null,
+    });
+    setSaving(false);
+    if (error) { alert('Erro: ' + error.message); return; }
+    onSave();
+    onClose();
+  };
+
   return (
     <Modal title="Ajuste manual de ponto" onClose={onClose}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <FieldRow label="Funcionário">
+        <FieldRow label="Funcionário *">
           <select className="field" value={form.employee_id} onChange={e => set('employee_id', e.target.value)}>
             <option value="">Selecione…</option>
             {employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
           </select>
         </FieldRow>
-        <FieldRow label="Data">
+        <FieldRow label="Data *">
           <input type="date" className="field" value={form.date} onChange={e => set('date', e.target.value)} />
         </FieldRow>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           <FieldRow label="Entrada">
-            <input type="time" className="field" value={form.entrada} onChange={e => set('entrada', e.target.value)} />
+            <input type="time" className="field" value={form.time_in} onChange={e => set('time_in', e.target.value)} />
           </FieldRow>
           <FieldRow label="Saída">
-            <input type="time" className="field" value={form.saida} onChange={e => set('saida', e.target.value)} />
+            <input type="time" className="field" value={form.time_out} onChange={e => set('time_out', e.target.value)} />
           </FieldRow>
         </div>
         <FieldRow label="Motivo do ajuste">
-          <textarea className="field" rows={2} placeholder="Ex: Esqueceu de registrar saída…" value={form.motivo}
-            onChange={e => set('motivo', e.target.value)} style={{ resize: 'vertical' }} />
+          <textarea className="field" rows={2} placeholder="Ex: Esqueceu de registrar saída…" value={form.notes}
+            onChange={e => set('notes', e.target.value)} style={{ resize: 'vertical' }} />
         </FieldRow>
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
           <button className="btn" onClick={onClose}>Cancelar</button>
-          <button className="btn primary" onClick={() => onSave(form)}>Salvar ajuste</button>
-        </div>
-      </div>
-    </Modal>
-  );
-}
-
-function EscalaModal({ employees, onClose, onSave }) {
-  const [form, setForm] = useState({ nome: '', turno: 'manhã', inicio: '', fim: '', dias: [] });
-  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
-  const toggleDia = (d) => setForm(f => ({
-    ...f, dias: f.dias.includes(d) ? f.dias.filter(x => x !== d) : [...f.dias, d]
-  }));
-  return (
-    <Modal title="Criar escala" onClose={onClose} width={520}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <FieldRow label="Nome da escala">
-          <input type="text" className="field" placeholder="Ex: Turno manhã — Comercial" value={form.nome} onChange={e => set('nome', e.target.value)} />
-        </FieldRow>
-        <FieldRow label="Turno">
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            {['manhã','tarde','noite','integral'].map(t => (
-              <button key={t} onClick={() => set('turno', t)} style={{
-                flex: '1 1 80px', padding: '7px 0', borderRadius: 8, border: '1px solid',
-                borderColor: form.turno === t ? 'var(--brand)' : 'var(--line)',
-                background: form.turno === t ? 'var(--brand-tint)' : 'var(--surface-2)',
-                color: form.turno === t ? 'var(--brand)' : 'var(--muted)',
-                fontWeight: form.turno === t ? 700 : 400, fontSize: 12, cursor: 'pointer',
-                textTransform: 'capitalize',
-              }}>{t}</button>
-            ))}
-          </div>
-        </FieldRow>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12 }}>
-          <FieldRow label="Horário entrada">
-            <input type="time" className="field" value={form.inicio} onChange={e => set('inicio', e.target.value)} />
-          </FieldRow>
-          <FieldRow label="Horário saída">
-            <input type="time" className="field" value={form.fim} onChange={e => set('fim', e.target.value)} />
-          </FieldRow>
-        </div>
-        <FieldRow label="Dias da semana">
-          <div style={{ display: 'flex', gap: 6 }}>
-            {DAYS_PT.map((d, i) => (
-              <button key={d} onClick={() => toggleDia(i)} style={{
-                flex: 1, padding: '7px 0', borderRadius: 8, border: '1px solid',
-                borderColor: form.dias.includes(i) ? 'var(--brand)' : 'var(--line)',
-                background: form.dias.includes(i) ? 'var(--brand-tint)' : 'var(--surface-2)',
-                color: form.dias.includes(i) ? 'var(--brand)' : 'var(--muted)',
-                fontWeight: form.dias.includes(i) ? 700 : 400, fontSize: 11, cursor: 'pointer',
-              }}>{d}</button>
-            ))}
-          </div>
-        </FieldRow>
-        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
-          <button className="btn" onClick={onClose}>Cancelar</button>
-          <button className="btn primary" onClick={() => onSave(form)}>Criar escala</button>
+          <button className="btn primary" onClick={handleSave} disabled={saving || !form.employee_id || !form.date}>
+            {saving ? 'Salvando…' : 'Salvar ajuste'}
+          </button>
         </div>
       </div>
     </Modal>
@@ -270,22 +298,23 @@ function EscalaModal({ employees, onClose, onSave }) {
 }
 
 // ── Calendário mensal ─────────────────────────────────────────
-function MonthCalendar({ ym, empId }) {
-  const statuses = generateDayStatuses(ym, empId);
-  const total    = daysInMonth(ym);
-  const offset   = firstDayOfWeek(ym);
-  const cells    = Array.from({ length: Math.ceil((offset + total) / 7) * 7 });
+function MonthCalendar({ ym, dayStatuses }) {
+  const total  = daysInMonth(ym);
+  const offset = firstDayOfWeek(ym);
+  const cells  = Array.from({ length: Math.ceil((offset + total) / 7) * 7 });
 
-  const counts = Object.values(statuses).reduce((a, s) => {
-    if (s !== 'weekend') a[s] = (a[s] || 0) + 1;
+  const counts = Object.values(dayStatuses).reduce((a, ds) => {
+    if (ds.status !== 'weekend' && ds.status !== 'sem_registro') {
+      a[ds.status] = (a[ds.status] || 0) + 1;
+    }
     return a;
   }, {});
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      {/* Mini legend */}
+      {/* Mini legenda */}
       <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-        {[['ok','Normal','var(--ok)'],['atraso','Atraso','#ca8a04'],['falta','Falta','#dc2626']].map(([k,l,c]) => (
+        {[['presente','Normal','var(--ok)'],['atraso','Atraso','#ca8a04'],['falta','Falta','#dc2626'],['hora_extra','Extra','#7c3aed']].map(([k,l,c]) => (
           <div key={k} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--muted)' }}>
             <span style={{ width: 10, height: 10, borderRadius: 3, background: c, opacity: .7 }} />
             {l} <strong style={{ color: 'var(--ink)', marginLeft: 2 }}>{counts[k] || 0}</strong>
@@ -304,27 +333,32 @@ function MonthCalendar({ ym, empId }) {
           const day = i - offset + 1;
           const valid = day >= 1 && day <= total;
           if (!valid) return <div key={i} />;
-          const s = statuses[day];
-          const sc = STATUS_COLOR[s] || {};
+          const ds = dayStatuses[day];
+          const sc = ds ? STATUS_COLOR[ds.status] || {} : {};
           const isToday = (() => {
             const now = new Date();
             const [y, m] = ym.split('-').map(Number);
             return now.getFullYear() === y && now.getMonth() + 1 === m && now.getDate() === day;
           })();
+          const entry = ds?.entry;
+          const timeLabel = entry?.time_in
+            ? entry.time_in.slice(0,5)
+            : ds?.status === 'falta' ? 'Falta'
+            : ds?.status === 'atraso' ? 'Atraso'
+            : ds?.status === 'hora_extra' ? 'Extra'
+            : '';
+
           return (
             <div key={i} style={{
               borderRadius: 8, padding: '8px 4px', textAlign: 'center',
               background: isToday ? 'var(--brand)' : (sc.bg || 'var(--surface-2)'),
               color: isToday ? 'var(--brand-ink,#fff)' : (sc.color || 'var(--muted-2)'),
               border: isToday ? 'none' : '1px solid var(--line)',
-              cursor: s && s !== 'weekend' ? 'pointer' : 'default',
-              transition: 'opacity .1s',
+              cursor: ds && ds.status !== 'weekend' && ds.status !== 'sem_registro' ? 'pointer' : 'default',
             }}>
               <div style={{ fontSize: 13, fontWeight: isToday ? 700 : 500 }}>{day}</div>
-              {s && s !== 'weekend' && !isToday && (
-                <div style={{ fontSize: 9, marginTop: 2, fontWeight: 600, opacity: .8 }}>
-                  {s === 'ok' ? '08h00' : s === 'atraso' ? 'Atraso' : 'Falta'}
-                </div>
+              {timeLabel && !isToday && (
+                <div style={{ fontSize: 9, marginTop: 2, fontWeight: 600, opacity: .8 }}>{timeLabel}</div>
               )}
             </div>
           );
@@ -336,60 +370,90 @@ function MonthCalendar({ ym, empId }) {
 
 // ── Tela principal ────────────────────────────────────────────
 const TABS = [
-  { id: 'jornada',   label: 'Jornada',       icon: 'clock'     },
-  { id: 'extras',    label: 'Horas extras',   icon: 'sparkle'   },
-  { id: 'faltas',    label: 'Faltas',         icon: 'alert'     },
-  { id: 'banco',     label: 'Banco de horas', icon: 'chart'     },
-  { id: 'escalas',   label: 'Escalas',        icon: 'dashboard' },
+  { id: 'jornada', label: 'Jornada',       icon: 'clock'     },
+  { id: 'extras',  label: 'Horas extras',  icon: 'sparkle'   },
+  { id: 'faltas',  label: 'Faltas',        icon: 'alert'     },
+  { id: 'banco',   label: 'Banco de horas',icon: 'chart'     },
 ];
 
 const NEW_ACTIONS = [
-  { id: 'falta',    label: 'Registrar falta',      icon: 'alert'   },
-  { id: 'extra',    label: 'Lançar hora extra',     icon: 'sparkle' },
-  { id: 'ajuste',   label: 'Ajuste manual de ponto',icon: 'edit'    },
-  { id: 'escala',   label: 'Criar escala',          icon: 'dashboard'},
+  { id: 'falta',  label: 'Registrar falta',       icon: 'alert'    },
+  { id: 'extra',  label: 'Lançar hora extra',      icon: 'sparkle'  },
+  { id: 'ajuste', label: 'Ajuste manual de ponto', icon: 'edit'     },
 ];
+
+const STATUS_LABEL = { presente: 'Presente', ok: 'Presente', ajuste: 'Ajuste', falta: 'Falta', atraso: 'Atraso', hora_extra: 'Extra' };
+const STATUS_CLS   = { presente: 'ok', ok: 'ok', ajuste: 'ok', falta: 'bad', atraso: 'warn', hora_extra: 'info' };
 
 export function TimeScreen({ addToast }) {
   const { employees, loading: empLoading } = useEmployees();
-  const { timecards, loading: tcLoading }  = useAllTimecards();
-
-  const [tab,       setTab]       = useState('jornada');
-  const [empId,     setEmpId]     = useState('');
-  const [month,     setMonth]     = useState(new Date().toISOString().slice(0, 7));
-  const [modal,     setModal]     = useState(null);
-  const [menuOpen,  setMenuOpen]  = useState(false);
+  const [tab,      setTab]      = useState('jornada');
+  const [empId,    setEmpId]    = useState('');
+  const [month,    setMonth]    = useState(new Date().toISOString().slice(0, 7));
+  const [modal,    setModal]    = useState(null);
+  const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef();
 
-  const selectedEmp = employees.find(e => e.id === empId);
+  const { entries, loading: entLoading, refetch } = useMonthEntries(empId || null, month);
 
-  // close dropdown on outside click
+  const selectedEmp  = employees.find(e => e.id === empId);
+  const dayStatuses  = empId ? buildDayStatuses(entries, month) : {};
+
+  // KPIs (só quando funcionário selecionado)
+  const presenteEntries = entries.filter(e => ['presente','ok','ajuste'].includes(e.status) && e.time_in);
+  const faltaCount  = entries.filter(e => e.status === 'falta').length;
+  const atrasoCount = entries.filter(e => e.status === 'atraso').length;
+  const extraCount  = entries.filter(e => e.status === 'hora_extra').length;
+
+  const totalMins = presenteEntries.reduce((sum, e) => {
+    const tin  = parseTimeToMinutes(e.time_in);
+    const tout = parseTimeToMinutes(e.time_out);
+    if (tin !== null && tout !== null && tout > tin) return sum + (tout - tin);
+    return sum;
+  }, 0);
+  const workedH = empId ? (totalMins > 0 ? minutesToHM(totalMins) : '—') : '—';
+  const banco   = empId ? `${extraCount > 0 ? '+' : ''}${extraCount * 2}h` : '—';
+
+  const workDays = (() => {
+    const total = daysInMonth(month);
+    const [y, m] = month.split('-').map(Number);
+    let count = 0;
+    for (let d = 1; d <= total; d++) {
+      const dow = new Date(y, m - 1, d).getDay();
+      if (dow !== 0 && dow !== 6) count++;
+    }
+    return count;
+  })();
+
   useEffect(() => {
-    const handler = (e) => { if (menuRef.current && !menuRef.current.contains(e.target)) setMenuOpen(false); };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
+    const h = (e) => { if (menuRef.current && !menuRef.current.contains(e.target)) setMenuOpen(false); };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
   }, []);
 
-  // KPIs from timecards of selected employee/month
-  const card = timecards.find(tc => tc.employee_id === empId && tc.month_year === month);
-  const dayStatuses = generateDayStatuses(month, empId);
-  const workDays = Object.values(dayStatuses).filter(s => s !== 'weekend').length;
-  const faltas   = Object.values(dayStatuses).filter(s => s === 'falta').length;
-  const atrasos  = Object.values(dayStatuses).filter(s => s === 'atraso').length;
-  const workedH  = card?.worked_hours || (empId ? `${(workDays - faltas) * 8}h00` : '—');
-  const banco    = empId ? `+${atrasos > 0 ? Math.max(0, 4 - atrasos * 0.5).toFixed(0) : '4'}h 30m` : '—';
-
-  const handleSave = async (type, data) => {
-    setModal(null);
-    // persist via createTimecard for jornada; for others show success toast
-    if (type === 'extra' && data.employee_id && data.horas) {
-      await createTimecard({ employee_id: data.employee_id, month_year: month, worked_hours: data.horas });
-    }
+  const handleSaved = useCallback(() => {
+    refetch();
     addToast({ kind: 'ok', msg: 'Registro salvo com sucesso.' });
-  };
+  }, [refetch, addToast]);
 
-  // Table data for non-jornada tabs (derived from timecards)
-  const tableRows = timecards.filter(tc => !empId || tc.employee_id === empId);
+  // Dados para cada tab
+  const faltaRows  = entries.filter(e => e.status === 'falta');
+  const extraRows  = entries.filter(e => e.status === 'hora_extra');
+
+  // Para banco: agrupa por funcionário
+  const bancoMap = entries.reduce((acc, e) => {
+    const name = e.employees?.name || e.employee_id;
+    if (!acc[name]) acc[name] = { name, presente: 0, falta: 0, extra: 0, mins: 0 };
+    if (e.status === 'falta') acc[name].falta++;
+    else if (e.status === 'hora_extra') acc[name].extra++;
+    else if (e.time_in && e.time_out) {
+      const tin  = parseTimeToMinutes(e.time_in);
+      const tout = parseTimeToMinutes(e.time_out);
+      if (tin !== null && tout !== null && tout > tin) { acc[name].mins += tout - tin; acc[name].presente++; }
+    }
+    return acc;
+  }, {});
+  const bancoRows = Object.values(bancoMap);
 
   return (
     <>
@@ -400,12 +464,10 @@ export function TimeScreen({ addToast }) {
         <div style={{ flex: 1 }}>
           <h1 style={{ margin: '0 0 4px', fontSize: 22, fontWeight: 700, letterSpacing: -0.4 }}>Controle de ponto</h1>
           <p style={{ margin: 0, fontSize: 13, color: 'var(--muted)' }}>
-            Jornada, faltas, horas extras, banco e escalas em um único lugar.
+            Jornada, faltas, horas extras e banco em um único lugar.
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <button className="btn"><Icon name="download" size={14} /> Exportar espelho</button>
-          {/* Novo button + dropdown */}
           <div ref={menuRef} style={{ position: 'relative' }}>
             <button className="btn primary" onClick={() => setMenuOpen(o => !o)}>
               <Icon name="plus" size={14} /> Novo <Icon name="chevron-down" size={12} />
@@ -421,8 +483,7 @@ export function TimeScreen({ addToast }) {
                   <button key={a.id} onClick={() => { setMenuOpen(false); setModal(a.id); }} style={{
                     display: 'flex', alignItems: 'center', gap: 10,
                     width: '100%', padding: '11px 14px', border: 'none',
-                    background: 'transparent', cursor: 'pointer', fontSize: 13.5, color: 'var(--ink)',
-                    textAlign: 'left',
+                    background: 'transparent', cursor: 'pointer', fontSize: 13.5, color: 'var(--ink)', textAlign: 'left',
                   }}
                   onMouseEnter={e => e.currentTarget.style.background = 'var(--hover)'}
                   onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
@@ -437,12 +498,11 @@ export function TimeScreen({ addToast }) {
         </div>
       </div>
 
-      {/* ── Filtros: funcionário + mês ── */}
+      {/* ── Filtros ── */}
       <div style={{
         display: 'flex', gap: 10, flexWrap: 'wrap',
         padding: '12px 16px', background: 'var(--surface)',
-        border: '1px solid var(--line)', borderRadius: 10,
-        alignItems: 'center',
+        border: '1px solid var(--line)', borderRadius: 10, alignItems: 'center',
       }}>
         <Icon name="user" size={15} style={{ color: 'var(--muted)', flexShrink: 0 }} />
         <select
@@ -453,16 +513,12 @@ export function TimeScreen({ addToast }) {
           style={{ flex: 1, maxWidth: 280, height: 36, fontSize: 13 }}
         >
           <option value="">Todos os funcionários</option>
-          {employees.map(e => <option key={e.id} value={e.id}>{e.name} — {e.dept}</option>)}
+          {employees.map(e => <option key={e.id} value={e.id}>{e.name}{e.dept ? ` — ${e.dept}` : ''}</option>)}
         </select>
-
         <div style={{ width: 1, height: 24, background: 'var(--line)', margin: '0 4px' }} />
-
         <Icon name="history" size={15} style={{ color: 'var(--muted)', flexShrink: 0 }} />
         <input
-          type="month"
-          className="field"
-          value={month}
+          type="month" className="field" value={month}
           onChange={e => setMonth(e.target.value)}
           style={{ width: 160, height: 36, fontSize: 13 }}
         />
@@ -483,33 +539,24 @@ export function TimeScreen({ addToast }) {
       {/* ── KPIs ── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
         {[
-          { label: 'Horas trabalhadas', value: workedH,          icon: 'clock',    color: 'var(--brand)' },
-          { label: 'Banco de horas',    value: banco,            icon: 'sparkle',  color: 'var(--ok)'   },
-          { label: 'Faltas no mês',     value: empId ? faltas : '—', icon: 'alert', color: faltas > 0 ? '#dc2626' : 'var(--muted)' },
-          { label: 'Atrasos no mês',    value: empId ? atrasos : '—', icon: 'history', color: atrasos > 0 ? '#ca8a04' : 'var(--muted)' },
+          { label: 'Horas trabalhadas', value: workedH,                          icon: 'clock',   color: 'var(--brand)'                            },
+          { label: 'Banco de horas',    value: banco,                             icon: 'sparkle', color: 'var(--ok)'                               },
+          { label: 'Faltas no mês',     value: empId ? faltaCount  : '—',        icon: 'alert',   color: faltaCount  > 0 ? '#dc2626' : 'var(--muted)' },
+          { label: 'Atrasos no mês',    value: empId ? atrasoCount : '—',        icon: 'history', color: atrasoCount > 0 ? '#ca8a04' : 'var(--muted)' },
         ].map((k, i) => (
-          <div key={i} style={{
-            background: 'var(--surface)', border: '1px solid var(--line)',
-            borderRadius: 10, padding: '14px 18px',
-          }}>
+          <div key={i} style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 10, padding: '14px 18px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
               <Icon name={k.icon} size={13} style={{ color: k.color }} />
-              <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                {k.label}
-              </span>
+              <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>{k.label}</span>
             </div>
-            <div style={{ fontSize: 22, fontWeight: 800, color: k.color, letterSpacing: -0.5 }}>
-              {k.value}
-            </div>
-            <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
-              {fmtMonth(month)}
-            </div>
+            <div style={{ fontSize: 22, fontWeight: 800, color: k.color, letterSpacing: -0.5 }}>{k.value}</div>
+            <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>{fmtMonth(month)}</div>
           </div>
         ))}
       </div>
 
-      {/* ── Tab strip ── */}
-      <div style={{ display: 'flex', borderBottom: '1px solid var(--line)', gap: 0 }}>
+      {/* ── Tabs ── */}
+      <div style={{ display: 'flex', borderBottom: '1px solid var(--line)' }}>
         {TABS.map(t => (
           <button key={t.id} onClick={() => setTab(t.id)} style={{
             display: 'flex', alignItems: 'center', gap: 6,
@@ -519,110 +566,125 @@ export function TimeScreen({ addToast }) {
             borderBottom: `2px solid ${tab === t.id ? 'var(--brand)' : 'transparent'}`,
             marginBottom: -1, cursor: 'pointer', whiteSpace: 'nowrap',
           }}>
-            <Icon name={t.icon} size={13} />
-            {t.label}
+            <Icon name={t.icon} size={13} />{t.label}
           </button>
         ))}
       </div>
 
-      {/* ── Tab content ── */}
+      {/* ── Jornada ── */}
       {tab === 'jornada' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 16, alignItems: 'start' }}>
-          {/* Calendar */}
-          <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 10, padding: 20 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-              <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700 }}>
-                {fmtMonth(month)}
-              </h3>
-              {!empId && (
-                <span style={{ fontSize: 12, color: 'var(--muted)', background: 'var(--surface-2)', padding: '3px 10px', borderRadius: 20 }}>
-                  Selecione um funcionário para ver a jornada
-                </span>
-              )}
-            </div>
-            <MonthCalendar ym={month} empId={empId} />
-          </div>
-
-          {/* Side panel */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {/* Resumo do mês */}
-            <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 10, padding: 16 }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 12 }}>
-                Resumo do mês
-              </div>
-              {[
-                { l: 'Dias úteis',       v: `${workDays}d` },
-                { l: 'Dias trabalhados', v: empId ? `${workDays - faltas}d` : '—' },
-                { l: 'Faltas',           v: empId ? `${faltas}d` : '—',     warn: faltas > 0 },
-                { l: 'Atrasos',          v: empId ? `${atrasos}x` : '—',   warn: atrasos > 0 },
-                { l: 'Horas previstas',  v: `${workDays * 8}h` },
-                { l: 'Horas trabalhadas',v: workedH },
-              ].map((r, i) => (
-                <div key={i} style={{
-                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                  padding: '7px 0', borderBottom: i < 5 ? '1px solid var(--line-soft)' : 'none',
-                }}>
-                  <span style={{ fontSize: 13, color: 'var(--muted)' }}>{r.l}</span>
-                  <span style={{ fontSize: 13, fontWeight: 600, color: r.warn ? '#dc2626' : 'var(--ink)' }}>{r.v}</span>
+        <div style={{ display: 'grid', gridTemplateColumns: empId ? '1fr 340px' : '1fr', gap: 16, alignItems: 'start' }}>
+          {empId ? (
+            <>
+              {/* Calendário */}
+              <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 10, padding: 20 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+                  <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700 }}>{fmtMonth(month)}</h3>
+                  {entLoading && <span style={{ fontSize: 12, color: 'var(--muted)' }} className="pulse">Carregando…</span>}
                 </div>
-              ))}
-            </div>
-
-            {/* Ações rápidas */}
-            <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 10, padding: 16 }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 12 }}>
-                Ações rápidas
+                <MonthCalendar ym={month} dayStatuses={dayStatuses} />
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {NEW_ACTIONS.map(a => (
-                  <button key={a.id} className="btn" style={{ justifyContent: 'flex-start', gap: 8 }}
-                    onClick={() => setModal(a.id)}>
-                    <Icon name={a.icon} size={13} style={{ color: 'var(--brand)' }} />
-                    {a.label}
-                  </button>
-                ))}
+              {/* Painel lateral */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 10, padding: 16 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 12 }}>
+                    Resumo do mês
+                  </div>
+                  {[
+                    { l: 'Dias úteis',        v: `${workDays}d` },
+                    { l: 'Dias com registro', v: `${presenteEntries.length}d` },
+                    { l: 'Faltas',            v: `${faltaCount}d`,   warn: faltaCount  > 0 },
+                    { l: 'Atrasos',           v: `${atrasoCount}x`,  warn: atrasoCount > 0 },
+                    { l: 'Horas extras',      v: `${extraCount}x` },
+                    { l: 'Horas trabalhadas', v: workedH },
+                  ].map((r, i) => (
+                    <div key={i} style={{
+                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                      padding: '7px 0', borderBottom: i < 5 ? '1px solid var(--line-soft)' : 'none',
+                    }}>
+                      <span style={{ fontSize: 13, color: 'var(--muted)' }}>{r.l}</span>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: r.warn ? '#dc2626' : 'var(--ink)' }}>{r.v}</span>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 10, padding: 16 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 12 }}>
+                    Ações rápidas
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {NEW_ACTIONS.map(a => (
+                      <button key={a.id} className="btn" style={{ justifyContent: 'flex-start', gap: 8 }} onClick={() => setModal(a.id)}>
+                        <Icon name={a.icon} size={13} style={{ color: 'var(--brand)' }} />{a.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
+            </>
+          ) : (
+            /* Tabela de todos quando nenhum funcionário selecionado */
+            <EntriesTable entries={entries} loading={entLoading} emptyMsg="Selecione um funcionário ou veja todos os registros do mês." showEmployee />
+          )}
         </div>
       )}
 
-      {tab !== 'jornada' && (
+      {/* ── Faltas ── */}
+      {tab === 'faltas' && (
+        <EntriesTable entries={faltaRows} loading={entLoading} showEmployee={!empId}
+          columns={[
+            { key: 'date',  label: 'Data',       render: r => fmtDate(r.date) },
+            !empId && { key: 'emp', label: 'Funcionário', render: r => r.employees?.name || '—' },
+            { key: 'tipo',  label: 'Tipo',        render: r => r.tipo ? (r.tipo.charAt(0).toUpperCase() + r.tipo.slice(1)) : '—' },
+            { key: 'notes', label: 'Motivo',      render: r => r.notes || '—' },
+          ].filter(Boolean)}
+          emptyMsg="Nenhuma falta registrada neste período."
+        />
+      )}
+
+      {/* ── Extras ── */}
+      {tab === 'extras' && (
+        <EntriesTable entries={extraRows} loading={entLoading} showEmployee={!empId}
+          columns={[
+            { key: 'date',        label: 'Data',         render: r => fmtDate(r.date) },
+            !empId && { key: 'emp', label: 'Funcionário', render: r => r.employees?.name || '—' },
+            { key: 'extra_hours', label: 'Horas extras', render: r => r.extra_hours || '—' },
+            { key: 'notes',       label: 'Justificativa',render: r => r.notes || '—' },
+          ].filter(Boolean)}
+          emptyMsg="Nenhuma hora extra registrada neste período."
+        />
+      )}
+
+      {/* ── Banco ── */}
+      {tab === 'banco' && (
         <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 10, overflow: 'hidden' }}>
-          {tcLoading ? (
-            <div style={{ padding: 40, textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>
-              <div className="pulse">Carregando…</div>
-            </div>
-          ) : tableRows.length === 0 ? (
-            <div style={{ padding: 56, textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>
-              <Icon name={TABS.find(t=>t.id===tab)?.icon || 'clock'} size={28} style={{ opacity: .3, marginBottom: 10 }} />
-              <div style={{ fontWeight: 600, marginBottom: 4 }}>Nenhum registro</div>
-              <div style={{ fontSize: 12 }}>Use o botão "Novo" para lançar</div>
-            </div>
+          {entLoading ? (
+            <div style={{ padding: 40, textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}><div className="pulse">Carregando…</div></div>
+          ) : bancoRows.length === 0 ? (
+            <EmptyState icon="chart" msg="Nenhum registro encontrado para este período." />
           ) : (
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
               <thead>
                 <tr style={{ background: 'var(--surface-2)', color: 'var(--muted)', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 }}>
                   <th style={{ padding: '10px 18px', textAlign: 'left', fontWeight: 600 }}>Funcionário</th>
-                  <th style={{ padding: '10px 18px', textAlign: 'left', fontWeight: 600 }}>Mês</th>
-                  <th style={{ padding: '10px 18px', textAlign: 'left', fontWeight: 600 }}>
-                    {tab === 'extras' ? 'Horas extras' : tab === 'faltas' ? 'Faltas' : tab === 'banco' ? 'Saldo' : 'Escala'}
-                  </th>
-                  <th style={{ padding: '10px 18px', textAlign: 'left', fontWeight: 600 }}>Status</th>
-                  <th style={{ width: 60 }} />
+                  <th style={{ padding: '10px 18px', textAlign: 'left', fontWeight: 600 }}>Dias presentes</th>
+                  <th style={{ padding: '10px 18px', textAlign: 'left', fontWeight: 600 }}>Horas trabalhadas</th>
+                  <th style={{ padding: '10px 18px', textAlign: 'left', fontWeight: 600 }}>Faltas</th>
+                  <th style={{ padding: '10px 18px', textAlign: 'left', fontWeight: 600 }}>Horas extras</th>
                 </tr>
               </thead>
               <tbody>
-                {tableRows.map(tc => (
-                  <tr key={tc.id} style={{ borderTop: '1px solid var(--line-soft)' }}
+                {bancoRows.map((r, i) => (
+                  <tr key={i} style={{ borderTop: '1px solid var(--line-soft)' }}
                     onMouseEnter={e => e.currentTarget.style.background = 'var(--hover)'}
                     onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                    <td style={{ padding: '10px 18px', fontWeight: 500 }}>{tc.employees?.name || '—'}</td>
-                    <td style={{ padding: '10px 18px', color: 'var(--muted)' }}>{tc.month_year}</td>
-                    <td style={{ padding: '10px 18px', fontFamily: 'monospace' }}>{tc.worked_hours}</td>
-                    <td style={{ padding: '10px 18px' }}><span className="pill ok" style={{ fontSize: 11 }}>OK</span></td>
+                    <td style={{ padding: '10px 18px', fontWeight: 500 }}>{r.name}</td>
+                    <td style={{ padding: '10px 18px', color: 'var(--muted)' }}>{r.presente}d</td>
+                    <td style={{ padding: '10px 18px', fontFamily: 'monospace' }}>{minutesToHM(r.mins)}</td>
                     <td style={{ padding: '10px 18px' }}>
-                      <button className="btn ghost icon sm"><Icon name="more-v" size={13} /></button>
+                      {r.falta > 0 ? <span className="pill bad" style={{ fontSize: 11 }}>{r.falta}d</span> : <span style={{ color: 'var(--muted)' }}>—</span>}
+                    </td>
+                    <td style={{ padding: '10px 18px' }}>
+                      {r.extra > 0 ? <span className="pill info" style={{ fontSize: 11 }}>{r.extra}x</span> : <span style={{ color: 'var(--muted)' }}>—</span>}
                     </td>
                   </tr>
                 ))}
@@ -634,11 +696,71 @@ export function TimeScreen({ addToast }) {
 
     </div>
 
-    {/* modais fora do fade-up para não quebrarem position:fixed */}
-    {modal === 'falta'  && <FaltaModal    employees={employees} onClose={() => setModal(null)} onSave={d => handleSave('falta', d)}  />}
-    {modal === 'extra'  && <HoraExtraModal employees={employees} onClose={() => setModal(null)} onSave={d => handleSave('extra', d)}  />}
-    {modal === 'ajuste' && <AjusteModal   employees={employees} onClose={() => setModal(null)} onSave={d => handleSave('ajuste', d)} />}
-    {modal === 'escala' && <EscalaModal   employees={employees} onClose={() => setModal(null)} onSave={d => handleSave('escala', d)} />}
-  </>
+    {modal === 'falta'  && <FaltaModal     employees={employees} onClose={() => setModal(null)} onSave={handleSaved} />}
+    {modal === 'extra'  && <HoraExtraModal employees={employees} onClose={() => setModal(null)} onSave={handleSaved} />}
+    {modal === 'ajuste' && <AjusteModal    employees={employees} onClose={() => setModal(null)} onSave={handleSaved} />}
+    </>
+  );
+}
+
+// ── Componentes auxiliares ────────────────────────────────────
+function EmptyState({ icon, msg }) {
+  return (
+    <div style={{ padding: 56, textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>
+      <Icon name={icon} size={28} style={{ opacity: .3, marginBottom: 10 }} />
+      <div style={{ fontWeight: 600, marginBottom: 4 }}>Nenhum registro</div>
+      <div style={{ fontSize: 12 }}>{msg}</div>
+    </div>
+  );
+}
+
+function EntriesTable({ entries, loading, columns, emptyMsg, showEmployee }) {
+  const STATUS_LABEL = { presente: 'Presente', ok: 'Presente', ajuste: 'Ajuste', falta: 'Falta', atraso: 'Atraso', hora_extra: 'Extra' };
+  const STATUS_CLS   = { presente: 'ok', ok: 'ok', ajuste: 'ok', falta: 'bad', atraso: 'warn', hora_extra: 'info' };
+
+  const cols = columns || [
+    showEmployee && { key: 'emp',      label: 'Funcionário', render: r => r.employees?.name || '—' },
+    { key: 'date',     label: 'Data',     render: r => fmtDate(r.date) },
+    { key: 'time_in',  label: 'Entrada',  render: r => r.time_in ? r.time_in.slice(0,5) : '—' },
+    { key: 'time_out', label: 'Saída',    render: r => r.time_out ? r.time_out.slice(0,5) : '—' },
+    { key: 'status',   label: 'Status',   render: r => (
+      <span className={`pill ${STATUS_CLS[r.status] || 'ok'}`} style={{ fontSize: 11 }}>
+        {STATUS_LABEL[r.status] || r.status || 'Presente'}
+      </span>
+    )},
+    { key: 'notes',    label: 'Obs.',     render: r => r.notes ? <span style={{ color: 'var(--muted)', fontSize: 12 }}>{r.notes}</span> : null },
+  ].filter(Boolean);
+
+  return (
+    <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 10, overflow: 'hidden' }}>
+      {loading ? (
+        <div style={{ padding: 40, textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}><div className="pulse">Carregando…</div></div>
+      ) : entries.length === 0 ? (
+        <EmptyState icon="clock" msg={emptyMsg || 'Nenhum registro encontrado.'} />
+      ) : (
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 400 }}>
+            <thead>
+              <tr style={{ background: 'var(--surface-2)', color: 'var(--muted)', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                {cols.map(c => <th key={c.key} style={{ padding: '10px 18px', textAlign: 'left', fontWeight: 600, whiteSpace: 'nowrap' }}>{c.label}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {entries.map(r => (
+                <tr key={r.id} style={{ borderTop: '1px solid var(--line-soft)' }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'var(--hover)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                  {cols.map(c => (
+                    <td key={c.key} style={{ padding: '10px 18px', color: 'var(--ink)' }}>
+                      {c.render(r) ?? <span style={{ color: 'var(--muted)' }}>—</span>}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
   );
 }
