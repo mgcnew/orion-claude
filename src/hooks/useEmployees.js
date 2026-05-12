@@ -1,8 +1,56 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase.js';
 
-// Lista de funcionários com filtro opcional por status e busca textual
-export function useEmployees({ status, search } = {}) {
+// ============================================================
+// EMPRESAS
+// ============================================================
+
+export function useCompanies() {
+  const [companies, setCompanies] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const fetch = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    const { data, error: err } = await supabase
+      .from('companies')
+      .select('*')
+      .eq('active', true)
+      .order('name');
+    if (err) setError(err.message);
+    else setCompanies(data ?? []);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { fetch(); }, [fetch]);
+
+  return { companies, loading, error, refetch: fetch };
+}
+
+export async function createCompany(data) {
+  const { data: created, error } = await supabase
+    .from('companies')
+    .insert(data)
+    .select()
+    .single();
+  return { created, error };
+}
+
+export async function updateCompany(id, data) {
+  const { error } = await supabase
+    .from('companies')
+    .update(data)
+    .eq('id', id);
+  return { error };
+}
+
+// ============================================================
+// FUNCIONÁRIOS
+// ============================================================
+
+// Lista de funcionários com filtro opcional por status, busca textual e empresa
+export function useEmployees({ status, search, companyId } = {}) {
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -20,6 +68,10 @@ export function useEmployees({ status, search } = {}) {
       query = query.eq('status', status);
     }
 
+    if (companyId) {
+      query = query.eq('company_id', companyId);
+    }
+
     if (search) {
       query = query.or(
         `name.ilike.%${search}%,role.ilike.%${search}%,dept.ilike.%${search}%`
@@ -30,7 +82,7 @@ export function useEmployees({ status, search } = {}) {
     if (err) setError(err.message);
     else setEmployees(data ?? []);
     setLoading(false);
-  }, [status, search]);
+  }, [status, search, companyId]);
 
   useEffect(() => { fetch(); }, [fetch]);
 
@@ -471,4 +523,37 @@ export async function createTimecard(data) {
 
   if (error) throw error;
   return res;
+}
+
+// ============================================================
+// CONVITES
+// ============================================================
+
+export function usePendingInvites() {
+  const [invites, setInvites] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetch = useCallback(async () => {
+    setLoading(true);
+    const { data } = await supabase
+      .from('pending_invites')
+      .select('*')
+      .order('created_at', { ascending: false });
+    setInvites(data ?? []);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { fetch(); }, [fetch]);
+
+  return { invites, loading, refetch: fetch };
+}
+
+export async function sendInvite({ email, role, companyIds }) {
+  const { data: { user } } = await supabase.auth.getUser();
+  const { data, error } = await supabase
+    .from('pending_invites')
+    .insert({ email, role, company_ids: companyIds, invited_by: user?.id })
+    .select()
+    .single();
+  return { data, error };
 }

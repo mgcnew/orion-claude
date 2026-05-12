@@ -1,8 +1,56 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import Icon from '../components/Icon.jsx';
 import Avatar from '../components/Avatar.jsx';
-import { useEmployees, useEmployee, useEmployeeCounts, useEmployeeWarnings, useEmployeeVacations, useEmployeeDocuments, useEmployeeHistory, useEmployeeTimeEntries, clockIn, clockOut, createEmployee, updateEmployee, updateEmployeeStatus, createDocuments } from '../hooks/useEmployees.js';
+import { useEmployees, useEmployee, useEmployeeCounts, useEmployeeWarnings, useEmployeeVacations, useEmployeeDocuments, useEmployeeHistory, useEmployeeTimeEntries, clockIn, clockOut, createEmployee, updateEmployee, updateEmployeeStatus, createDocuments, useCompanies } from '../hooks/useEmployees.js';
 import { supabase } from '../lib/supabase.js';
+
+const fmtDate = (d) => d ? new Date(d + 'T00:00:00').toLocaleDateString('pt-BR') : '—';
+const normalizeDateForInput = (value) => {
+  if (!value) return '';
+  if (typeof value !== 'string') return '';
+  const trimmed = value.slice(0, 10);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? '' : date.toISOString().slice(0, 10);
+};
+
+// Campo de data com máscara DD/MM/AAAA que converte de/para ISO internamente
+function DateInput({ value, onChange, className, hasError }) {
+  const toDisplay = (iso) => {
+    if (!iso) return '';
+    const [y, m, d] = iso.split('-');
+    return `${d}/${m}/${y}`;
+  };
+
+  const [display, setDisplay] = useState(() => toDisplay(value));
+
+  useEffect(() => { setDisplay(toDisplay(value)); }, [value]);
+
+  const handleChange = (e) => {
+    let raw = e.target.value.replace(/\D/g, '').slice(0, 8);
+    let masked = raw;
+    if (raw.length > 4) masked = raw.slice(0, 2) + '/' + raw.slice(2, 4) + '/' + raw.slice(4);
+    else if (raw.length > 2) masked = raw.slice(0, 2) + '/' + raw.slice(2);
+    setDisplay(masked);
+    if (raw.length === 8) {
+      onChange({ target: { value: `${raw.slice(4, 8)}-${raw.slice(2, 4)}-${raw.slice(0, 2)}` } });
+    } else {
+      onChange({ target: { value: '' } });
+    }
+  };
+
+  return (
+    <input
+      type="text"
+      className={`field${hasError ? ' error' : ''}${className ? ' ' + className : ''}`}
+      value={display}
+      onChange={handleChange}
+      placeholder="DD/MM/AAAA"
+      maxLength={10}
+      inputMode="numeric"
+    />
+  );
+}
 
 // ============================================================
 // MODAL BASE
@@ -71,7 +119,7 @@ const NEW_EMP_STEPS = [
 
 const BLANK_EMP = {
   name: '', cpf: '', birth_date: '', civil_status: 'Solteiro(a)',
-  role: '', dept: '', company: 'Orion Matriz', contract: 'CLT — Tempo indet.',
+  role: '', dept: '', company: '', company_id: '', contract: 'CLT — Tempo indet.',
   admission: new Date().toISOString().slice(0, 10), salary: '', cost_center: '', workload: '44h semanais', regime: 'Presencial', supervisor: '',
   phone: '', email_personal: '', address: '', neighborhood: '', city: '', state: '', zip_code: '',
   status: 'ativo',
@@ -84,6 +132,7 @@ export function NewEmployeeModal({ onClose, onCreated }) {
   const [errors, setErrors] = useState({});
   const [docFiles, setDocFiles] = useState([]);
   const docInputRef = useRef();
+  const { companies } = useCompanies();
 
   useEffect(() => {
     const esc = (e) => e.key === 'Escape' && onClose();
@@ -224,7 +273,7 @@ export function NewEmployeeModal({ onClose, onCreated }) {
                 <input className="field" value={form.cpf} onChange={e => set('cpf', e.target.value)} placeholder="000.000.000-00" />
               </FL>
               <FL label="Data de nascimento">
-                <input type="date" className="field" value={form.birth_date} onChange={e => set('birth_date', e.target.value)} />
+                <DateInput value={form.birth_date} onChange={e => set('birth_date', e.target.value)} />
               </FL>
               <FL label="Estado civil" span={2}>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -253,8 +302,17 @@ export function NewEmployeeModal({ onClose, onCreated }) {
                 {errors.dept && <span style={{ fontSize: 11, color: 'var(--bad)' }}>{errors.dept}</span>}
               </FL>
               <FL label="Empresa">
-                <select className="field" value={form.company} onChange={e => set('company', e.target.value)}>
-                  {['Orion Matriz','Orion Filial SP','Orion Filial RJ','Orion Filial MG'].map(c => <option key={c}>{c}</option>)}
+                <select
+                  className="field"
+                  value={form.company_id}
+                  onChange={e => {
+                    const co = companies.find(c => c.id === e.target.value);
+                    set('company_id', e.target.value);
+                    set('company', co?.name || '');
+                  }}
+                >
+                  <option value="">Selecionar empresa…</option>
+                  {companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </FL>
               <FL label="Tipo de contrato">
@@ -263,7 +321,7 @@ export function NewEmployeeModal({ onClose, onCreated }) {
                 </select>
               </FL>
               <FL label="Data de admissão *">
-                <input type="date" className={`field ${errors.admission ? 'error' : ''}`} value={form.admission} onChange={e => set('admission', e.target.value)} />
+                <DateInput value={form.admission} onChange={e => set('admission', e.target.value)} hasError={!!errors.admission} />
                 {errors.admission && <span style={{ fontSize: 11, color: 'var(--bad)' }}>{errors.admission}</span>}
               </FL>
               <FL label="Salário base (R$)">
@@ -319,11 +377,11 @@ export function NewEmployeeModal({ onClose, onCreated }) {
               {[
                 {
                   title: 'Dados pessoais',
-                  rows: [['Nome', form.name||'—'],['CPF', form.cpf||'—'],['Nascimento', form.birth_date||'—'],['Estado civil', form.civil_status]],
+                  rows: [['Nome', form.name||'—'],['CPF', form.cpf||'—'],['Nascimento', fmtDate(form.birth_date)],['Estado civil', form.civil_status]],
                 },
                 {
                   title: 'Dados profissionais',
-                  rows: [['Cargo', form.role||'—'],['Departamento', form.dept||'—'],['Empresa', form.company],['Contrato', form.contract],['Admissão', form.admission||'—'],['Salário', form.salary ? `R$ ${parseFloat(form.salary).toLocaleString('pt-BR',{minimumFractionDigits:2})}` : '—'],['Regime', form.regime],['Carga', form.workload]],
+                  rows: [['Cargo', form.role||'—'],['Departamento', form.dept||'—'],['Empresa', form.company],['Contrato', form.contract],['Admissão', fmtDate(form.admission)],['Salário', form.salary ? `R$ ${parseFloat(form.salary).toLocaleString('pt-BR',{minimumFractionDigits:2})}` : '—'],['Regime', form.regime],['Carga', form.workload]],
                 },
                 ...(form.phone || form.email_personal || form.city ? [{
                   title: 'Contato & endereço',
@@ -656,7 +714,7 @@ function RowMenu({ emp, onProfile, onAfastar, onDesligar, onReativar }) {
   );
 }
 
-export function EmployeesList({ setRoute, setRouteParam, setRouteLabel }) {
+export function EmployeesList({ setRoute, setRouteParam, setRouteLabel, companyId }) {
   const [view, setView]     = useState('table');
   const [tab, setTab]       = useState('todos');
   const [q, setQ]           = useState('');
@@ -668,6 +726,7 @@ export function EmployeesList({ setRoute, setRouteParam, setRouteLabel }) {
   const { employees: filtered, loading, refetch } = useEmployees({
     status: tab !== 'todos' ? tab : undefined,
     search: q || undefined,
+    companyId,
   });
 
   const onSaved = () => { refetch(); refetchCounts(); };
@@ -1076,12 +1135,14 @@ const EDIT_EMP_STEPS = [
 
 function EditEmployeeModal({ employee, onClose, onSaved }) {
   const [step, setStep] = useState(0);
+  const { companies } = useCompanies();
   const [form, setForm] = useState({
     name: employee.name || '', cpf: employee.cpf || '',
-    birth_date: employee.birth_date || '', civil_status: employee.civil_status || 'Solteiro(a)',
+    birth_date: normalizeDateForInput(employee.birth_date), civil_status: employee.civil_status || 'Solteiro(a)',
     role: employee.role || '', dept: employee.dept || '',
-    company: employee.company || 'Orion Matriz', contract: employee.contract || 'CLT — Tempo indet.',
-    admission: employee.admission || '', salary: employee.salary?.toString() || '',
+    company: employee.company || '', company_id: employee.company_id || '',
+    contract: employee.contract || 'CLT — Tempo indet.',
+    admission: normalizeDateForInput(employee.admission), salary: employee.salary?.toString() || '',
     cost_center: employee.cost_center || '', workload: employee.workload || '44h semanais',
     regime: employee.regime || 'Presencial', supervisor: employee.supervisor || '',
     phone: employee.phone || '', email_personal: employee.email_personal || '',
@@ -1212,7 +1273,7 @@ function EditEmployeeModal({ employee, onClose, onSaved }) {
                 <input className="field" value={form.cpf} onChange={e => set('cpf', e.target.value)} placeholder="000.000.000-00" />
               </FL>
               <FL label="Data de nascimento">
-                <input type="date" className="field" value={form.birth_date} onChange={e => set('birth_date', e.target.value)} />
+                <DateInput value={form.birth_date} onChange={e => set('birth_date', e.target.value)} />
               </FL>
               <FL label="Estado civil" span={2}>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -1241,8 +1302,17 @@ function EditEmployeeModal({ employee, onClose, onSaved }) {
                 {errors.dept && <span style={{ fontSize: 11, color: 'var(--bad)' }}>{errors.dept}</span>}
               </FL>
               <FL label="Empresa">
-                <select className="field" value={form.company} onChange={e => set('company', e.target.value)}>
-                  {['Orion Matriz','Orion Filial SP','Orion Filial RJ','Orion Filial MG'].map(c => <option key={c}>{c}</option>)}
+                <select
+                  className="field"
+                  value={form.company_id}
+                  onChange={e => {
+                    const co = companies.find(c => c.id === e.target.value);
+                    set('company_id', e.target.value);
+                    set('company', co?.name || '');
+                  }}
+                >
+                  <option value="">Selecionar empresa…</option>
+                  {companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </FL>
               <FL label="Tipo de contrato">
@@ -1251,7 +1321,7 @@ function EditEmployeeModal({ employee, onClose, onSaved }) {
                 </select>
               </FL>
               <FL label="Data de admissão">
-                <input type="date" className="field" value={form.admission} onChange={e => set('admission', e.target.value)} />
+                <DateInput value={form.admission} onChange={e => set('admission', e.target.value)} />
               </FL>
               <FL label="Salário base (R$)">
                 <input className="field" value={form.salary} onChange={e => set('salary', e.target.value)} placeholder="0,00" />

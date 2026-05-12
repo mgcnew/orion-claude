@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from './lib/supabase.js';
+import { useCompanies } from './hooks/useEmployees.js';
 
 import Sidebar from './components/Sidebar.jsx';
 import Header from './components/Header.jsx';
@@ -9,7 +10,7 @@ import Toasts from './components/Toasts.jsx';
 import TweaksPanel from './components/TweaksPanel.jsx';
 import Icon from './components/Icon.jsx';
 
-import { LoginScreen, InviteScreen } from './screens/Auth.jsx';
+import { LoginScreen, InviteScreen, SendInviteModal } from './screens/Auth.jsx';
 import Dashboard from './screens/Dashboard.jsx';
 import { EmployeesList, EmployeeProfile } from './screens/Employees.jsx';
 import DocumentsScreen from './screens/Documents.jsx';
@@ -47,6 +48,9 @@ export default function App() {
   const [cmdOpen, setCmdOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [toasts, setToasts] = useState([]);
+  const [activeCompany, setActiveCompany] = useState(null); // null = todas as empresas
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const { companies } = useCompanies();
 
   // Supabase auth state
   useEffect(() => {
@@ -140,7 +144,7 @@ export default function App() {
   // ===== ROUTING =====
   const renderScreen = () => {
     if (route === 'dashboard') return <Dashboard setRoute={setRoute} addToast={addToast} />;
-    if (route === 'employees') return <EmployeesList setRoute={setRoute} setRouteParam={setRouteParam} setRouteLabel={setRouteLabel} />;
+    if (route === 'employees') return <EmployeesList setRoute={setRoute} setRouteParam={setRouteParam} setRouteLabel={setRouteLabel} companyId={activeCompany?.id} />;
     if (route === 'employees-profile') return <EmployeeProfile setRoute={setRoute} employeeId={routeParam} />;
     if (route.startsWith('documents'))
       return <DocumentsScreen addToast={addToast} />;
@@ -188,6 +192,9 @@ export default function App() {
         userEmail={userEmail}
         isAdmin={isAdmin}
         onLogout={() => supabase.auth.signOut()}
+        companies={companies}
+        activeCompany={activeCompany}
+        setActiveCompany={setActiveCompany}
       />
       <main
         style={{
@@ -211,6 +218,7 @@ export default function App() {
           userEmail={userEmail}
           isAdmin={isAdmin}
           routeLabel={routeLabel}
+          onInvite={() => setInviteOpen(true)}
         />
         <div style={{ flex: 1, overflowY: 'auto' }} key={route}>
           {renderScreen()}
@@ -225,6 +233,13 @@ export default function App() {
       <NotificationsPanel open={notifOpen} onClose={() => setNotifOpen(false)} />
 
       <Toasts toasts={toasts} />
+
+      {inviteOpen && (
+        <SendInviteModal
+          onClose={() => setInviteOpen(false)}
+          addToast={addToast}
+        />
+      )}
 
       <TweaksPanel
         tweaks={tweaks}

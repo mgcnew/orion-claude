@@ -13,6 +13,9 @@ import {
   createVacation,
   useAllDocuments,
   useAllTimecards,
+  useCompanies,
+  createCompany,
+  updateCompany,
 } from '../hooks/useEmployees.js';
 
 // ============================================================
@@ -1409,6 +1412,193 @@ export function NewEmployee({ setRoute, addToast }) {
 }
 
 // ============================================================
+// EMPRESAS TAB
+// ============================================================
+function EmpresasTab({ addToast }) {
+  const { companies, loading, refetch } = useCompanies();
+  const [showNew, setShowNew] = useState(false);
+  const [editTarget, setEditTarget] = useState(null);
+  const [form, setForm] = useState({ name: '', slug: '' });
+  const [saving, setSaving] = useState(false);
+
+  const slugify = (name) =>
+    name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+
+  const openNew = () => {
+    setForm({ name: '', slug: '' });
+    setEditTarget(null);
+    setShowNew(true);
+  };
+
+  const openEdit = (c) => {
+    setForm({ name: c.name, slug: c.slug || '' });
+    setEditTarget(c);
+    setShowNew(true);
+  };
+
+  const handleSave = async () => {
+    if (!form.name.trim()) return;
+    setSaving(true);
+    const payload = {
+      name: form.name.trim(),
+      slug: form.slug.trim() || slugify(form.name.trim()),
+    };
+    const { error } = editTarget
+      ? await updateCompany(editTarget.id, payload)
+      : await createCompany(payload);
+    setSaving(false);
+    if (error) {
+      addToast({ kind: 'err', msg: error.message });
+    } else {
+      addToast({ kind: 'ok', msg: editTarget ? 'Empresa atualizada' : 'Empresa criada' });
+      setShowNew(false);
+      refetch();
+    }
+  };
+
+  const handleToggleActive = async (c) => {
+    const { error } = await updateCompany(c.id, { active: !c.active });
+    if (error) addToast({ kind: 'err', msg: error.message });
+    else refetch();
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <div style={{ fontSize: 15, fontWeight: 700 }}>Empresas</div>
+          <div style={{ fontSize: 12.5, color: 'var(--muted)', marginTop: 2 }}>
+            Gerencie as empresas da sua conta. Cada empresa tem seus próprios funcionários e dados.
+          </div>
+        </div>
+        <button className="btn primary sm" onClick={openNew}>
+          <Icon name="plus" size={13} /> Nova empresa
+        </button>
+      </div>
+
+      {loading ? (
+        <div style={{ padding: 32, textAlign: 'center', color: 'var(--muted)', fontSize: 13 }} className="pulse">
+          Carregando…
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {companies.map((c) => (
+            <div key={c.id} className="card" style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 14 }}>
+              <div
+                style={{
+                  width: 38, height: 38, borderRadius: 10, flexShrink: 0,
+                  background: 'linear-gradient(135deg, var(--brand) 0%, var(--brand-700) 100%)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: 'var(--brand-ink)', fontWeight: 700, fontSize: 14,
+                }}
+              >
+                {c.name.charAt(0).toUpperCase()}
+              </div>
+              <div className="grow" style={{ minWidth: 0 }}>
+                <div style={{ fontWeight: 600, fontSize: 13.5 }}>{c.name}</div>
+                <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
+                  /{c.slug || '—'}
+                  {!c.active && (
+                    <span style={{
+                      marginLeft: 8, fontSize: 10.5, fontWeight: 700,
+                      background: 'var(--surface-2)', color: 'var(--muted)',
+                      border: '1px solid var(--line)', borderRadius: 4, padding: '1px 6px',
+                    }}>
+                      INATIVA
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="row gap-2">
+                <button className="btn ghost sm" onClick={() => openEdit(c)}>
+                  <Icon name="edit" size={13} /> Editar
+                </button>
+                <button
+                  className="btn ghost sm"
+                  onClick={() => handleToggleActive(c)}
+                  style={{ color: c.active ? 'var(--bad)' : 'var(--good)' }}
+                >
+                  <Icon name={c.active ? 'x' : 'check'} size={13} />
+                  {c.active ? 'Desativar' : 'Ativar'}
+                </button>
+              </div>
+            </div>
+          ))}
+          {companies.length === 0 && (
+            <div style={{ padding: 32, textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>
+              Nenhuma empresa cadastrada.
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Modal nova/editar empresa */}
+      {showNew && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, zIndex: 200,
+            background: 'rgba(0,0,0,.5)', backdropFilter: 'blur(4px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
+          }}
+          onClick={() => setShowNew(false)}
+        >
+          <div
+            style={{
+              width: '100%', maxWidth: 440,
+              background: 'var(--surface)', borderRadius: 14,
+              boxShadow: '0 24px 60px rgba(0,0,0,.2)',
+              padding: 24,
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 18 }}>
+              {editTarget ? 'Editar empresa' : 'Nova empresa'}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div>
+                <label className="label">Nome da empresa *</label>
+                <input
+                  className="field"
+                  value={form.name}
+                  onChange={(e) => {
+                    const name = e.target.value;
+                    setForm((f) => ({
+                      ...f,
+                      name,
+                      slug: f.slug || slugify(name),
+                    }));
+                  }}
+                  placeholder="Ex: Empresa João LTDA"
+                  autoFocus
+                />
+              </div>
+              <div>
+                <label className="label">Identificador (slug)</label>
+                <input
+                  className="field"
+                  value={form.slug}
+                  onChange={(e) => setForm((f) => ({ ...f, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') }))}
+                  placeholder="empresa-joao"
+                />
+                <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>
+                  Usado internamente. Só letras minúsculas, números e hifens.
+                </div>
+              </div>
+            </div>
+            <div className="row" style={{ justifyContent: 'flex-end', gap: 8, marginTop: 22 }}>
+              <button className="btn" onClick={() => setShowNew(false)}>Cancelar</button>
+              <button className="btn primary" onClick={handleSave} disabled={saving || !form.name.trim()}>
+                {saving ? 'Salvando…' : editTarget ? 'Salvar alterações' : 'Criar empresa'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
 // SETTINGS (with Permissions as a tab)
 // ============================================================
 export function SettingsScreen({ initialTab, addToast, setRoute }) {
@@ -1419,6 +1609,7 @@ export function SettingsScreen({ initialTab, addToast, setRoute }) {
 
   const tabs = [
     { id: 'geral',      l: 'Geral',       i: 'settings' },
+    { id: 'empresas',   l: 'Empresas',    i: 'building' },
     { id: 'aparencia',  l: 'Aparência',   i: 'sparkle' },
     { id: 'seguranca',  l: 'Segurança',   i: 'shield' },
     { id: 'permissoes', l: 'Permissões',  i: 'key' },
@@ -1474,6 +1665,8 @@ export function SettingsScreen({ initialTab, addToast, setRoute }) {
           </button>
         ))}
       </div>
+
+      {tab === 'empresas' && <EmpresasTab addToast={addToast} />}
 
       {tab === 'geral' && (
         <div className="col gap-4">

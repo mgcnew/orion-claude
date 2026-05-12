@@ -54,6 +54,8 @@ export default function Header({
   userName,
   userEmail,
   routeLabel,
+  isAdmin,
+  onInvite,
 }) {
   const crumbs = buildCrumbs(route, routeLabel);
 
@@ -135,6 +137,12 @@ export default function Header({
         </span>
         <span className="kbd orion-search-kbd">⌘K</span>
       </button>
+
+      {isAdmin && onInvite && (
+        <button className="btn primary sm" onClick={onInvite} title="Convidar usuário">
+          <Icon name="user-plus" size={14} /> Convidar
+        </button>
+      )}
 
       <button
         className="btn ghost icon"

@@ -38,6 +38,14 @@ export default function Icon({ name, size = 18, stroke = 1.6, className, style }
           <path d="M5 20c.8-3.6 3.4-5.5 7-5.5s6.2 1.9 7 5.5" />
         </svg>
       );
+    case 'user-plus':
+      return (
+        <svg {...props}>
+          <circle cx="10" cy="8" r="3.2" />
+          <path d="M3 20c.7-3.2 3-5 7-5s6.3 1.8 7 5" />
+          <path d="M19 8v6M16 11h6" />
+        </svg>
+      );
     case 'doc':
       return (
         <svg {...props}>

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import Icon from '../components/Icon.jsx';
 import OrionGlyph from '../components/OrionGlyph.jsx';
 import { supabase } from '../lib/supabase.js';
+import { useCompanies, sendInvite } from '../hooks/useEmployees.js';
 
 export function LoginScreen({ onLogin }) {
   const [email, setEmail] = useState('');
@@ -373,6 +374,160 @@ export function LoginScreen({ onLogin }) {
             ))}
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// Modal de envio de convite (usado pelo admin dentro do sistema)
+export function SendInviteModal({ onClose, addToast }) {
+  const { companies } = useCompanies();
+  const [email, setEmail] = useState('');
+  const [role, setRole] = useState('Operacional');
+  const [selectedCompanies, setSelectedCompanies] = useState([]);
+  const [saving, setSaving] = useState(false);
+  const [sent, setSent] = useState(null);
+
+  const toggleCompany = (id) => {
+    setSelectedCompanies((prev) =>
+      prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id]
+    );
+  };
+
+  const handleSend = async () => {
+    if (!email.trim() || selectedCompanies.length === 0) return;
+    setSaving(true);
+    const { data, error } = await sendInvite({ email: email.trim(), role, companyIds: selectedCompanies });
+    setSaving(false);
+    if (error) {
+      addToast?.({ kind: 'err', msg: error.message });
+    } else {
+      setSent(data);
+      addToast?.({ kind: 'ok', msg: `Convite registrado para ${email}` });
+    }
+  };
+
+  return (
+    <div
+      style={{
+        position: 'fixed', inset: 0, zIndex: 300,
+        background: 'rgba(0,0,0,.5)', backdropFilter: 'blur(4px)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
+      }}
+      onClick={onClose}
+    >
+      <div
+        style={{
+          width: '100%', maxWidth: 480,
+          background: 'var(--surface)', borderRadius: 16,
+          boxShadow: '0 32px 80px rgba(0,0,0,.25)',
+          padding: 28,
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 22 }}>
+          <div>
+            <div style={{ fontSize: 16, fontWeight: 700 }}>Convidar usuário</div>
+            <div style={{ fontSize: 12.5, color: 'var(--muted)', marginTop: 3 }}>
+              O convidado receberá acesso às empresas selecionadas.
+            </div>
+          </div>
+          <button className="btn ghost icon sm" onClick={onClose}><Icon name="x" size={15} /></button>
+        </div>
+
+        {sent ? (
+          <div style={{ textAlign: 'center', padding: '24px 0' }}>
+            <div style={{ fontSize: 36, marginBottom: 12 }}>✓</div>
+            <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 6 }}>Convite registrado!</div>
+            <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 20 }}>
+              Para enviar o acesso, encaminhe o link abaixo para <strong>{sent.email}</strong>:
+            </div>
+            <div
+              style={{
+                padding: '10px 14px', borderRadius: 8,
+                background: 'var(--surface-2)', border: '1px solid var(--line)',
+                fontSize: 12, fontFamily: 'monospace', wordBreak: 'break-all',
+                cursor: 'pointer', textAlign: 'left',
+              }}
+              onClick={() => navigator.clipboard.writeText(`${window.location.origin}?invite=${sent.token}`)}
+            >
+              {window.location.origin}?invite={sent.token}
+              <span style={{ marginLeft: 8, color: 'var(--brand)', fontSize: 11 }}>copiar</span>
+            </div>
+            <button className="btn primary" style={{ marginTop: 18, width: '100%', justifyContent: 'center' }} onClick={onClose}>
+              Fechar
+            </button>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div>
+              <label className="label">E-mail do convidado *</label>
+              <input
+                className="field"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="usuario@empresa.com"
+                autoFocus
+              />
+            </div>
+
+            <div>
+              <label className="label">Cargo / Perfil de acesso *</label>
+              <select className="field" value={role} onChange={(e) => setRole(e.target.value)}>
+                {['Operacional', 'RH', 'Gestor', 'Financeiro', 'Supervisor'].map((r) => (
+                  <option key={r}>{r}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="label">Empresas com acesso * <span style={{ color: 'var(--muted)', fontWeight: 400 }}>(selecione uma ou mais)</span></label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 6 }}>
+                {companies.map((c) => (
+                  <label
+                    key={c.id}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 10,
+                      padding: '10px 12px', borderRadius: 8, cursor: 'pointer',
+                      border: `1px solid ${selectedCompanies.includes(c.id) ? 'var(--brand)' : 'var(--line)'}`,
+                      background: selectedCompanies.includes(c.id) ? 'var(--brand-tint)' : 'var(--surface-2)',
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedCompanies.includes(c.id)}
+                      onChange={() => toggleCompany(c.id)}
+                      style={{ accentColor: 'var(--brand)', flexShrink: 0 }}
+                    />
+                    <div
+                      style={{
+                        width: 26, height: 26, borderRadius: 6, flexShrink: 0,
+                        background: 'var(--brand)', color: 'var(--brand-ink)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: 11, fontWeight: 700,
+                      }}
+                    >
+                      {c.name.charAt(0)}
+                    </div>
+                    <span style={{ fontSize: 13, fontWeight: 500 }}>{c.name}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 4 }}>
+              <button className="btn" onClick={onClose}>Cancelar</button>
+              <button
+                className="btn primary"
+                onClick={handleSend}
+                disabled={saving || !email.trim() || selectedCompanies.length === 0}
+              >
+                {saving ? 'Enviando…' : <><Icon name="mail" size={13} /> Enviar convite</>}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -68,7 +68,7 @@ function Logo({ collapsed }) {
   );
 }
 
-export default function Sidebar({ route, setRoute, collapsed, setCollapsed, userName, userEmail, isAdmin, onLogout }) {
+export default function Sidebar({ route, setRoute, collapsed, setCollapsed, userName, userEmail, isAdmin, onLogout, companies = [], activeCompany, setActiveCompany }) {
   const [open, setOpen] = useState({
     employees: route.startsWith('employees'),
     documents: route.startsWith('documents'),
@@ -114,6 +114,51 @@ export default function Sidebar({ route, setRoute, collapsed, setCollapsed, user
           </button>
         )}
       </div>
+
+      {/* Seletor de empresa — visível quando expandido e houver empresas */}
+      {!collapsed && companies.length > 0 && (
+        <div style={{ padding: '8px 10px', borderBottom: '1px solid var(--line)' }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--muted-2)', letterSpacing: 1, marginBottom: 5, paddingLeft: 2 }}>
+            EMPRESA
+          </div>
+          <div style={{ position: 'relative' }}>
+            <select
+              value={activeCompany?.id || ''}
+              onChange={(e) => {
+                const found = companies.find(c => c.id === e.target.value);
+                setActiveCompany(found || null);
+              }}
+              style={{
+                width: '100%',
+                padding: '7px 28px 7px 10px',
+                borderRadius: 8,
+                border: '1px solid var(--line)',
+                background: 'var(--surface)',
+                color: 'var(--ink)',
+                fontSize: 12.5,
+                fontWeight: 600,
+                cursor: 'pointer',
+                appearance: 'none',
+                WebkitAppearance: 'none',
+              }}
+            >
+              {isAdmin && <option value="">Todas as empresas</option>}
+              {companies.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+            <Icon
+              name="chevron-down"
+              size={13}
+              style={{
+                position: 'absolute', right: 9, top: '50%',
+                transform: 'translateY(-50%)',
+                pointerEvents: 'none', color: 'var(--muted)',
+              }}
+            />
+          </div>
+        </div>
+      )}
 
       <nav style={{ flex: 1, overflowY: 'auto', padding: '10px 8px' }}>
         {NAV.map((item, i) => {
