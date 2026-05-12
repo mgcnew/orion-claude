@@ -160,12 +160,7 @@ export default function App() {
           desc="Histórico de desligamentos e documentação rescisória."
         />
       );
-    if (
-      route === 'documents' ||
-      route === 'documents-upload' ||
-      route === 'documents-pending' ||
-      route === 'documents-sign'
-    )
+    if (route.startsWith('documents'))
       return <DocumentsScreen addToast={addToast} />;
     if (route.startsWith('time')) return <TimeScreen addToast={addToast} />;
     if (route === 'permissions' || route === 'settings-permissions')
