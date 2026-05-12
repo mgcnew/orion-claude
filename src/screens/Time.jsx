@@ -56,11 +56,30 @@ function parseExtraHoursToMins(str) {
 }
 
 // Calcula quantas horas foram trabalhadas em uma entrada (em minutos)
+// Se tiver periods JSONB, soma cada período individualmente (descontando intervalos)
 function entryWorkedMins(e) {
+  if (e.periods && Array.isArray(e.periods) && e.periods.length > 0) {
+    return e.periods.reduce((sum, p) => {
+      const tin  = parseTimeToMinutes(p.in);
+      const tout = parseTimeToMinutes(p.out);
+      if (tin === null || tout === null || tout <= tin) return sum;
+      return sum + (tout - tin);
+    }, 0);
+  }
   const tin  = parseTimeToMinutes(e.time_in);
   const tout = parseTimeToMinutes(e.time_out);
   if (tin === null || tout === null || tout <= tin) return 0;
   return tout - tin;
+}
+
+// Calcula o total de minutos de um array de períodos { in, out }
+function periodsWorkedMins(periods) {
+  return (periods || []).reduce((sum, p) => {
+    const tin  = parseTimeToMinutes(p.in);
+    const tout = parseTimeToMinutes(p.out);
+    if (tin === null || tout === null || tout <= tin) return sum;
+    return sum + (tout - tin);
+  }, 0);
 }
 
 // Computa todas as estatísticas de um array de time_entries
@@ -129,6 +148,169 @@ const STATUS_COLOR = {
   sem_registro: { bg: 'var(--surface-2)',     color: 'var(--muted-2)',  label: ''         },
   weekend:      { bg: 'var(--surface-2)',     color: 'var(--muted-2)',  label: ''         },
 };
+
+// ── Modal Cartão de Ponto ─────────────────────────────────────
+const DEFAULT_PERIODS = [
+  { in: '', out: '' },
+  { in: '', out: '' },
+];
+
+function CartaoModal({ employees, onClose, onSave }) {
+  const [empId,   setEmpId]   = useState('');
+  const [date,    setDate]    = useState(new Date().toISOString().slice(0,10));
+  const [periods, setPeriods] = useState(DEFAULT_PERIODS.map(p => ({ ...p })));
+  const [saving,  setSaving]  = useState(false);
+
+  const updatePeriod = (i, field, val) =>
+    setPeriods(ps => ps.map((p, idx) => idx === i ? { ...p, [field]: val } : p));
+
+  const addPeriod = () => setPeriods(ps => [...ps, { in: '', out: '' }]);
+  const removePeriod = (i) => setPeriods(ps => ps.filter((_, idx) => idx !== i));
+
+  const validPeriods = periods.filter(p => p.in && p.out);
+  const totalMins    = periodsWorkedMins(validPeriods);
+  const extraMins    = Math.max(0, totalMins - STANDARD_MINS);
+  const hasRequired  = empId && date && validPeriods.length > 0;
+
+  const handleSave = async () => {
+    if (!hasRequired) return;
+    setSaving(true);
+    const firstIn  = validPeriods[0]?.in  || null;
+    const lastOut  = validPeriods[validPeriods.length - 1]?.out || null;
+    const { error } = await createTimeEntry({
+      employee_id: empId,
+      date,
+      time_in:  firstIn,
+      time_out: lastOut,
+      status:   'presente',
+      periods:  validPeriods,
+      extra_hours: extraMins > 0 ? minutesToHM(extraMins) : null,
+    });
+    setSaving(false);
+    if (error) { alert('Erro: ' + error.message); return; }
+    onSave();
+    onClose();
+  };
+
+  return (
+    <div style={{ position:'fixed', inset:0, zIndex:200, background:'rgba(0,0,0,.5)', backdropFilter:'blur(4px)', display:'flex', alignItems:'center', justifyContent:'center', padding:'clamp(8px,2vw,24px)', overflowY:'auto' }} onClick={onClose}>
+      <div style={{ width:'100%', maxWidth:500, background:'var(--surface)', borderRadius:16, boxShadow:'0 32px 80px rgba(0,0,0,.25)', overflow:'hidden', display:'flex', flexDirection:'column', maxHeight:'calc(100vh - 32px)', margin:'auto' }} onClick={e => e.stopPropagation()}>
+
+        {/* Header */}
+        <div style={{ padding:'16px 20px', borderBottom:'1px solid var(--line)', display:'flex', alignItems:'center', gap:10 }}>
+          <div style={{ width:32, height:32, borderRadius:8, background:'var(--brand-tint)', color:'var(--brand)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+            <Icon name="clock" size={16} />
+          </div>
+          <div style={{ flex:1 }}>
+            <div style={{ fontSize:15, fontWeight:700 }}>Lançar cartão de ponto</div>
+            <div style={{ fontSize:12, color:'var(--muted)', marginTop:1 }}>Registre os períodos trabalhados do dia</div>
+          </div>
+          <button className="btn ghost icon sm" onClick={onClose}><Icon name="x" size={15} /></button>
+        </div>
+
+        <div style={{ overflowY:'auto', flex:1, minHeight:0, padding:20, display:'flex', flexDirection:'column', gap:16 }}>
+          {/* Funcionário + Data */}
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+            <div style={{ display:'flex', flexDirection:'column', gap:5 }}>
+              <label style={{ fontSize:11, fontWeight:700, color:'var(--muted)', textTransform:'uppercase', letterSpacing:0.6 }}>Funcionário *</label>
+              <select className="field" value={empId} onChange={e => setEmpId(e.target.value)}>
+                <option value="">Selecione…</option>
+                {employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+              </select>
+            </div>
+            <div style={{ display:'flex', flexDirection:'column', gap:5 }}>
+              <label style={{ fontSize:11, fontWeight:700, color:'var(--muted)', textTransform:'uppercase', letterSpacing:0.6 }}>Data *</label>
+              <input type="date" className="field" value={date} onChange={e => setDate(e.target.value)} />
+            </div>
+          </div>
+
+          {/* Períodos */}
+          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+            <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+              <span style={{ fontSize:11, fontWeight:700, color:'var(--muted)', textTransform:'uppercase', letterSpacing:0.6, flex:1 }}>Horários</span>
+              <span style={{ fontSize:11, color:'var(--muted)', flex:1, textAlign:'center' }}>Entrada</span>
+              <span style={{ fontSize:11, color:'var(--muted)', flex:1, textAlign:'center' }}>Saída</span>
+              <div style={{ width:28 }} />
+            </div>
+
+            {periods.map((p, i) => {
+              const isExtra  = i >= 2;
+              const label    = i === 0 ? 'Período 1' : i === 1 ? 'Período 2' : `Extra ${i - 1}`;
+              const pMins    = periodsWorkedMins([p]);
+              const isValid  = p.in && p.out;
+              return (
+                <div key={i} style={{ display:'flex', alignItems:'center', gap:8 }}>
+                  <div style={{ flex:1, display:'flex', alignItems:'center', gap:6 }}>
+                    <span style={{ width:8, height:8, borderRadius:'50%', background: isExtra ? '#7c3aed' : 'var(--brand)', flexShrink:0 }} />
+                    <span style={{ fontSize:12, fontWeight:600, color: isExtra ? '#7c3aed' : 'var(--ink)', whiteSpace:'nowrap' }}>{label}</span>
+                    {isValid && pMins > 0 && (
+                      <span style={{ fontSize:10, color:'var(--muted)', marginLeft:2 }}>{minutesToHM(pMins)}</span>
+                    )}
+                  </div>
+                  <input
+                    type="time" className="field"
+                    value={p.in} onChange={e => updatePeriod(i, 'in', e.target.value)}
+                    style={{ flex:1, height:36, fontSize:13, textAlign:'center' }}
+                  />
+                  <input
+                    type="time" className="field"
+                    value={p.out} onChange={e => updatePeriod(i, 'out', e.target.value)}
+                    style={{ flex:1, height:36, fontSize:13, textAlign:'center' }}
+                  />
+                  {isExtra ? (
+                    <button className="btn ghost icon sm" onClick={() => removePeriod(i)} title="Remover" style={{ width:28, height:28, padding:0, flexShrink:0 }}>
+                      <Icon name="x" size={12} />
+                    </button>
+                  ) : (
+                    <div style={{ width:28 }} />
+                  )}
+                </div>
+              );
+            })}
+
+            <button
+              className="btn ghost sm"
+              onClick={addPeriod}
+              style={{ alignSelf:'flex-start', color:'#7c3aed', borderColor:'#7c3aed', marginTop:2 }}
+            >
+              <Icon name="plus" size={12} /> Período extra
+            </button>
+          </div>
+
+          {/* Totalizador */}
+          {totalMins > 0 && (
+            <div style={{ background:'var(--surface-2)', border:'1px solid var(--line)', borderRadius:10, padding:'12px 16px', display:'flex', gap:16, flexWrap:'wrap' }}>
+              <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
+                <span style={{ fontSize:10, fontWeight:700, color:'var(--muted)', textTransform:'uppercase', letterSpacing:0.5 }}>Total trabalhado</span>
+                <span style={{ fontSize:18, fontWeight:800, color:'var(--brand)' }}>{minutesToHM(totalMins)}</span>
+              </div>
+              {extraMins > 0 && (
+                <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
+                  <span style={{ fontSize:10, fontWeight:700, color:'var(--muted)', textTransform:'uppercase', letterSpacing:0.5 }}>Horas extras</span>
+                  <span style={{ fontSize:18, fontWeight:800, color:'#7c3aed' }}>+{minutesToHM(extraMins)}</span>
+                </div>
+              )}
+              {totalMins < STANDARD_MINS && (
+                <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
+                  <span style={{ fontSize:10, fontWeight:700, color:'var(--muted)', textTransform:'uppercase', letterSpacing:0.5 }}>Déficit</span>
+                  <span style={{ fontSize:18, fontWeight:800, color:'#dc2626' }}>-{minutesToHM(STANDARD_MINS - totalMins)}</span>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div style={{ padding:'14px 20px', borderTop:'1px solid var(--line)', display:'flex', gap:8, justifyContent:'flex-end' }}>
+          <button className="btn ghost" onClick={onClose}>Cancelar</button>
+          <button className="btn primary" onClick={handleSave} disabled={saving || !hasRequired}>
+            {saving ? 'Salvando…' : 'Lançar cartão'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // ── Modal base ────────────────────────────────────────────────
 function Modal({ title, onClose, children, width = 480 }) {
@@ -367,9 +549,10 @@ const TABS = [
 ];
 
 const NEW_ACTIONS = [
-  { id:'falta',  label:'Registrar falta',       icon:'alert'   },
-  { id:'extra',  label:'Lançar hora extra',      icon:'sparkle' },
-  { id:'ajuste', label:'Ajuste manual de ponto', icon:'edit'    },
+  { id:'cartao', label:'Lançar cartão de ponto', icon:'clock'   },
+  { id:'falta',  label:'Registrar falta',        icon:'alert'   },
+  { id:'extra',  label:'Lançar hora extra',       icon:'sparkle' },
+  { id:'ajuste', label:'Ajuste manual de ponto',  icon:'edit'    },
 ];
 
 export function TimeScreen({ addToast }) {
@@ -537,8 +720,8 @@ export function TimeScreen({ addToast }) {
                   <div style={{ fontSize:12, fontWeight:700, color:'var(--muted)', textTransform:'uppercase', letterSpacing:0.5, marginBottom:12 }}>Ações rápidas</div>
                   <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
                     {NEW_ACTIONS.map(a => (
-                      <button key={a.id} className="btn" style={{ justifyContent:'flex-start', gap:8 }} onClick={() => setModal(a.id)}>
-                        <Icon name={a.icon} size={13} style={{ color:'var(--brand)' }} />{a.label}
+                      <button key={a.id} className="btn" style={{ justifyContent:'flex-start', gap:8, ...(a.id==='cartao'?{background:'var(--brand-tint)',color:'var(--brand)',borderColor:'var(--brand)'}:{}) }} onClick={() => setModal(a.id)}>
+                        <Icon name={a.icon} size={13} style={{ color: a.id==='cartao' ? 'var(--brand)' : 'var(--brand)' }} />{a.label}
                       </button>
                     ))}
                   </div>
@@ -728,6 +911,7 @@ export function TimeScreen({ addToast }) {
 
     </div>
 
+    {modal==='cartao' && <CartaoModal    employees={employees} onClose={() => setModal(null)} onSave={handleSaved} />}
     {modal==='falta'  && <FaltaModal     employees={employees} onClose={() => setModal(null)} onSave={handleSaved} />}
     {modal==='extra'  && <HoraExtraModal employees={employees} onClose={() => setModal(null)} onSave={handleSaved} />}
     {modal==='ajuste' && <AjusteModal    employees={employees} onClose={() => setModal(null)} onSave={handleSaved} />}
