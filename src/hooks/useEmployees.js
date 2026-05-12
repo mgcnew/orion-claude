@@ -440,3 +440,33 @@ export function useAllTimeEntries(dateStr) {
 
   return { entries, loading };
 }
+
+export function useAllTimecards() {
+  const [timecards, setTimecards] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function load() {
+      const { data, error } = await supabase
+        .from('timecards')
+        .select('*, employees(name)')
+        .order('created_at', { ascending: false });
+      if (!error && data) setTimecards(data);
+      setLoading(false);
+    }
+    load();
+  }, []);
+
+  return { timecards, loading, setTimecards };
+}
+
+export async function createTimecard(data) {
+  const { data: res, error } = await supabase
+    .from('timecards')
+    .insert([data])
+    .select()
+    .single();
+
+  if (error) throw error;
+  return res;
+}
