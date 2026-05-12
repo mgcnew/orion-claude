@@ -11,6 +11,8 @@ import {
   updateVacationStatus,
   createDocuments,
   createVacation,
+  useAllTimecards,
+  createTimecard
 } from '../hooks/useEmployees.js';
 
 // ============================================================
@@ -23,18 +25,68 @@ function formatDatePtBR(date) {
 }
 
 export function TimeScreen({ addToast }) {
-  const [clockedIn, setClockedIn] = useState(true);
-  const [now, setNow] = useState(new Date());
-  useEffect(() => {
-    const t = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(t);
-  }, []);
-
-  const time = now.toLocaleTimeString('pt-BR', {
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
+  const { employees, loading: empLoading } = useEmployees();
+  const { timecards, loading: tcLoading, setTimecards } = useAllTimecards();
+  
+  const [form, setForm] = useState({
+    employee_id: '',
+    month_year: new Date().toISOString().slice(0, 7), // YYYY-MM
+    worked_hours: ''
   });
+  const [file, setFile] = useState(null);
+  const [uploading, setUploading] = useState(false);
+
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!form.employee_id || !form.month_year || !form.worked_hours) {
+      addToast({ kind: 'warn', msg: 'Preencha todos os campos.' });
+      return;
+    }
+
+    setUploading(true);
+    let document_url = null;
+
+    try {
+      if (file) {
+        // Upload timecard photo to Supabase via createDocuments
+        // Actually, createDocuments expects { name, category, employee_id, type, size, status, file }
+        // Let's create a document for it.
+        const docRes = await createDocuments({
+          name: `Cartão de Ponto - ${form.month_year}`,
+          category: 'Ponto',
+          employee_id: form.employee_id,
+          type: file.type.includes('image') ? 'img' : 'pdf',
+          size: (file.size / 1024).toFixed(0) + ' kb',
+          status: 'ok',
+          file: file
+        });
+        // We could store the document URL if returned, or just link by employee_id and name.
+        // For simplicity, we just save the timecard entry.
+      }
+
+      const res = await createTimecard({
+        employee_id: form.employee_id,
+        month_year: form.month_year,
+        worked_hours: form.worked_hours,
+        document_url: file ? file.name : null
+      });
+
+      // Optimistic update
+      const empName = employees.find(e => e.id === form.employee_id)?.name;
+      setTimecards([{ ...res, employees: { name: empName } }, ...timecards]);
+      
+      addToast({ kind: 'ok', msg: 'Controle de ponto salvo com sucesso!' });
+      setForm({ ...form, worked_hours: '' });
+      setFile(null);
+    } catch (err) {
+      console.error(err);
+      addToast({ kind: 'bad', msg: 'Erro ao salvar controle de ponto.' });
+    } finally {
+      setUploading(false);
+    }
+  };
 
   return (
     <div className="fade-up" style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -44,291 +96,109 @@ export function TimeScreen({ addToast }) {
             Controle de ponto
           </h1>
           <p style={{ margin: 0, fontSize: 13, color: 'var(--muted)' }}>
-            Jornadas, horas extras e banco de horas em tempo real.
+            Upload de cartão de ponto e controle de horas mensais.
           </p>
         </div>
-        <div className="row gap-2">
-          <button className="btn">
-            <Icon name="qr" size={15} /> QR Code de marcação
-          </button>
-          <button className="btn">
-            <Icon name="download" size={15} /> Espelho mensal
-          </button>
-        </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 16 }}>
-        {/* Clock card */}
-        <div
-          className="card"
-          style={{
-            padding: 24,
-            background: 'linear-gradient(135deg, var(--surface) 0%, var(--surface-2) 100%)',
-          }}
-        >
-          <div className="row">
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 16, alignItems: 'start' }}>
+        {/* Form */}
+        <div className="card" style={{ padding: 24 }}>
+          <h3 style={{ margin: '0 0 16px', fontSize: 15, fontWeight: 700 }}>Novo Registro Mensal</h3>
+          <form onSubmit={handleSubmit} className="col gap-3">
             <div>
-              <div
-                style={{
-                  fontSize: 11.5,
-                  color: 'var(--muted)',
-                  textTransform: 'uppercase',
-                  letterSpacing: 0.6,
-                  fontWeight: 600,
-                }}
+              <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)' }}>Funcionário</label>
+              <select
+                className="field"
+                value={form.employee_id}
+                onChange={e => set(e.target.name, e.target.value)}
+                name="employee_id"
+                disabled={empLoading}
               >
-                Marcação atual
-              </div>
-              <div
-                className="mono"
-                style={{
-                  fontSize: 56,
-                  fontWeight: 700,
-                  letterSpacing: -2.5,
-                  lineHeight: 1,
-                  marginTop: 8,
-                }}
-              >
-                {time}
-              </div>
-              <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 6 }}>
-                {formatDatePtBR(now)} · São Paulo, SP
-              </div>
+                <option value="">Selecione...</option>
+                {employees.map(emp => (
+                  <option key={emp.id} value={emp.id}>{emp.name}</option>
+                ))}
+              </select>
             </div>
-            <span className="grow" />
-            <div className="col gap-2" style={{ alignItems: 'flex-end' }}>
-              <span className={`pill ${clockedIn ? 'ok' : ''}`}>
-                <span className="dot pulse" /> {clockedIn ? 'Em jornada' : 'Fora de jornada'}
-              </span>
-              <span className="mono" style={{ fontSize: 11, color: 'var(--muted)' }}>
-                Início 08:14:22
-              </span>
-            </div>
-          </div>
-          <div className="h-line" style={{ margin: '20px 0' }} />
-          <div className="row gap-2" style={{ flexWrap: 'wrap' }}>
-            <button
-              className="btn primary"
-              style={{ height: 44, padding: '0 18px' }}
-              onClick={() => {
-                setClockedIn(!clockedIn);
-                addToast({
-                  kind: 'ok',
-                  msg: clockedIn
-                    ? 'Saída registrada às ' + time.slice(0, 5)
-                    : 'Entrada registrada às ' + time.slice(0, 5),
-                });
-              }}
-            >
-              <Icon name="fingerprint" size={16} />{' '}
-              {clockedIn ? 'Registrar saída' : 'Registrar entrada'}
-            </button>
-            <button className="btn" style={{ height: 44 }}>
-              <Icon name="clock" size={15} /> Iniciar pausa
-            </button>
-            <button className="btn" style={{ height: 44 }}>
-              <Icon name="edit" size={15} /> Solicitar ajuste
-            </button>
-            <span className="grow" />
-            <div className="col" style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: 11, color: 'var(--muted)' }}>Hoje</div>
-              <div className="mono" style={{ fontSize: 16, fontWeight: 700 }}>
-                04h 26m / 08h 00m
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Banco de horas */}
-        <div className="card" style={{ padding: 22 }}>
-          <div className="row">
             <div>
-              <div
-                style={{
-                  fontSize: 11.5,
-                  color: 'var(--muted)',
-                  textTransform: 'uppercase',
-                  letterSpacing: 0.6,
-                  fontWeight: 600,
-                }}
-              >
-                Banco de horas
-              </div>
-              <div
-                className="mono"
-                style={{
-                  fontSize: 36,
-                  fontWeight: 700,
-                  letterSpacing: -1,
-                  marginTop: 6,
-                  color: 'var(--ok)',
-                }}
-              >
-                +12h 30m
-              </div>
-              <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>
-                Saldo do mês de maio · vence em 30/06
-              </div>
+              <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)' }}>Mês/Ano</label>
+              <input
+                type="month"
+                className="field"
+                name="month_year"
+                value={form.month_year}
+                onChange={e => set(e.target.name, e.target.value)}
+              />
             </div>
-          </div>
-          <div className="h-line" style={{ margin: '16px 0' }} />
-          <div className="col gap-2">
-            {[
-              { l: 'Horas extras 100%', v: '08h 30m', c: 'var(--brand)' },
-              { l: 'Horas extras 50%', v: '04h 00m', c: 'var(--info)' },
-              { l: 'Compensações', v: '—', c: 'var(--muted-2)' },
-            ].map((r, i) => (
-              <div key={i} className="row">
-                <span
-                  style={{
-                    width: 8,
-                    height: 8,
-                    borderRadius: 2,
-                    background: r.c,
-                    marginRight: 8,
-                  }}
-                />
-                <span style={{ fontSize: 12.5, color: 'var(--muted)' }}>{r.l}</span>
-                <span className="grow" />
-                <span className="mono" style={{ fontSize: 13, fontWeight: 600 }}>
-                  {r.v}
-                </span>
-              </div>
-            ))}
-          </div>
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)' }}>Total de Horas Trabalhadas</label>
+              <input
+                type="text"
+                className="field"
+                name="worked_hours"
+                placeholder="Ex: 160:00 ou 160h"
+                value={form.worked_hours}
+                onChange={e => set(e.target.name, e.target.value)}
+              />
+            </div>
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)' }}>Foto do Cartão de Ponto</label>
+              <input
+                type="file"
+                className="field"
+                accept="image/*,.pdf"
+                onChange={e => setFile(e.target.files[0])}
+                style={{ padding: '8px 12px' }}
+              />
+            </div>
+            <button className="btn primary" type="submit" disabled={uploading} style={{ marginTop: 8 }}>
+              {uploading ? 'Salvando...' : 'Salvar Registro'}
+            </button>
+          </form>
         </div>
-      </div>
 
-      {/* Week chart */}
-      <div className="card" style={{ padding: 22 }}>
-        <div className="row" style={{ marginBottom: 16 }}>
-          <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700 }}>Jornada da semana</h3>
-          <span className="grow" />
-          <div className="row gap-3" style={{ fontSize: 11.5, color: 'var(--muted)' }}>
-            <span className="row gap-2">
-              <span style={{ width: 10, height: 10, background: 'var(--brand)', borderRadius: 2 }} />{' '}
-              Realizado
-            </span>
-            <span className="row gap-2">
-              <span style={{ width: 10, height: 10, background: 'var(--warn)', borderRadius: 2 }} />{' '}
-              Hora extra
-            </span>
+        {/* History List */}
+        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+          <div className="row" style={{ padding: '14px 18px', borderBottom: '1px solid var(--line)' }}>
+            <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700 }}>Histórico de Lançamentos</h3>
           </div>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 14, height: 200 }}>
-          {D.hoursWeek.map((d, i) => {
-            const max = 10;
-            return (
-              <div
-                key={i}
-                style={{
-                  flex: 1,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: 8,
-                }}
-              >
-                <div className="mono" style={{ fontSize: 10.5, color: 'var(--muted)' }}>
-                  {(d.a + d.e).toFixed(1)}h
-                </div>
-                <div
-                  style={{
-                    width: '100%',
-                    maxWidth: 50,
-                    flex: 1,
-                    display: 'flex',
-                    flexDirection: 'column-reverse',
-                    justifyContent: 'flex-start',
-                  }}
-                >
-                  <div
-                    style={{
-                      height: `${(d.a / max) * 100}%`,
-                      background: 'var(--brand)',
-                      borderRadius: '4px 4px 0 0',
-                    }}
-                  />
-                  {d.e > 0 && (
-                    <div
-                      style={{
-                        height: `${(d.e / max) * 100}%`,
-                        background: 'var(--warn)',
-                        borderRadius: '4px 4px 0 0',
-                      }}
-                    />
-                  )}
-                </div>
-                <div style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 500 }}>{d.d}</div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Team status */}
-      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-        <div className="row" style={{ padding: '14px 18px', borderBottom: '1px solid var(--line)' }}>
-          <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700 }}>Equipe — status agora</h3>
-          <span className="grow" />
-          <span style={{ fontSize: 12, color: 'var(--muted)' }}>atualizado há 12s</span>
-        </div>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13.5 }}>
-          <thead>
-            <tr
-              style={{
-                background: 'var(--surface-2)',
-                color: 'var(--muted)',
-                fontSize: 11,
-                textTransform: 'uppercase',
-                letterSpacing: 0.6,
-              }}
-            >
-              <th style={{ textAlign: 'left', padding: '10px 18px', fontWeight: 600 }}>Funcionário</th>
-              <th style={{ textAlign: 'left', padding: '10px 18px', fontWeight: 600 }}>Início</th>
-              <th style={{ textAlign: 'left', padding: '10px 18px', fontWeight: 600 }}>Pausa</th>
-              <th style={{ textAlign: 'left', padding: '10px 18px', fontWeight: 600 }}>Tempo hoje</th>
-              <th style={{ textAlign: 'left', padding: '10px 18px', fontWeight: 600 }}>Status</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {D.employees.slice(0, 6).map((emp, i) => {
-              const states = ['Trabalhando', 'Em pausa', 'Trabalhando', 'Trabalhando', 'Não iniciou', 'Trabalhando'];
-              const kinds = ['ok', 'warn', 'ok', 'ok', '', 'ok'];
-              return (
-                <tr key={emp.id} style={{ borderTop: '1px solid var(--line-soft)' }}>
-                  <td style={{ padding: '10px 18px' }}>
-                    <div className="row gap-2">
-                      <Avatar name={emp.name} hue={emp.hue} size={28} />
-                      <span style={{ fontWeight: 500 }}>{emp.name}</span>
-                    </div>
-                  </td>
-                  <td style={{ padding: '10px 18px' }} className="mono">
-                    {['08:14', '07:55', '08:32', '08:01', '—', '09:08'][i]}
-                  </td>
-                  <td style={{ padding: '10px 18px' }} className="mono">
-                    {['—', '12:00 →', '—', '11:48–12:46', '—', '—'][i]}
-                  </td>
-                  <td style={{ padding: '10px 18px' }} className="mono">
-                    {['04h 26m', '04h 02m', '04h 18m', '03h 51m', '00h 00m', '03h 12m'][i]}
-                  </td>
-                  <td style={{ padding: '10px 18px' }}>
-                    <span className={`pill ${kinds[i]}`}>
-                      <span className="dot" />
-                      {states[i]}
-                    </span>
-                  </td>
-                  <td style={{ padding: '10px 18px' }}>
-                    <button className="btn ghost icon sm">
-                      <Icon name="more-v" size={13} />
-                    </button>
-                  </td>
+          {tcLoading ? (
+            <div style={{ padding: 24, textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>Carregando...</div>
+          ) : timecards.length === 0 ? (
+            <div style={{ padding: 24, textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>Nenhum registro de ponto encontrado.</div>
+          ) : (
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13.5 }}>
+              <thead>
+                <tr style={{ background: 'var(--surface-2)', color: 'var(--muted)', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.6 }}>
+                  <th style={{ textAlign: 'left', padding: '10px 18px', fontWeight: 600 }}>Mês/Ano</th>
+                  <th style={{ textAlign: 'left', padding: '10px 18px', fontWeight: 600 }}>Funcionário</th>
+                  <th style={{ textAlign: 'left', padding: '10px 18px', fontWeight: 600 }}>Horas</th>
+                  <th style={{ textAlign: 'left', padding: '10px 18px', fontWeight: 600 }}>Documento</th>
                 </tr>
-              );
-            })}
-          </tbody>
-        </table>
+              </thead>
+              <tbody>
+                {timecards.map(tc => (
+                  <tr key={tc.id} style={{ borderTop: '1px solid var(--line-soft)' }}>
+                    <td style={{ padding: '10px 18px', fontWeight: 500 }}>{tc.month_year}</td>
+                    <td style={{ padding: '10px 18px' }}>{tc.employees?.name}</td>
+                    <td style={{ padding: '10px 18px' }}>{tc.worked_hours}</td>
+                    <td style={{ padding: '10px 18px' }}>
+                      {tc.document_url ? (
+                        <span className="pill info" style={{ fontSize: 11 }}>
+                          <Icon name="file" size={12} style={{ marginRight: 4 }} />
+                          Anexado
+                        </span>
+                      ) : (
+                        <span style={{ color: 'var(--muted)' }}>—</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
       </div>
     </div>
   );
