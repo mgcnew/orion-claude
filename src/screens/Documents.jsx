@@ -629,74 +629,90 @@ export default function DocumentsScreen({ addToast }) {
 
 function ListView({ docs, categories, selected, onToggle }) {
   return (
-    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-      <thead>
-        <tr style={{ background: 'var(--surface-2)', color: 'var(--muted)', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-          <th style={{ padding: '9px 16px', width: 36 }}>
-            <input type="checkbox" style={{ accentColor: 'var(--brand)' }} />
-          </th>
-          <th style={{ padding: '9px 16px', textAlign: 'left', fontWeight: 600 }}>Nome</th>
-          <th style={{ padding: '9px 16px', textAlign: 'left', fontWeight: 600 }}>Categoria</th>
-          <th style={{ padding: '9px 16px', textAlign: 'left', fontWeight: 600 }}>Funcionário</th>
-          <th style={{ padding: '9px 16px', textAlign: 'left', fontWeight: 600 }}>Data</th>
-          <th style={{ padding: '9px 16px', textAlign: 'left', fontWeight: 600 }}>Tamanho</th>
-          <th style={{ padding: '9px 16px', textAlign: 'left', fontWeight: 600 }}>Status</th>
-          <th style={{ width: 80 }} />
-        </tr>
-      </thead>
-      <tbody>
-        {docs.map(f => {
-          const cm = categories.find(c => c.id === f.cat);
-          const st = STATUS_MAP[f.status] || STATUS_MAP.ok;
-          return (
-            <tr
-              key={f.id}
-              style={{ borderTop: '1px solid var(--line-soft)', cursor: 'pointer' }}
-              onMouseEnter={e => e.currentTarget.style.background = 'var(--hover)'}
-              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-            >
-              <td style={{ padding: '10px 16px' }} onClick={e => { e.stopPropagation(); onToggle(f.id); }}>
-                <input type="checkbox" checked={selected.has(f.id)} onChange={() => onToggle(f.id)} style={{ accentColor: 'var(--brand)' }} />
-              </td>
-              <td style={{ padding: '10px 16px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <FileIcon type={f.type} color={cm?.color} size={30} />
-                  <span style={{ fontWeight: 500, maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span>
-                </div>
-              </td>
-              <td style={{ padding: '10px 16px' }}>
-                {cm && (
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 500, color: cm.color, background: cm.color + '14', padding: '2px 8px', borderRadius: 20 }}>
-                    <span style={{ width: 5, height: 5, borderRadius: '50%', background: cm.color }} />
-                    {cm.name}
-                  </span>
-                )}
-              </td>
-              <td style={{ padding: '10px 16px', color: 'var(--muted)', fontSize: 12.5 }}>{f.who}</td>
-              <td style={{ padding: '10px 16px', color: 'var(--muted)', fontSize: 12.5 }}>{f.date}</td>
-              <td style={{ padding: '10px 16px', color: 'var(--muted)', fontSize: 12.5 }}>{f.size ?? '—'}</td>
-              <td style={{ padding: '10px 16px' }}>
-                <span className={`pill ${st.cls}`} style={{ fontSize: 11 }}>{st.label}</span>
-              </td>
-              <td style={{ padding: '10px 16px' }}>
-                <div style={{ display: 'flex', gap: 2 }}>
-                  {f.file_url && (
-                    <a href={f.file_url} target="_blank" rel="noreferrer">
-                      <button className="btn ghost icon sm"><Icon name="eye" size={13} /></button>
-                    </a>
+    <div style={{ overflowX: 'auto' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 480 }}>
+        <thead>
+          <tr style={{ background: 'var(--surface-2)', color: 'var(--muted)', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+            <th style={{ padding: '9px 16px', width: 36 }}>
+              <input type="checkbox" style={{ accentColor: 'var(--brand)' }} />
+            </th>
+            <th style={{ padding: '9px 16px', textAlign: 'left', fontWeight: 600 }}>Nome</th>
+            <th className="doc-col-cat"  style={{ padding: '9px 16px', textAlign: 'left', fontWeight: 600 }}>Categoria</th>
+            <th className="doc-col-who"  style={{ padding: '9px 16px', textAlign: 'left', fontWeight: 600 }}>Funcionário</th>
+            <th className="doc-col-date" style={{ padding: '9px 16px', textAlign: 'left', fontWeight: 600 }}>Data</th>
+            <th className="doc-col-size" style={{ padding: '9px 16px', textAlign: 'left', fontWeight: 600 }}>Tamanho</th>
+            <th className="doc-col-status" style={{ padding: '9px 16px', textAlign: 'left', fontWeight: 600 }}>Status</th>
+            <th style={{ width: 72 }} />
+          </tr>
+        </thead>
+        <tbody>
+          {docs.map(f => {
+            const cm = categories.find(c => c.id === f.cat);
+            const st = STATUS_MAP[f.status] || STATUS_MAP.ok;
+            return (
+              <tr
+                key={f.id}
+                style={{ borderTop: '1px solid var(--line-soft)', cursor: 'pointer' }}
+                onMouseEnter={e => e.currentTarget.style.background = 'var(--hover)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+              >
+                <td style={{ padding: '10px 16px' }} onClick={e => { e.stopPropagation(); onToggle(f.id); }}>
+                  <input type="checkbox" checked={selected.has(f.id)} onChange={() => onToggle(f.id)} style={{ accentColor: 'var(--brand)' }} />
+                </td>
+
+                {/* Nome — absorbe info das colunas ocultas */}
+                <td style={{ padding: '10px 16px', minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                    <FileIcon type={f.type} color={cm?.color} size={30} />
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</div>
+                      {/* Subtítulo aparece quando colunas sumem */}
+                      <div className="doc-name-sub" style={{ display: 'none', alignItems: 'center', gap: 6, marginTop: 2, flexWrap: 'wrap' }}>
+                        {cm && (
+                          <span className="doc-name-sub-cat" style={{ display: 'none', fontSize: 11, color: cm.color, fontWeight: 600 }}>{cm.name}</span>
+                        )}
+                        <span style={{ fontSize: 11, color: 'var(--muted)' }}>{f.who}</span>
+                        <span style={{ fontSize: 11, color: 'var(--muted-2)' }}>·</span>
+                        <span style={{ fontSize: 11, color: 'var(--muted)' }}>{f.date}</span>
+                      </div>
+                    </div>
+                  </div>
+                </td>
+
+                <td className="doc-col-cat" style={{ padding: '10px 16px' }}>
+                  {cm && (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 500, color: cm.color, background: cm.color + '14', padding: '2px 8px', borderRadius: 20, whiteSpace: 'nowrap' }}>
+                      <span style={{ width: 5, height: 5, borderRadius: '50%', background: cm.color, flexShrink: 0 }} />
+                      {cm.name}
+                    </span>
                   )}
-                  {f.file_url && (
-                    <a href={f.file_url} download>
-                      <button className="btn ghost icon sm"><Icon name="download" size={13} /></button>
-                    </a>
-                  )}
-                </div>
-              </td>
-            </tr>
-          );
-        })}
-      </tbody>
-    </table>
+                </td>
+                <td className="doc-col-who"   style={{ padding: '10px 16px', color: 'var(--muted)', fontSize: 12.5, whiteSpace: 'nowrap' }}>{f.who}</td>
+                <td className="doc-col-date"  style={{ padding: '10px 16px', color: 'var(--muted)', fontSize: 12.5, whiteSpace: 'nowrap' }}>{f.date}</td>
+                <td className="doc-col-size"  style={{ padding: '10px 16px', color: 'var(--muted)', fontSize: 12.5, whiteSpace: 'nowrap' }}>{f.size ?? '—'}</td>
+                <td className="doc-col-status" style={{ padding: '10px 16px' }}>
+                  <span className={`pill ${st.cls}`} style={{ fontSize: 11 }}>{st.label}</span>
+                </td>
+                <td style={{ padding: '10px 12px' }}>
+                  <div style={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
+                    {f.file_url && (
+                      <a href={f.file_url} target="_blank" rel="noreferrer">
+                        <button className="btn ghost icon sm"><Icon name="eye" size={13} /></button>
+                      </a>
+                    )}
+                    {f.file_url && (
+                      <a href={f.file_url} download>
+                        <button className="btn ghost icon sm"><Icon name="download" size={13} /></button>
+                      </a>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
   );
 }
 

@@ -404,6 +404,23 @@ select {
   }
 }
 
+/* === Documents table responsive columns === */
+@media (max-width: 1100px) {
+  .doc-col-size { display: none; }
+}
+@media (max-width: 960px) {
+  .doc-col-status { display: none; }
+}
+@media (max-width: 800px) {
+  .doc-col-who  { display: none; }
+  .doc-name-sub { display: flex !important; }
+}
+@media (max-width: 660px) {
+  .doc-col-date { display: none; }
+  .doc-col-cat  { display: none; }
+  .doc-name-sub-cat { display: inline !important; }
+}
+
 /* === Print: A4 export for Justiça === */
 @media print {
   @page {
