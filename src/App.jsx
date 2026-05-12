@@ -19,11 +19,9 @@ import {
   PermissionsScreen, // eslint-disable-line no-unused-vars
   AuditScreen,
   ReportsScreen,
-  NewEmployee,
   SettingsScreen,
   WarningsScreen,
   VacationScreen,
-  OrgChartScreen,
   Placeholder,
 } from './screens/Other.jsx';
 
@@ -143,23 +141,7 @@ export default function App() {
   const renderScreen = () => {
     if (route === 'dashboard') return <Dashboard setRoute={setRoute} addToast={addToast} />;
     if (route === 'employees') return <EmployeesList setRoute={setRoute} setRouteParam={setRouteParam} setRouteLabel={setRouteLabel} />;
-    if (route === 'employees-new')
-      return <NewEmployee setRoute={setRoute} addToast={addToast} />;
     if (route === 'employees-profile') return <EmployeeProfile setRoute={setRoute} employeeId={routeParam} />;
-    if (route === 'employees-leave')
-      return (
-        <Placeholder
-          title="Funcionários afastados"
-          desc="Filtragem rápida de afastados por categoria, prazo e documentação."
-        />
-      );
-    if (route === 'employees-off')
-      return (
-        <Placeholder
-          title="Desligados (90 dias)"
-          desc="Histórico de desligamentos e documentação rescisória."
-        />
-      );
     if (route.startsWith('documents'))
       return <DocumentsScreen addToast={addToast} />;
     if (route.startsWith('time')) return <TimeScreen addToast={addToast} />;
@@ -174,7 +156,6 @@ export default function App() {
       return <SettingsScreen addToast={addToast} setRoute={setRoute} />;
     if (route === 'rh-warn') return <WarningsScreen addToast={addToast} />;
     if (route === 'rh-vacation') return <VacationScreen addToast={addToast} />;
-    if (route === 'employees-org') return <OrgChartScreen />;
     if (route.startsWith('rh'))
       return (
         <Placeholder

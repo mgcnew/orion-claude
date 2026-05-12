@@ -5,19 +5,7 @@ import OrionGlyph from './OrionGlyph.jsx';
 
 const NAV = [
   { id: 'dashboard', label: 'Dashboard', icon: 'dashboard' },
-  {
-    id: 'employees',
-    label: 'Funcionários',
-    icon: 'users',
-    badge: 12,
-    sub: [
-      { id: 'employees', label: 'Todos funcionários' },
-      { id: 'employees-new', label: 'Cadastro' },
-      { id: 'employees-leave', label: 'Afastados' },
-      { id: 'employees-off', label: 'Desligados' },
-      { id: 'employees-org', label: 'Organograma' },
-    ],
-  },
+  { id: 'employees', label: 'Funcionários', icon: 'users' },
   {
     id: 'documents',
     label: 'Documentos',

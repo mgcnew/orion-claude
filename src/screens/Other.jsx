@@ -1063,6 +1063,7 @@ export function WarningsScreen({ addToast }) {
   const countBySeverity = (s) => allWarnings.filter((w) => (w.severity || 'verbal') === s).length;
 
   return (
+    <>
     <div className="fade-up" style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div className="row" style={{ flexWrap: 'wrap', gap: 12 }}>
         <div className="grow">
@@ -1181,16 +1182,17 @@ export function WarningsScreen({ addToast }) {
           </table>
         )}
       </div>
+    </div>
 
-      {/* New warning modal */}
-      {showModal && (
-        <div
-          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-          onClick={() => setShowModal(false)}
-        >
+    {/* New warning modal — fora do fade-up para position:fixed funcionar corretamente */}
+    {showModal && (
+      <div
+        style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 'clamp(8px, 2vw, 24px)', overflowY: 'auto' }}
+        onClick={() => setShowModal(false)}
+      >
           <div
             className="card"
-            style={{ width: 480, padding: 28, position: 'relative' }}
+            style={{ width: '100%', maxWidth: 480, padding: 24, position: 'relative', maxHeight: 'calc(100vh - 32px)', overflowY: 'auto', margin: 'auto' }}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="row" style={{ marginBottom: 20 }}>
@@ -1271,7 +1273,7 @@ export function WarningsScreen({ addToast }) {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }
 
@@ -1312,6 +1314,7 @@ export function VacationScreen({ addToast }) {
   const fmtDate = (d) => d ? new Date(d + 'T00:00:00').toLocaleDateString('pt-BR') : '—';
 
   return (
+    <>
     <div className="fade-up" style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div className="row" style={{ flexWrap: 'wrap', gap: 12 }}>
         <div className="grow">
@@ -1436,15 +1439,16 @@ export function VacationScreen({ addToast }) {
           </table>
         )}
       </div>
+    </div>
 
-      {showModal && (
-        <div
-          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-          onClick={() => setShowModal(false)}
+    {showModal && (
+      <div
+        style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 'clamp(8px, 2vw, 24px)', overflowY: 'auto' }}
+        onClick={() => setShowModal(false)}
         >
           <div
             className="card"
-            style={{ width: 540, padding: 28, position: 'relative', maxHeight: '90vh', overflowY: 'auto' }}
+            style={{ width: '100%', maxWidth: 540, padding: 24, position: 'relative', maxHeight: 'calc(100vh - 32px)', overflowY: 'auto', margin: 'auto' }}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="row" style={{ marginBottom: 20 }}>
@@ -1469,17 +1473,17 @@ export function VacationScreen({ addToast }) {
                   ))}
                 </select>
               </div>
-              <div className="row gap-3">
-                <div style={{ flex: 1 }}>
+              <div className="row gap-3" style={{ flexWrap: 'wrap' }}>
+                <div style={{ flex: '1 1 140px', minWidth: 0 }}>
                   <label className="label">Início</label>
-                  <input 
-                    type="date" 
-                    className="field" 
+                  <input
+                    type="date"
+                    className="field"
                     value={newVacation.period_start}
                     onChange={(e) => setNewVacation({ ...newVacation, period_start: e.target.value })}
                   />
                 </div>
-                <div style={{ flex: 1 }}>
+                <div style={{ flex: '1 1 140px', minWidth: 0 }}>
                   <label className="label">Fim</label>
                   <input 
                     type="date" 
@@ -1609,7 +1613,7 @@ export function VacationScreen({ addToast }) {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }
 
@@ -1700,54 +1704,6 @@ function OrgNode({ node, depth = 0 }) {
           )}
         </>
       )}
-    </div>
-  );
-}
-
-export function OrgChartScreen() {
-  const [zoom, setZoom] = useState(1);
-  return (
-    <div className="fade-up" style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16, height: '100%' }}>
-      <div className="row" style={{ flexWrap: 'wrap', gap: 12 }}>
-        <div className="grow">
-          <h1 style={{ margin: '0 0 4px', fontSize: 22, fontWeight: 700, letterSpacing: -0.4 }}>Organograma</h1>
-          <p style={{ margin: 0, fontSize: 13, color: 'var(--muted)' }}>
-            Estrutura hierárquica da equipe por departamento e supervisão.
-          </p>
-        </div>
-        <div className="row gap-2">
-          <button className="btn ghost icon" onClick={() => setZoom((z) => Math.max(0.5, z - 0.1))} title="Reduzir">
-            <Icon name="minus" size={15} />
-          </button>
-          <span className="mono" style={{ fontSize: 12, color: 'var(--muted)', minWidth: 36, textAlign: 'center', lineHeight: '36px' }}>
-            {Math.round(zoom * 100)}%
-          </span>
-          <button className="btn ghost icon" onClick={() => setZoom((z) => Math.min(1.4, z + 0.1))} title="Ampliar">
-            <Icon name="plus" size={15} />
-          </button>
-          <button className="btn" onClick={() => setZoom(1)}>
-            <Icon name="sparkle" size={14} /> Ajustar
-          </button>
-          <button className="btn"><Icon name="download" size={15} /> Exportar</button>
-        </div>
-      </div>
-
-      <div
-        className="card"
-        style={{
-          flex: 1,
-          padding: 32,
-          overflowX: 'auto',
-          overflowY: 'auto',
-          display: 'flex',
-          alignItems: 'flex-start',
-          justifyContent: 'center',
-        }}
-      >
-        <div style={{ transform: `scale(${zoom})`, transformOrigin: 'top center', transition: 'transform .2s' }}>
-          <OrgNode node={D.orgChart} depth={0} />
-        </div>
-      </div>
     </div>
   );
 }

@@ -54,7 +54,11 @@ function Modal({ title, onClose, children, width = 480 }) {
   useEffect(() => {
     const esc = (e) => e.key === 'Escape' && onClose();
     window.addEventListener('keydown', esc);
-    return () => window.removeEventListener('keydown', esc);
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', esc);
+      document.body.style.overflow = '';
+    };
   }, [onClose]);
 
   return (
@@ -62,20 +66,26 @@ function Modal({ title, onClose, children, width = 480 }) {
       position: 'fixed', inset: 0, zIndex: 200,
       background: 'rgba(0,0,0,.45)', backdropFilter: 'blur(3px)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
+      padding: 'clamp(8px, 2vw, 24px)',
+      overflowY: 'auto',
     }} onClick={onClose}>
       <div style={{
-        width, background: 'var(--surface)', borderRadius: 14,
+        width: '100%', maxWidth: width,
+        background: 'var(--surface)', borderRadius: 14,
         boxShadow: '0 24px 64px rgba(0,0,0,.22)',
         overflow: 'hidden',
+        maxHeight: 'calc(100vh - 32px)',
+        display: 'flex', flexDirection: 'column',
+        margin: 'auto',
       }} onClick={e => e.stopPropagation()}>
         <div style={{
-          padding: '18px 22px', borderBottom: '1px solid var(--line)',
-          display: 'flex', alignItems: 'center', gap: 10,
+          padding: '16px 20px', borderBottom: '1px solid var(--line)',
+          display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0,
         }}>
-          <div style={{ flex: 1, fontSize: 15, fontWeight: 700 }}>{title}</div>
+          <div style={{ flex: 1, fontSize: 15, fontWeight: 700, minWidth: 0 }}>{title}</div>
           <button className="btn ghost icon sm" onClick={onClose}><Icon name="x" size={15} /></button>
         </div>
-        <div style={{ padding: 22 }}>{children}</div>
+        <div style={{ padding: 20, overflowY: 'auto', flex: 1, minHeight: 0 }}>{children}</div>
       </div>
     </div>
   );
@@ -109,10 +119,10 @@ function FaltaModal({ employees, onClose, onSave }) {
           <input type="date" className="field" value={form.date} onChange={e => set('date', e.target.value)} />
         </FieldRow>
         <FieldRow label="Tipo">
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {['justificada','injustificada'].map(t => (
               <button key={t} onClick={() => set('tipo', t)} style={{
-                flex: 1, padding: '8px 0', borderRadius: 8, border: '1px solid',
+                flex: '1 1 120px', padding: '8px 0', borderRadius: 8, border: '1px solid',
                 borderColor: form.tipo === t ? 'var(--brand)' : 'var(--line)',
                 background: form.tipo === t ? 'var(--brand-tint)' : 'var(--surface-2)',
                 color: form.tipo === t ? 'var(--brand)' : 'var(--muted)',
@@ -146,7 +156,7 @@ function HoraExtraModal({ employees, onClose, onSave }) {
             {employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
           </select>
         </FieldRow>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12 }}>
           <FieldRow label="Data">
             <input type="date" className="field" value={form.date} onChange={e => set('date', e.target.value)} />
           </FieldRow>
@@ -182,7 +192,7 @@ function AjusteModal({ employees, onClose, onSave }) {
         <FieldRow label="Data">
           <input type="date" className="field" value={form.date} onChange={e => set('date', e.target.value)} />
         </FieldRow>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12 }}>
           <FieldRow label="Entrada">
             <input type="time" className="field" value={form.entrada} onChange={e => set('entrada', e.target.value)} />
           </FieldRow>
@@ -216,10 +226,10 @@ function EscalaModal({ employees, onClose, onSave }) {
           <input type="text" className="field" placeholder="Ex: Turno manhã — Comercial" value={form.nome} onChange={e => set('nome', e.target.value)} />
         </FieldRow>
         <FieldRow label="Turno">
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {['manhã','tarde','noite','integral'].map(t => (
               <button key={t} onClick={() => set('turno', t)} style={{
-                flex: 1, padding: '7px 0', borderRadius: 8, border: '1px solid',
+                flex: '1 1 80px', padding: '7px 0', borderRadius: 8, border: '1px solid',
                 borderColor: form.turno === t ? 'var(--brand)' : 'var(--line)',
                 background: form.turno === t ? 'var(--brand-tint)' : 'var(--surface-2)',
                 color: form.turno === t ? 'var(--brand)' : 'var(--muted)',
@@ -229,7 +239,7 @@ function EscalaModal({ employees, onClose, onSave }) {
             ))}
           </div>
         </FieldRow>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12 }}>
           <FieldRow label="Horário entrada">
             <input type="time" className="field" value={form.inicio} onChange={e => set('inicio', e.target.value)} />
           </FieldRow>
@@ -382,6 +392,7 @@ export function TimeScreen({ addToast }) {
   const tableRows = timecards.filter(tc => !empId || tc.employee_id === empId);
 
   return (
+    <>
     <div className="fade-up" style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 18 }}>
 
       {/* ── Header ── */}
@@ -621,11 +632,13 @@ export function TimeScreen({ addToast }) {
         </div>
       )}
 
-      {/* ── Modais ── */}
-      {modal === 'falta'  && <FaltaModal    employees={employees} onClose={() => setModal(null)} onSave={d => handleSave('falta', d)}  />}
-      {modal === 'extra'  && <HoraExtraModal employees={employees} onClose={() => setModal(null)} onSave={d => handleSave('extra', d)}  />}
-      {modal === 'ajuste' && <AjusteModal   employees={employees} onClose={() => setModal(null)} onSave={d => handleSave('ajuste', d)} />}
-      {modal === 'escala' && <EscalaModal   employees={employees} onClose={() => setModal(null)} onSave={d => handleSave('escala', d)} />}
     </div>
+
+    {/* modais fora do fade-up para não quebrarem position:fixed */}
+    {modal === 'falta'  && <FaltaModal    employees={employees} onClose={() => setModal(null)} onSave={d => handleSave('falta', d)}  />}
+    {modal === 'extra'  && <HoraExtraModal employees={employees} onClose={() => setModal(null)} onSave={d => handleSave('extra', d)}  />}
+    {modal === 'ajuste' && <AjusteModal   employees={employees} onClose={() => setModal(null)} onSave={d => handleSave('ajuste', d)} />}
+    {modal === 'escala' && <EscalaModal   employees={employees} onClose={() => setModal(null)} onSave={d => handleSave('escala', d)} />}
+  </>
   );
 }

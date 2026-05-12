@@ -1,7 +1,531 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import Icon from '../components/Icon.jsx';
 import Avatar from '../components/Avatar.jsx';
-import { useEmployees, useEmployee, useEmployeeCounts, useEmployeeWarnings, useEmployeeVacations, useEmployeeDocuments, useEmployeeHistory, useEmployeeTimeEntries, clockIn, clockOut } from '../hooks/useEmployees.js';
+import { useEmployees, useEmployee, useEmployeeCounts, useEmployeeWarnings, useEmployeeVacations, useEmployeeDocuments, useEmployeeHistory, useEmployeeTimeEntries, clockIn, clockOut, createEmployee, updateEmployeeStatus } from '../hooks/useEmployees.js';
+
+// ============================================================
+// MODAL BASE
+// ============================================================
+function Modal({ title, subtitle, onClose, children, width = 560 }) {
+  useEffect(() => {
+    const esc = (e) => e.key === 'Escape' && onClose();
+    window.addEventListener('keydown', esc);
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', esc);
+      document.body.style.overflow = '';
+    };
+  }, [onClose]);
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 300,
+      background: 'rgba(0,0,0,.5)', backdropFilter: 'blur(4px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      padding: 'clamp(8px, 2vw, 24px)',
+      overflowY: 'auto',
+    }} onClick={onClose}>
+      <div style={{
+        width: '100%', maxWidth: width,
+        background: 'var(--surface)', borderRadius: 16,
+        boxShadow: '0 32px 80px rgba(0,0,0,.25)',
+        overflow: 'hidden',
+        maxHeight: 'calc(100vh - 32px)',
+        display: 'flex', flexDirection: 'column',
+        margin: 'auto',
+      }} onClick={e => e.stopPropagation()}>
+        <div style={{
+          padding: '18px 22px', borderBottom: '1px solid var(--line)',
+          display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0,
+        }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 16, fontWeight: 700 }}>{title}</div>
+            {subtitle && <div style={{ fontSize: 12.5, color: 'var(--muted)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{subtitle}</div>}
+          </div>
+          <button className="btn ghost icon sm" onClick={onClose}><Icon name="x" size={15} /></button>
+        </div>
+        <div style={{ overflowY: 'auto', flex: 1, minHeight: 0 }}>{children}</div>
+      </div>
+    </div>
+  );
+}
+
+function FL({ label, children, span }) {
+  return (
+    <div style={{ gridColumn: span ? `1 / -1` : undefined, display: 'flex', flexDirection: 'column', gap: 5, minWidth: 0 }}>
+      <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.6 }}>{label}</label>
+      {children}
+    </div>
+  );
+}
+
+// ============================================================
+// MODAL NOVO FUNCIONÁRIO — 4 steps com progresso
+// ============================================================
+const NEW_EMP_STEPS = [
+  { id: 'pessoal',      label: 'Dados pessoais',    icon: 'user'      },
+  { id: 'profissional', label: 'Dados profissionais',icon: 'briefcase' },
+  { id: 'contato',      label: 'Contato & endereço', icon: 'mail'      },
+  { id: 'revisao',      label: 'Revisão',            icon: 'check'     },
+];
+
+const BLANK_EMP = {
+  name: '', cpf: '', birth_date: '', civil_status: 'Solteiro(a)',
+  role: '', dept: '', company: 'Orion Matriz', contract: 'CLT — Tempo indet.',
+  admission: new Date().toISOString().slice(0, 10), salary: '', cost_center: '', workload: '44h semanais', regime: 'Presencial', supervisor: '',
+  phone: '', email_personal: '', address: '', neighborhood: '', city: '', state: '', zip_code: '',
+  status: 'ativo',
+};
+
+export function NewEmployeeModal({ onClose, onCreated }) {
+  const [step, setStep]     = useState(0);
+  const [form, setForm]     = useState(BLANK_EMP);
+  const [saving, setSaving] = useState(false);
+  const [errors, setErrors] = useState({});
+
+  useEffect(() => {
+    const esc = (e) => e.key === 'Escape' && onClose();
+    window.addEventListener('keydown', esc);
+    document.body.style.overflow = 'hidden';
+    return () => { window.removeEventListener('keydown', esc); document.body.style.overflow = ''; };
+  }, [onClose]);
+
+  const set = (k, v) => { setForm(f => ({ ...f, [k]: v })); setErrors(e => ({ ...e, [k]: undefined })); };
+
+  const validate = () => {
+    const e = {};
+    if (step === 0 && !form.name.trim()) e.name = 'Obrigatório';
+    if (step === 1) {
+      if (!form.role.trim()) e.role = 'Obrigatório';
+      if (!form.dept.trim()) e.dept = 'Obrigatório';
+      if (!form.admission)   e.admission = 'Obrigatório';
+    }
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  };
+
+  const next = () => { if (validate()) setStep(s => Math.min(s + 1, 3)); };
+  const prev = () => setStep(s => Math.max(s - 1, 0));
+
+  const handleSave = async () => {
+    setSaving(true);
+    const payload = {
+      name: form.name, role: form.role, dept: form.dept, company: form.company,
+      contract: form.contract, admission: form.admission,
+      salary: form.salary ? parseFloat(form.salary) : null,
+      cost_center: form.cost_center, workload: form.workload, regime: form.regime,
+      supervisor: form.supervisor, phone: form.phone, email_personal: form.email_personal,
+      address: form.address, neighborhood: form.neighborhood, city: form.city,
+      state: form.state, zip_code: form.zip_code,
+      cpf: form.cpf, birth_date: form.birth_date || null, civil_status: form.civil_status,
+      status: 'ativo', hue: Math.floor(Math.random() * 360),
+    };
+    const { error } = await createEmployee(payload);
+    setSaving(false);
+    if (error) { alert('Erro ao salvar: ' + error.message); return; }
+    onCreated?.();
+    onClose();
+  };
+
+  // ── backdrop ──────────────────────────────────────────────────
+  return (
+    <div
+      style={{
+        position: 'fixed', inset: 0, zIndex: 300,
+        background: 'rgba(0,0,0,.5)', backdropFilter: 'blur(4px)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: 'clamp(8px, 2vw, 24px)',
+      }}
+      onClick={onClose}
+    >
+      {/* ── modal card ── */}
+      <div
+        style={{
+          width: '100%', maxWidth: 640,
+          background: 'var(--surface)', borderRadius: 16,
+          boxShadow: '0 32px 80px rgba(0,0,0,.25)',
+          display: 'flex', flexDirection: 'column',
+          maxHeight: 'calc(100dvh - 32px)',
+          overflow: 'hidden',
+        }}
+        onClick={e => e.stopPropagation()}
+      >
+        {/* ── HEADER fixo ── */}
+        <div style={{ flexShrink: 0, borderBottom: '1px solid var(--line)' }}>
+          {/* título */}
+          <div style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 16, fontWeight: 700 }}>Novo funcionário</div>
+              <div style={{ fontSize: 12.5, color: 'var(--muted)', marginTop: 2 }}>Preencha os dados do novo colaborador</div>
+            </div>
+            <button className="btn ghost icon sm" onClick={onClose}><Icon name="x" size={15} /></button>
+          </div>
+
+          {/* barra de progresso */}
+          <div style={{ padding: '0 20px 16px', display: 'flex', alignItems: 'flex-start' }}>
+            {NEW_EMP_STEPS.map((s, i) => (
+              <div key={s.id} style={{ display: 'flex', alignItems: 'flex-start', flex: i < NEW_EMP_STEPS.length - 1 ? 1 : 0 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5 }}>
+                  <div style={{
+                    width: 28, height: 28, borderRadius: '50%',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    background: i < step ? 'var(--ok)' : i === step ? 'var(--brand)' : 'var(--surface-2)',
+                    border: `2px solid ${i < step ? 'var(--ok)' : i === step ? 'var(--brand)' : 'var(--line)'}`,
+                    color: i <= step ? '#fff' : 'var(--muted)',
+                    fontSize: 12, fontWeight: 700, flexShrink: 0, transition: 'all .2s',
+                  }}>
+                    {i < step ? <Icon name="check" size={12} /> : i + 1}
+                  </div>
+                  <span style={{
+                    fontSize: 10, fontWeight: i === step ? 700 : 400,
+                    color: i === step ? 'var(--ink)' : 'var(--muted)',
+                    textAlign: 'center', lineHeight: 1.25,
+                    width: 60, wordBreak: 'break-word',
+                  }}>
+                    {s.label}
+                  </span>
+                </div>
+                {i < NEW_EMP_STEPS.length - 1 && (
+                  <div style={{
+                    flex: 1, height: 2, margin: '13px 6px 0',
+                    background: i < step ? 'var(--ok)' : 'var(--line)',
+                    transition: 'background .3s', minWidth: 8,
+                  }} />
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* ── BODY rolável ── */}
+        <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, padding: '20px 20px 8px' }}>
+          {step === 0 && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14 }}>
+              <FL label="Nome completo *" span={2}>
+                <input className={`field ${errors.name ? 'error' : ''}`} value={form.name} onChange={e => set('name', e.target.value)} placeholder="Nome completo do colaborador" />
+                {errors.name && <span style={{ fontSize: 11, color: 'var(--bad)' }}>{errors.name}</span>}
+              </FL>
+              <FL label="CPF">
+                <input className="field" value={form.cpf} onChange={e => set('cpf', e.target.value)} placeholder="000.000.000-00" />
+              </FL>
+              <FL label="Data de nascimento">
+                <input type="date" className="field" value={form.birth_date} onChange={e => set('birth_date', e.target.value)} />
+              </FL>
+              <FL label="Estado civil" span={2}>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {['Solteiro(a)', 'Casado(a)', 'Divorciado(a)', 'Viúvo(a)'].map(v => (
+                    <button key={v} onClick={() => set('civil_status', v)} style={{
+                      flex: '1 1 110px', padding: '8px 4px', borderRadius: 8, border: '1px solid',
+                      borderColor: form.civil_status === v ? 'var(--brand)' : 'var(--line)',
+                      background: form.civil_status === v ? 'var(--brand-tint)' : 'var(--surface-2)',
+                      color: form.civil_status === v ? 'var(--brand)' : 'var(--muted)',
+                      fontWeight: form.civil_status === v ? 700 : 400, fontSize: 12, cursor: 'pointer',
+                    }}>{v}</button>
+                  ))}
+                </div>
+              </FL>
+            </div>
+          )}
+
+          {step === 1 && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14 }}>
+              <FL label="Cargo *">
+                <input className={`field ${errors.role ? 'error' : ''}`} value={form.role} onChange={e => set('role', e.target.value)} placeholder="Ex: Analista de RH" />
+                {errors.role && <span style={{ fontSize: 11, color: 'var(--bad)' }}>{errors.role}</span>}
+              </FL>
+              <FL label="Departamento *">
+                <input className={`field ${errors.dept ? 'error' : ''}`} value={form.dept} onChange={e => set('dept', e.target.value)} placeholder="Ex: Recursos Humanos" />
+                {errors.dept && <span style={{ fontSize: 11, color: 'var(--bad)' }}>{errors.dept}</span>}
+              </FL>
+              <FL label="Empresa">
+                <select className="field" value={form.company} onChange={e => set('company', e.target.value)}>
+                  {['Orion Matriz','Orion Filial SP','Orion Filial RJ','Orion Filial MG'].map(c => <option key={c}>{c}</option>)}
+                </select>
+              </FL>
+              <FL label="Tipo de contrato">
+                <select className="field" value={form.contract} onChange={e => set('contract', e.target.value)}>
+                  {['CLT — Tempo indet.','CLT — Tempo det.','PJ','Estágio','Temporário','Aprendiz'].map(c => <option key={c}>{c}</option>)}
+                </select>
+              </FL>
+              <FL label="Data de admissão *">
+                <input type="date" className={`field ${errors.admission ? 'error' : ''}`} value={form.admission} onChange={e => set('admission', e.target.value)} />
+                {errors.admission && <span style={{ fontSize: 11, color: 'var(--bad)' }}>{errors.admission}</span>}
+              </FL>
+              <FL label="Salário base (R$)">
+                <input className="field" value={form.salary} onChange={e => set('salary', e.target.value)} placeholder="0,00" />
+              </FL>
+              <FL label="Centro de custo">
+                <input className="field" value={form.cost_center} onChange={e => set('cost_center', e.target.value)} placeholder="Ex: RH-001" />
+              </FL>
+              <FL label="Supervisor direto">
+                <input className="field" value={form.supervisor} onChange={e => set('supervisor', e.target.value)} placeholder="Nome do supervisor" />
+              </FL>
+              <FL label="Carga horária">
+                <select className="field" value={form.workload} onChange={e => set('workload', e.target.value)}>
+                  {['44h semanais','40h semanais','30h semanais','20h semanais'].map(c => <option key={c}>{c}</option>)}
+                </select>
+              </FL>
+              <FL label="Regime de trabalho">
+                <select className="field" value={form.regime} onChange={e => set('regime', e.target.value)}>
+                  {['Presencial','Remoto','Híbrido (2×3)','Híbrido (3×2)'].map(c => <option key={c}>{c}</option>)}
+                </select>
+              </FL>
+            </div>
+          )}
+
+          {step === 2 && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14 }}>
+              <FL label="Telefone">
+                <input className="field" value={form.phone} onChange={e => set('phone', e.target.value)} placeholder="+55 11 9 0000-0000" />
+              </FL>
+              <FL label="E-mail pessoal">
+                <input type="email" className="field" value={form.email_personal} onChange={e => set('email_personal', e.target.value)} placeholder="nome@email.com" />
+              </FL>
+              <FL label="Logradouro" span={2}>
+                <input className="field" value={form.address} onChange={e => set('address', e.target.value)} placeholder="Rua, número, complemento" />
+              </FL>
+              <FL label="Bairro">
+                <input className="field" value={form.neighborhood} onChange={e => set('neighborhood', e.target.value)} placeholder="Bairro" />
+              </FL>
+              <FL label="CEP">
+                <input className="field" value={form.zip_code} onChange={e => set('zip_code', e.target.value)} placeholder="00000-000" />
+              </FL>
+              <FL label="Cidade">
+                <input className="field" value={form.city} onChange={e => set('city', e.target.value)} placeholder="Cidade" />
+              </FL>
+              <FL label="Estado (UF)">
+                <input className="field" value={form.state} onChange={e => set('state', e.target.value)} placeholder="SP" maxLength={2} style={{ textTransform: 'uppercase' }} />
+              </FL>
+            </div>
+          )}
+
+          {step === 3 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              {[
+                {
+                  title: 'Dados pessoais',
+                  rows: [['Nome', form.name||'—'],['CPF', form.cpf||'—'],['Nascimento', form.birth_date||'—'],['Estado civil', form.civil_status]],
+                },
+                {
+                  title: 'Dados profissionais',
+                  rows: [['Cargo', form.role||'—'],['Departamento', form.dept||'—'],['Empresa', form.company],['Contrato', form.contract],['Admissão', form.admission||'—'],['Salário', form.salary ? `R$ ${parseFloat(form.salary).toLocaleString('pt-BR',{minimumFractionDigits:2})}` : '—'],['Regime', form.regime],['Carga', form.workload]],
+                },
+                ...(form.phone || form.email_personal || form.city ? [{
+                  title: 'Contato & endereço',
+                  rows: [['Telefone', form.phone||'—'],['E-mail', form.email_personal||'—'],['Cidade/UF', form.city && form.state ? `${form.city} / ${form.state}` : form.city||'—']],
+                }] : []),
+              ].map(section => (
+                <div key={section.title} style={{ background: 'var(--surface-2)', borderRadius: 10, padding: 16, border: '1px solid var(--line)' }}>
+                  <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 12 }}>
+                    {section.title}
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 10 }}>
+                    {section.rows.map(([l, v]) => (
+                      <div key={l}>
+                        <div style={{ fontSize: 10.5, color: 'var(--muted)', fontWeight: 600, marginBottom: 2 }}>{l}</div>
+                        <div style={{ fontSize: 13, fontWeight: 500 }}>{v}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* ── FOOTER fixo ── */}
+        <div style={{
+          flexShrink: 0, padding: '14px 20px',
+          borderTop: '1px solid var(--line)',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          background: 'var(--surface)',
+        }}>
+          <button className="btn" onClick={step === 0 ? onClose : prev}>
+            {step === 0 ? 'Cancelar' : <><Icon name="chevron-left" size={13} /> Voltar</>}
+          </button>
+          <span style={{ fontSize: 12, color: 'var(--muted)' }}>Etapa {step + 1} de {NEW_EMP_STEPS.length}</span>
+          {step < 3 ? (
+            <button className="btn primary" onClick={next}>
+              Próximo <Icon name="chevron-right" size={13} />
+            </button>
+          ) : (
+            <button className="btn primary" onClick={handleSave} disabled={saving}>
+              {saving ? 'Salvando…' : <><Icon name="check" size={13} /> Cadastrar funcionário</>}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// MODAL AFASTAMENTO
+// ============================================================
+export function AfastamentoModal({ employee, onClose, onSaved }) {
+  const TIPOS = ['Licença médica','Licença maternidade','Licença paternidade','Acidente de trabalho','Licença não remunerada','Outro'];
+  const [form, setForm] = useState({ tipo: TIPOS[0], inicio: new Date().toISOString().slice(0,10), retorno: '', obs: '' });
+  const [saving, setSaving] = useState(false);
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  const handleSave = async () => {
+    setSaving(true);
+    const { error } = await updateEmployeeStatus(employee.id, 'afastado');
+    setSaving(false);
+    if (error) { alert('Erro: ' + error.message); return; }
+    onSaved?.();
+    onClose();
+  };
+
+  return (
+    <Modal title="Registrar afastamento" subtitle={employee?.name} onClose={onClose} width={500}>
+      <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <FL label="Tipo de afastamento">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 8 }}>
+            {TIPOS.map(t => (
+              <button key={t} onClick={() => set('tipo', t)} style={{
+                padding: '9px 12px', borderRadius: 8, border: '1px solid',
+                borderColor: form.tipo === t ? 'var(--brand)' : 'var(--line)',
+                background: form.tipo === t ? 'var(--brand-tint)' : 'var(--surface-2)',
+                color: form.tipo === t ? 'var(--brand)' : 'var(--muted)',
+                fontWeight: form.tipo === t ? 700 : 400, fontSize: 12.5, cursor: 'pointer',
+                textAlign: 'left',
+              }}>{t}</button>
+            ))}
+          </div>
+        </FL>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
+          <FL label="Data de início">
+            <input type="date" className="field" value={form.inicio} onChange={e => set('inicio', e.target.value)} />
+          </FL>
+          <FL label="Retorno previsto">
+            <input type="date" className="field" value={form.retorno} onChange={e => set('retorno', e.target.value)} />
+          </FL>
+        </div>
+        <FL label="Observações">
+          <textarea className="field" rows={3} placeholder="Informações adicionais sobre o afastamento…" value={form.obs}
+            onChange={e => set('obs', e.target.value)} style={{ resize: 'vertical' }} />
+        </FL>
+      </div>
+      <div style={{ padding: '14px 24px', borderTop: '1px solid var(--line)', display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+        <button className="btn" onClick={onClose}>Cancelar</button>
+        <button className="btn" style={{ background: '#fef9c3', borderColor: '#ca8a04', color: '#92400e' }} onClick={handleSave} disabled={saving}>
+          <Icon name="alert" size={13} /> {saving ? 'Salvando…' : 'Confirmar afastamento'}
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+// ============================================================
+// MODAL DESLIGAMENTO
+// ============================================================
+export function DesligamentoModal({ employee, onClose, onSaved }) {
+  const MOTIVOS = ['Pedido de demissão','Demissão sem justa causa','Demissão com justa causa','Término de contrato','Aposentadoria','Falecimento'];
+  const [form, setForm] = useState({ motivo: MOTIVOS[0], data: new Date().toISOString().slice(0,10), obs: '' });
+  const [confirm, setConfirm] = useState('');
+  const [saving, setSaving] = useState(false);
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  const canSave = confirm === 'DESLIGAR';
+
+  const handleSave = async () => {
+    if (!canSave) return;
+    setSaving(true);
+    const { error } = await updateEmployeeStatus(employee.id, 'desligado');
+    setSaving(false);
+    if (error) { alert('Erro: ' + error.message); return; }
+    onSaved?.();
+    onClose();
+  };
+
+  return (
+    <Modal title="Desligar funcionário" subtitle={employee?.name} onClose={onClose} width={500}>
+      {/* Aviso crítico */}
+      <div style={{ margin: '20px 24px 0', padding: 14, background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: 10, display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+        <Icon name="alert" size={18} style={{ color: '#dc2626', flexShrink: 0, marginTop: 1 }} />
+        <div style={{ fontSize: 13, color: '#7f1d1d', lineHeight: 1.5 }}>
+          <strong>Ação irreversível.</strong> O funcionário será marcado como desligado e perderá acesso ao sistema. Certifique-se de ter concluído todos os processos de RH antes de prosseguir.
+        </div>
+      </div>
+
+      <div style={{ padding: '16px 24px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <FL label="Motivo do desligamento">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 8 }}>
+            {MOTIVOS.map(m => (
+              <button key={m} onClick={() => set('motivo', m)} style={{
+                padding: '9px 12px', borderRadius: 8, border: '1px solid',
+                borderColor: form.motivo === m ? '#dc2626' : 'var(--line)',
+                background: form.motivo === m ? '#fee2e2' : 'var(--surface-2)',
+                color: form.motivo === m ? '#dc2626' : 'var(--muted)',
+                fontWeight: form.motivo === m ? 700 : 400, fontSize: 12.5, cursor: 'pointer',
+                textAlign: 'left',
+              }}>{m}</button>
+            ))}
+          </div>
+        </FL>
+        <FL label="Data efetiva do desligamento">
+          <input type="date" className="field" value={form.data} onChange={e => set('data', e.target.value)} />
+        </FL>
+        <FL label="Observações">
+          <textarea className="field" rows={2} value={form.obs} onChange={e => set('obs', e.target.value)} placeholder="Informações adicionais…" style={{ resize: 'vertical' }} />
+        </FL>
+        <FL label={`Para confirmar, digite DESLIGAR`}>
+          <input className="field" value={confirm} onChange={e => setConfirm(e.target.value.toUpperCase())}
+            placeholder="DESLIGAR" style={{ fontFamily: 'monospace', letterSpacing: 1 }} />
+        </FL>
+      </div>
+      <div style={{ padding: '14px 24px', borderTop: '1px solid var(--line)', display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+        <button className="btn" onClick={onClose}>Cancelar</button>
+        <button onClick={handleSave} disabled={!canSave || saving} style={{
+          display: 'flex', alignItems: 'center', gap: 6,
+          padding: '8px 16px', borderRadius: 8, border: '1px solid #dc2626',
+          background: canSave ? '#dc2626' : 'var(--surface-2)',
+          color: canSave ? '#fff' : 'var(--muted)',
+          fontWeight: 600, fontSize: 13, cursor: canSave ? 'pointer' : 'not-allowed',
+          opacity: saving ? 0.7 : 1,
+        }}>
+          <Icon name="trash" size={13} /> {saving ? 'Salvando…' : 'Desligar funcionário'}
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+// ============================================================
+// MODAL REATIVAÇÃO
+// ============================================================
+export function ReativacaoModal({ employee, onClose, onSaved }) {
+  const [saving, setSaving] = useState(false);
+  const handleSave = async () => {
+    setSaving(true);
+    const { error } = await updateEmployeeStatus(employee.id, 'ativo');
+    setSaving(false);
+    if (error) { alert('Erro: ' + error.message); return; }
+    onSaved?.();
+    onClose();
+  };
+  return (
+    <Modal title="Reativar funcionário" subtitle={employee?.name} onClose={onClose} width={440}>
+      <div style={{ padding: '20px 24px' }}>
+        <div style={{ display: 'flex', gap: 14, alignItems: 'center', padding: 16, background: 'var(--ok-bg,#dcfce7)', border: '1px solid #86efac', borderRadius: 10, marginBottom: 16 }}>
+          <Avatar name={employee?.name || '?'} hue={employee?.hue || 120} size={44} />
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 15 }}>{employee?.name}</div>
+            <div style={{ fontSize: 12.5, color: 'var(--muted)', marginTop: 2 }}>{employee?.role} · {employee?.dept}</div>
+          </div>
+        </div>
+        <p style={{ fontSize: 13.5, color: 'var(--muted)', margin: 0, lineHeight: 1.6 }}>
+          O status do colaborador será alterado para <strong style={{ color: 'var(--ok)' }}>Ativo</strong> e ele voltará a aparecer nas listagens normais. Confirma a reativação?
+        </p>
+      </div>
+      <div style={{ padding: '14px 24px', borderTop: '1px solid var(--line)', display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+        <button className="btn" onClick={onClose}>Cancelar</button>
+        <button className="btn primary" onClick={handleSave} disabled={saving}>
+          {saving ? 'Salvando…' : <><Icon name="check" size={13} /> Reativar</>}
+        </button>
+      </div>
+    </Modal>
+  );
+}
 
 // ---- helpers shared across tabs ----
 const th = (w) => ({ textAlign: 'left', padding: '10px 14px', fontWeight: 600, width: w });
@@ -26,17 +550,73 @@ function StatusPill({ status }) {
 // ============================================================
 // LIST
 // ============================================================
+function RowMenu({ emp, onProfile, onAfastar, onDesligar, onReativar }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef();
+  useEffect(() => {
+    const h = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, []);
+  const isOff = emp.status === 'desligado' || emp.status === 'afastado';
+  const actions = [
+    { label: 'Ver perfil', icon: 'user', fn: onProfile },
+    null,
+    ...(isOff ? [{ label: 'Reativar', icon: 'check', fn: onReativar }] : []),
+    ...(!isOff ? [{ label: 'Registrar afastamento', icon: 'alert', fn: onAfastar, color: '#ca8a04' }] : []),
+    { label: 'Desligar', icon: 'trash', fn: onDesligar, color: '#dc2626' },
+  ].filter(Boolean);
+
+  return (
+    <div ref={ref} style={{ position: 'relative' }}>
+      <button className="btn ghost icon sm" onClick={e => { e.stopPropagation(); setOpen(o => !o); }}>
+        <Icon name="more-v" size={14} />
+      </button>
+      {open && (
+        <div style={{
+          position: 'absolute', right: 0, top: '100%', marginTop: 4, zIndex: 100,
+          background: 'var(--surface)', border: '1px solid var(--line)',
+          borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,.12)',
+          minWidth: 210, overflow: 'hidden',
+        }}>
+          {actions.map((a, i) =>
+            a === null ? (
+              <div key={i} style={{ height: 1, background: 'var(--line)', margin: '2px 0' }} />
+            ) : (
+              <button key={a.label} onClick={e => { e.stopPropagation(); setOpen(false); a.fn(); }} style={{
+                display: 'flex', alignItems: 'center', gap: 9,
+                width: '100%', padding: '10px 14px', border: 'none',
+                background: 'transparent', cursor: 'pointer', fontSize: 13.5,
+                color: a.color || 'var(--ink)', textAlign: 'left',
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = 'var(--hover)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                <Icon name={a.icon} size={14} style={{ color: a.color || 'var(--brand)' }} />
+                {a.label}
+              </button>
+            )
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function EmployeesList({ setRoute, setRouteParam, setRouteLabel }) {
   const [view, setView]     = useState('table');
   const [tab, setTab]       = useState('todos');
   const [q, setQ]           = useState('');
   const [selected, setSelected] = useState(new Set());
+  const [showNewModal, setShowNewModal] = useState(false);
+  const [actionModal, setActionModal]   = useState(null); // { type: 'afastar'|'desligar'|'reativar', emp }
 
-  const { counts } = useEmployeeCounts();
-  const { employees: filtered, loading } = useEmployees({
+  const { counts, refetch: refetchCounts } = useEmployeeCounts();
+  const { employees: filtered, loading, refetch } = useEmployees({
     status: tab !== 'todos' ? tab : undefined,
     search: q || undefined,
   });
+
+  const onSaved = () => { refetch(); refetchCounts(); };
 
   const tabs = [
     { id: 'todos',     l: 'Todos',      n: counts.todos },
@@ -60,6 +640,7 @@ export function EmployeesList({ setRoute, setRouteParam, setRouteLabel }) {
   };
 
   return (
+    <>
     <div className="fade-up" style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div className="row" style={{ gap: 12, flexWrap: 'wrap' }}>
         <div className="grow">
@@ -74,7 +655,7 @@ export function EmployeesList({ setRoute, setRouteParam, setRouteLabel }) {
           <button className="btn">
             <Icon name="download" size={15} /> Exportar CSV
           </button>
-          <button className="btn primary" onClick={() => setRoute('employees-new')}>
+          <button className="btn primary" onClick={() => setShowNewModal(true)}>
             <Icon name="plus" size={15} /> Novo funcionário
           </button>
         </div>
@@ -261,9 +842,13 @@ export function EmployeesList({ setRoute, setRouteParam, setRouteLabel }) {
                       </span>
                     </td>
                     <td style={td()} onClick={(e) => e.stopPropagation()}>
-                      <button className="btn ghost icon sm">
-                        <Icon name="more-v" size={14} />
-                      </button>
+                      <RowMenu
+                        emp={emp}
+                        onProfile={() => openProfile(emp.id, emp.name)}
+                        onAfastar={() => setActionModal({ type: 'afastar', emp })}
+                        onDesligar={() => setActionModal({ type: 'desligar', emp })}
+                        onReativar={() => setActionModal({ type: 'reativar', emp })}
+                      />
                     </td>
                   </tr>
                 ))}
@@ -297,6 +882,15 @@ export function EmployeesList({ setRoute, setRouteParam, setRouteLabel }) {
                   <Avatar name={emp.name} hue={emp.hue} size={42} />
                   <span className="grow" />
                   <StatusPill status={emp.status} />
+                  <div onClick={e => e.stopPropagation()}>
+                    <RowMenu
+                      emp={emp}
+                      onProfile={() => openProfile(emp.id, emp.name)}
+                      onAfastar={() => setActionModal({ type: 'afastar', emp })}
+                      onDesligar={() => setActionModal({ type: 'desligar', emp })}
+                      onReativar={() => setActionModal({ type: 'reativar', emp })}
+                    />
+                  </div>
                 </div>
                 <div style={{ fontWeight: 600, fontSize: 14 }}>{emp.name}</div>
                 <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>{emp.role}</div>
@@ -338,7 +932,22 @@ export function EmployeesList({ setRoute, setRouteParam, setRouteLabel }) {
           </div>
         </div>
       </div>
+
     </div>
+
+      {showNewModal && (
+        <NewEmployeeModal onClose={() => setShowNewModal(false)} onCreated={onSaved} />
+      )}
+      {actionModal?.type === 'afastar' && (
+        <AfastamentoModal employee={actionModal.emp} onClose={() => setActionModal(null)} onSaved={onSaved} />
+      )}
+      {actionModal?.type === 'desligar' && (
+        <DesligamentoModal employee={actionModal.emp} onClose={() => setActionModal(null)} onSaved={onSaved} />
+      )}
+      {actionModal?.type === 'reativar' && (
+        <ReativacaoModal employee={actionModal.emp} onClose={() => setActionModal(null)} onSaved={onSaved} />
+      )}
+    </>
   );
 }
 
