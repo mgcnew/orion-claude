@@ -1874,97 +1874,404 @@ function DadosProfissionais({ emp }) {
 }
 
 const DOC_CATEGORIES = [
-  { id: 'contratos',    name: 'Contratos',     icon: 'doc',         color: '#2A5BFF' },
-  { id: 'holerites',   name: 'Holerites',      icon: 'pdf',         color: '#059669' },
-  { id: 'atestados',   name: 'Atestados',      icon: 'image',       color: '#D97706' },
-  { id: 'rg-cpf',      name: 'RG / CPF',       icon: 'user',        color: '#1F8A5B' },
-  { id: 'exames',      name: 'Exames Médicos', icon: 'fingerprint', color: '#db2777' },
-  { id: 'ferias',      name: 'Férias',         icon: 'umbrella',    color: '#0891b2' },
-  { id: 'advertencias',name: 'Advertências',   icon: 'alert',       color: '#a855f7' },
-  { id: 'juridico',    name: 'Jurídico',       icon: 'shield',      color: '#475569' },
+  { id: 'contratos',     name: 'Contratos',      icon: 'doc',         color: '#2A5BFF' },
+  { id: 'holerites',    name: 'Holerites',       icon: 'pdf',         color: '#059669' },
+  { id: 'atestados',    name: 'Atestados',       icon: 'image',       color: '#D97706' },
+  { id: 'rg-cpf',       name: 'RG / CPF',        icon: 'user',        color: '#1F8A5B' },
+  { id: 'exames',       name: 'Exames Médicos',  icon: 'fingerprint', color: '#db2777' },
+  { id: 'ferias',       name: 'Férias',          icon: 'umbrella',    color: '#0891b2' },
+  { id: 'advertencias', name: 'Advertências',    icon: 'alert',       color: '#a855f7' },
+  { id: 'juridico',     name: 'Jurídico',        icon: 'shield',      color: '#475569' },
 ];
 
-function DocsTab({ employeeId, documents = [], refetch }) {
-  const [uploading, setUploading] = useState(false);
-  const [uploadCat, setUploadCat] = useState(null);
+// Campos extras por categoria — armazenados como JSON em notes
+const DOC_EXTRA_FIELDS = {
+  contratos: [
+    { key: 'tipo_contrato', label: 'Tipo de contrato', type: 'select', options: ['CLT', 'PJ', 'Estágio', 'Temporário', 'Intermitente', 'Autônomo'] },
+    { key: 'vigencia_inicio', label: 'Início da vigência', type: 'date' },
+    { key: 'vigencia_fim',   label: 'Fim da vigência',   type: 'date' },
+  ],
+  holerites: [
+    { key: 'mes_ref', label: 'Mês de referência', type: 'select', options: ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'] },
+    { key: 'ano_ref', label: 'Ano',               type: 'text',  placeholder: '2025' },
+  ],
+  atestados: [
+    { key: 'cid',    label: 'CID',                      type: 'text', placeholder: 'ex: A09' },
+    { key: 'dias',   label: 'Dias de afastamento',      type: 'text', placeholder: 'ex: 3' },
+    { key: 'medico', label: 'Médico / CRM',             type: 'text', placeholder: 'ex: Dr. Silva CRM-12345' },
+  ],
+  'rg-cpf': [
+    { key: 'tipo_doc', label: 'Tipo',               type: 'select', options: ['RG', 'CPF', 'RNE', 'CNH', 'Passaporte'] },
+    { key: 'numero',   label: 'Número do documento', type: 'text',   placeholder: 'ex: 12.345.678-9' },
+  ],
+  exames: [
+    { key: 'tipo_exame', label: 'Tipo de exame', type: 'select', options: ['Admissional', 'Periódico', 'Demissional', 'Retorno ao trabalho', 'Mudança de função'] },
+    { key: 'resultado',  label: 'Resultado',      type: 'select', options: ['Apto', 'Apto com restrições', 'Inapto'] },
+    { key: 'medico',     label: 'Médico / CRM',   type: 'text',   placeholder: 'ex: Dr. Silva CRM-12345' },
+  ],
+  ferias: [
+    { key: 'aq_inicio', label: 'Período aquisitivo — de', type: 'date' },
+    { key: 'aq_fim',    label: 'Período aquisitivo — até', type: 'date' },
+    { key: 'gozo_inicio', label: 'Período de gozo — de',  type: 'date' },
+    { key: 'gozo_fim',    label: 'Período de gozo — até', type: 'date' },
+  ],
+  advertencias: [
+    { key: 'tipo_adv', label: 'Tipo', type: 'select', options: ['Verbal', 'Escrita — 1ª', 'Escrita — 2ª', 'Suspensão'] },
+    { key: 'motivo',   label: 'Motivo', type: 'textarea' },
+  ],
+  juridico: [
+    { key: 'tipo_juridico',    label: 'Tipo',           type: 'select', options: ['Processo trabalhista', 'Notificação extrajudicial', 'Acordo', 'Sentença', 'Recurso', 'Outro'] },
+    { key: 'numero_processo',  label: 'Nº do processo', type: 'text',   placeholder: 'ex: 0001234-56.2025.5.00.0000' },
+  ],
+};
+
+// ============================================================
+// MODAL — Adicionar Documento
+// ============================================================
+function UploadDocModal({ employeeId, onClose, onSaved }) {
+  const [step, setStep] = useState('category'); // 'category' | 'form'
+  const [cat, setCat] = useState(null);
+  const [form, setForm] = useState({ name: '', doc_date: '', file: null });
+  const [extras, setExtras] = useState({});
+  const [saving, setSaving] = useState(false);
   const [userId, setUserId] = useState(null);
-  const fileInputRef = useRef();
+  const fileRef = useRef();
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => setUserId(user?.id ?? null));
   }, []);
 
-  const handleUpload = async (files) => {
-    if (!files?.length) return;
-    setUploading(true);
-    const rows = Array.from(files).map(f => ({
+  const catMeta = DOC_CATEGORIES.find(c => c.id === cat);
+  const extraFields = DOC_EXTRA_FIELDS[cat] ?? [];
+
+  const setEx = (k, v) => setExtras(e => ({ ...e, [k]: v }));
+
+  const handleSave = async () => {
+    if (!form.name.trim()) return;
+    setSaving(true);
+    const notes = Object.keys(extras).length ? JSON.stringify(extras) : null;
+    const file = form.file;
+    const row = {
       employee_id: employeeId,
-      name: f.name,
-      category: uploadCat,
-      size: f.size ? `${(f.size / 1024).toFixed(0)} KB` : '—',
-      type: f.type?.includes('image') ? 'image' : 'pdf',
+      name: form.name.trim(),
+      category: cat,
+      doc_date: form.doc_date || null,
+      notes,
+      size: file ? `${(file.size / 1024).toFixed(0)} KB` : null,
+      type: file ? (file.type?.includes('image') ? 'image' : 'pdf') : 'pdf',
       status: 'ok',
       uploaded_by: userId,
-    }));
-    const { error } = await supabase.from('documents').insert(rows);
-    setUploading(false);
-    if (error) alert('Erro ao fazer upload: ' + error.message);
-    else refetch?.();
+    };
+    const { error } = await supabase.from('documents').insert(row);
+    setSaving(false);
+    if (error) { alert('Erro: ' + error.message); return; }
+    onSaved?.();
+    onClose();
   };
 
   return (
-    <div>
-      <input
-        ref={fileInputRef}
-        type="file"
-        multiple
-        style={{ display: 'none' }}
-        onChange={e => { handleUpload(e.target.files); e.target.value = ''; }}
-      />
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 14 }}>
-        {DOC_CATEGORIES.map((c) => {
-          const catDocs = documents.filter(d => d.category === c.id);
-          return (
-            <div key={c.id} className="card" style={{ padding: 16 }}>
-              <div className="row gap-2" style={{ marginBottom: catDocs.length ? 10 : 0 }}>
-                <div style={{
-                  width: 34, height: 34, borderRadius: 8,
-                  background: c.color + '1f', color: c.color,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                }}>
-                  <Icon name={c.icon} size={16} />
-                </div>
-                <div className="grow">
-                  <div style={{ fontSize: 13, fontWeight: 600 }}>{c.name}</div>
-                  <div style={{ fontSize: 11.5, color: 'var(--muted)' }}>
-                    {catDocs.length} arquivo{catDocs.length !== 1 ? 's' : ''}
-                  </div>
-                </div>
-                <button
-                  className="btn ghost sm"
-                  title={`Upload em ${c.name}`}
-                  disabled={uploading}
-                  onClick={() => { setUploadCat(c.id); setTimeout(() => fileInputRef.current?.click(), 0); }}
-                >
-                  <Icon name="upload" size={13} />
-                </button>
-              </div>
-              {catDocs.length > 0 && (
-                <div style={{ borderTop: '1px solid var(--line)', paddingTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  {catDocs.map(d => (
-                    <div key={d.id} className="row gap-2" style={{ fontSize: 12.5 }}>
-                      <Icon name={d.type === 'image' ? 'image' : 'pdf'} size={13} style={{ color: c.color, flexShrink: 0 }} />
-                      <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.name}</span>
-                      <span style={{ color: 'var(--muted)', fontSize: 11, flexShrink: 0 }}>{d.size}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 400,
+      background: 'rgba(0,0,0,.5)', backdropFilter: 'blur(4px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      padding: 'clamp(8px,2vw,24px)',
+    }} onClick={onClose}>
+      <div style={{
+        width: '100%', maxWidth: step === 'category' ? 520 : 480,
+        background: 'var(--surface)', borderRadius: 16,
+        boxShadow: '0 32px 80px rgba(0,0,0,.25)',
+        overflow: 'hidden', display: 'flex', flexDirection: 'column',
+        maxHeight: 'calc(100vh - 32px)',
+      }} onClick={e => e.stopPropagation()}>
+
+        {/* Header */}
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--line)', display: 'flex', alignItems: 'center', gap: 10 }}>
+          {step === 'form' && (
+            <button className="btn ghost icon sm" onClick={() => setStep('category')}>
+              <Icon name="chevron-left" size={14} />
+            </button>
+          )}
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 15, fontWeight: 700 }}>
+              {step === 'category' ? 'Adicionar documento' : catMeta?.name}
             </div>
-          );
-        })}
+            {step === 'form' && (
+              <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 1 }}>Preencha os dados do documento</div>
+            )}
+          </div>
+          <button className="btn ghost icon sm" onClick={onClose}><Icon name="x" size={15} /></button>
+        </div>
+
+        <div style={{ overflowY: 'auto', flex: 1, minHeight: 0 }}>
+          {step === 'category' ? (
+            /* Escolha de categoria */
+            <div style={{ padding: 20, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              {DOC_CATEGORIES.map(c => (
+                <button
+                  key={c.id}
+                  onClick={() => { setCat(c.id); setExtras({}); setForm({ name: '', doc_date: '', file: null }); setStep('form'); }}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 12,
+                    padding: '12px 14px', borderRadius: 10, cursor: 'pointer',
+                    border: '1px solid var(--line)', background: 'var(--surface)',
+                    textAlign: 'left', transition: 'border-color .15s, background .15s',
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = c.color; e.currentTarget.style.background = c.color + '10'; }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--line)'; e.currentTarget.style.background = 'var(--surface)'; }}
+                >
+                  <div style={{ width: 34, height: 34, borderRadius: 8, background: c.color + '1f', color: c.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <Icon name={c.icon} size={16} />
+                  </div>
+                  <span style={{ fontSize: 13, fontWeight: 600 }}>{c.name}</span>
+                </button>
+              ))}
+            </div>
+          ) : (
+            /* Formulário */
+            <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
+              {/* Nome do documento */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.6 }}>Nome do documento *</label>
+                <input className="field" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="ex: Contrato de trabalho João" />
+              </div>
+
+              {/* Data do documento */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.6 }}>Data do documento</label>
+                <DateInput value={form.doc_date} onChange={e => setForm(f => ({ ...f, doc_date: e.target.value }))} />
+              </div>
+
+              {/* Campos extras por categoria */}
+              {extraFields.map(field => (
+                <div key={field.key} style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                  <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.6 }}>{field.label}</label>
+                  {field.type === 'select' ? (
+                    <select className="field" value={extras[field.key] ?? ''} onChange={e => setEx(field.key, e.target.value)}>
+                      <option value="">Selecione…</option>
+                      {field.options.map(o => <option key={o} value={o}>{o}</option>)}
+                    </select>
+                  ) : field.type === 'date' ? (
+                    <DateInput value={extras[field.key] ?? ''} onChange={e => setEx(field.key, e.target.value)} />
+                  ) : field.type === 'textarea' ? (
+                    <textarea className="field" rows={3} style={{ resize: 'vertical' }} value={extras[field.key] ?? ''} onChange={e => setEx(field.key, e.target.value)} placeholder={field.placeholder} />
+                  ) : (
+                    <input className="field" value={extras[field.key] ?? ''} onChange={e => setEx(field.key, e.target.value)} placeholder={field.placeholder} />
+                  )}
+                </div>
+              ))}
+
+              {/* Arquivo */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.6 }}>Arquivo</label>
+                <input ref={fileRef} type="file" style={{ display: 'none' }} onChange={e => setForm(f => ({ ...f, file: e.target.files?.[0] ?? null }))} />
+                <div
+                  style={{ border: '1.5px dashed var(--line)', borderRadius: 8, padding: '14px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, background: form.file ? 'var(--brand-tint)' : 'transparent' }}
+                  onClick={() => fileRef.current?.click()}
+                >
+                  <Icon name={form.file ? 'check' : 'upload'} size={16} style={{ color: form.file ? 'var(--brand)' : 'var(--muted)', flexShrink: 0 }} />
+                  <span style={{ fontSize: 13, color: form.file ? 'var(--ink)' : 'var(--muted)' }}>
+                    {form.file ? form.file.name : 'Clique para selecionar um arquivo'}
+                  </span>
+                  {form.file && <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--muted)' }}>{(form.file.size / 1024).toFixed(0)} KB</span>}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {step === 'form' && (
+          <div style={{ padding: '14px 20px', borderTop: '1px solid var(--line)', display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            <button className="btn ghost" onClick={onClose}>Cancelar</button>
+            <button className="btn primary" onClick={handleSave} disabled={saving || !form.name.trim()}>
+              {saving ? 'Salvando…' : 'Salvar documento'}
+            </button>
+          </div>
+        )}
       </div>
     </div>
+  );
+}
+
+// ============================================================
+// MODAL — Preview de Documento
+// ============================================================
+function DocPreviewModal({ doc, onClose }) {
+  const catMeta = DOC_CATEGORIES.find(c => c.id === doc.category);
+  const extraFields = DOC_EXTRA_FIELDS[doc.category] ?? [];
+  let parsedNotes = {};
+  try { if (doc.notes) parsedNotes = JSON.parse(doc.notes); } catch (_) { /* ignore */ }
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 400,
+      background: 'rgba(0,0,0,.5)', backdropFilter: 'blur(4px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      padding: 'clamp(8px,2vw,24px)',
+    }} onClick={onClose}>
+      <div style={{
+        width: '100%', maxWidth: 480,
+        background: 'var(--surface)', borderRadius: 16,
+        boxShadow: '0 32px 80px rgba(0,0,0,.25)',
+        overflow: 'hidden', display: 'flex', flexDirection: 'column',
+        maxHeight: 'calc(100vh - 32px)',
+      }} onClick={e => e.stopPropagation()}>
+
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--line)', display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ width: 38, height: 38, borderRadius: 9, background: (catMeta?.color ?? '#999') + '1f', color: catMeta?.color ?? '#999', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <Icon name={catMeta?.icon ?? 'doc'} size={18} />
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 15, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc.name}</div>
+            <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 1 }}>{catMeta?.name ?? doc.category}</div>
+          </div>
+          <button className="btn ghost icon sm" onClick={onClose}><Icon name="x" size={15} /></button>
+        </div>
+
+        <div style={{ overflowY: 'auto', flex: 1, minHeight: 0, padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
+
+          {/* Preview placeholder */}
+          <div style={{ borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--line)', height: 160, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, color: 'var(--muted)' }}>
+            <Icon name={doc.type === 'image' ? 'image' : 'pdf'} size={32} style={{ opacity: 0.4 }} />
+            <span style={{ fontSize: 12 }}>{doc.size ?? 'Arquivo não armazenado localmente'}</span>
+          </div>
+
+          {/* Dados base */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div>
+              <div style={{ fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--muted)', marginBottom: 3 }}>Data do documento</div>
+              <div style={{ fontSize: 13 }}>{doc.doc_date ? fmtDate(doc.doc_date) : '—'}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--muted)', marginBottom: 3 }}>Adicionado em</div>
+              <div style={{ fontSize: 13 }}>{doc.created_at ? new Date(doc.created_at).toLocaleDateString('pt-BR') : '—'}</div>
+            </div>
+          </div>
+
+          {/* Campos extras */}
+          {extraFields.length > 0 && Object.keys(parsedNotes).length > 0 && (
+            <div style={{ borderTop: '1px solid var(--line)', paddingTop: 14, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              {extraFields.map(f => parsedNotes[f.key] ? (
+                <div key={f.key} style={{ gridColumn: f.type === 'textarea' ? '1 / -1' : undefined }}>
+                  <div style={{ fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--muted)', marginBottom: 3 }}>{f.label}</div>
+                  <div style={{ fontSize: 13, whiteSpace: f.type === 'textarea' ? 'pre-wrap' : 'normal' }}>{parsedNotes[f.key]}</div>
+                </div>
+              ) : null)}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// TAB DOCUMENTOS
+// ============================================================
+function DocsTab({ employeeId, documents = [], refetch }) {
+  const [showUpload, setShowUpload] = useState(false);
+  const [preview, setPreview] = useState(null);
+
+  const catOf = (id) => DOC_CATEGORIES.find(c => c.id === id);
+
+  return (
+    <>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+        {/* Toolbar */}
+        <div className="row" style={{ marginBottom: 14 }}>
+          <span style={{ fontSize: 13, color: 'var(--muted)' }}>
+            {documents.length} documento{documents.length !== 1 ? 's' : ''}
+          </span>
+          <span className="grow" />
+          <button className="btn primary sm" onClick={() => setShowUpload(true)}>
+            <Icon name="upload" size={13} /> Adicionar documento
+          </button>
+        </div>
+
+        {/* Tabela */}
+        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+          {documents.length === 0 ? (
+            <div style={{ padding: '48px 24px', textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>
+              <Icon name="folder" size={28} style={{ opacity: 0.25, display: 'block', margin: '0 auto 10px' }} />
+              Nenhum documento cadastrado. Clique em "Adicionar documento" para começar.
+            </div>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                <thead>
+                  <tr style={{ background: 'var(--surface-2)', color: 'var(--muted)', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.6 }}>
+                    <th style={th()}>Documento</th>
+                    <th style={th()}>Categoria</th>
+                    <th style={th()}>Data</th>
+                    <th style={th()}>Detalhes</th>
+                    <th style={th()}>Status</th>
+                    <th style={th(52)}></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {documents.map(doc => {
+                    const c = catOf(doc.category);
+                    let parsedNotes = {};
+                    try { if (doc.notes) parsedNotes = JSON.parse(doc.notes); } catch (_) { /* */ }
+                    const extraFields = DOC_EXTRA_FIELDS[doc.category] ?? [];
+                    const firstExtra = extraFields[0] ? parsedNotes[extraFields[0].key] : null;
+
+                    return (
+                      <tr key={doc.id} style={{ borderTop: '1px solid var(--line-soft)' }}>
+                        <td style={td()}>
+                          <div className="row gap-2">
+                            <div style={{ width: 30, height: 30, borderRadius: 7, background: (c?.color ?? '#999') + '1f', color: c?.color ?? '#999', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                              <Icon name={c?.icon ?? 'doc'} size={14} />
+                            </div>
+                            <div style={{ minWidth: 0 }}>
+                              <div style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 200 }}>{doc.name}</div>
+                              {doc.size && <div style={{ fontSize: 11, color: 'var(--muted)' }}>{doc.size}</div>}
+                            </div>
+                          </div>
+                        </td>
+                        <td style={td()}>
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: (c?.color ?? '#999') + '18', color: c?.color ?? '#999', borderRadius: 20, padding: '3px 9px', fontSize: 11.5, fontWeight: 600 }}>
+                            {c?.name ?? doc.category}
+                          </span>
+                        </td>
+                        <td style={td()}>
+                          <span className="mono" style={{ fontSize: 12 }}>{doc.doc_date ? fmtDate(doc.doc_date) : '—'}</span>
+                        </td>
+                        <td style={td()}>
+                          <span style={{ fontSize: 12, color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 160, display: 'block' }}>
+                            {firstExtra ?? '—'}
+                          </span>
+                        </td>
+                        <td style={td()}><StatusPill status={doc.status ?? 'ok'} /></td>
+                        <td style={td(52)}>
+                          <button
+                            className="btn ghost icon sm"
+                            title="Visualizar documento"
+                            onClick={() => setPreview(doc)}
+                          >
+                            <Icon name="eye" size={14} />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {showUpload && (
+        <UploadDocModal
+          employeeId={employeeId}
+          onClose={() => setShowUpload(false)}
+          onSaved={() => { refetch?.(); setShowUpload(false); }}
+        />
+      )}
+      {preview && (
+        <DocPreviewModal doc={preview} onClose={() => setPreview(null)} />
+      )}
+    </>
   );
 }
 
