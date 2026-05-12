@@ -745,30 +745,147 @@ function RowMenu({ emp, onProfile, onAfastar, onDesligar, onReativar }) {
   );
 }
 
+const STATUS_OPTIONS = [
+  { id: 'todos',     l: 'Todos'      },
+  { id: 'ativo',     l: 'Ativos'     },
+  { id: 'férias',    l: 'Em férias'  },
+  { id: 'afastado',  l: 'Afastados'  },
+  { id: 'desligado', l: 'Desligados' },
+];
+
+function FilterPanel({ filters, onChange, onClear, anchorRect, onClose }) {
+  const ref = useRef();
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) onClose();
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [onClose]);
+
+  if (!anchorRect) return null;
+
+  const top = anchorRect.bottom + 6;
+  const left = anchorRect.right - 280;
+
+  return createPortal(
+    <div
+      ref={ref}
+      style={{
+        position: 'fixed',
+        top,
+        left: Math.max(8, left),
+        width: 280,
+        background: 'var(--surface)',
+        border: '1px solid var(--line)',
+        borderRadius: 10,
+        boxShadow: '0 8px 32px rgba(0,0,0,.15)',
+        zIndex: 500,
+        padding: 16,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 14,
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <span style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.6, color: 'var(--muted)' }}>
+          Filtros
+        </span>
+        <button className="btn ghost sm" style={{ fontSize: 11, padding: '2px 8px' }} onClick={onClear}>
+          Limpar
+        </button>
+      </div>
+
+      <div>
+        <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--muted)', marginBottom: 8 }}>
+          Status
+        </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {STATUS_OPTIONS.map((s) => (
+            <button
+              key={s.id}
+              onClick={() => onChange('status', s.id)}
+              style={{
+                border: `1px solid ${filters.status === s.id ? 'var(--brand)' : 'var(--line)'}`,
+                background: filters.status === s.id ? 'var(--brand-tint)' : 'transparent',
+                color: filters.status === s.id ? 'var(--brand)' : 'var(--ink)',
+                borderRadius: 20,
+                padding: '4px 12px',
+                fontSize: 12,
+                fontWeight: 500,
+                cursor: 'pointer',
+              }}
+            >
+              {s.l}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--muted)', marginBottom: 8 }}>
+          Admissão
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div>
+            <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>De</label>
+            <DateInput
+              value={filters.admissionFrom}
+              onChange={(e) => onChange('admissionFrom', e.target.value)}
+            />
+          </div>
+          <div>
+            <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Até</label>
+            <DateInput
+              value={filters.admissionTo}
+              onChange={(e) => onChange('admissionTo', e.target.value)}
+            />
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 export function EmployeesList({ setRoute, setRouteParam, setRouteLabel, companyId }) {
   const [view, setView]     = useState('table');
-  const [tab, setTab]       = useState('todos');
+  const [filters, setFilters] = useState({ status: 'todos', admissionFrom: '', admissionTo: '' });
   const [q, setQ]           = useState('');
   const [selected, setSelected] = useState(new Set());
   const [showNewModal, setShowNewModal] = useState(false);
   const [actionModal, setActionModal]   = useState(null); // { type: 'afastar'|'desligar'|'reativar', emp }
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [filterRect, setFilterRect] = useState(null);
+  const filterBtnRef = useRef();
 
   const { counts, refetch: refetchCounts } = useEmployeeCounts();
   const { employees: filtered, loading, refetch } = useEmployees({
-    status: tab !== 'todos' ? tab : undefined,
+    status: filters.status !== 'todos' ? filters.status : undefined,
     search: q || undefined,
     companyId,
+    admissionFrom: filters.admissionFrom || undefined,
+    admissionTo: filters.admissionTo || undefined,
   });
 
   const onSaved = () => { refetch(); refetchCounts(); };
 
-  const tabs = [
-    { id: 'todos',     l: 'Todos',      n: counts.todos },
-    { id: 'ativo',     l: 'Ativos',     n: counts.ativo },
-    { id: 'férias',    l: 'Em férias',  n: counts['férias'] },
-    { id: 'afastado',  l: 'Afastados',  n: counts.afastado },
-    { id: 'desligado', l: 'Desligados', n: counts.desligado },
-  ];
+  const activeFilterCount = [
+    filters.status !== 'todos',
+    !!filters.admissionFrom,
+    !!filters.admissionTo,
+  ].filter(Boolean).length;
+
+  const toggleFilter = () => {
+    if (!filterOpen) {
+      setFilterRect(filterBtnRef.current?.getBoundingClientRect() ?? null);
+    }
+    setFilterOpen((v) => !v);
+  };
+
+  const handleFilterChange = (key, val) => setFilters((f) => ({ ...f, [key]: val }));
+  const clearFilters = () => setFilters({ status: 'todos', admissionFrom: '', admissionTo: '' });
 
   const openProfile = useCallback((empId, empName) => {
     setRouteParam(empId);
@@ -806,53 +923,46 @@ export function EmployeesList({ setRoute, setRouteParam, setRouteLabel, companyI
       </div>
 
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-        {/* Tab strip */}
         <div
           className="row"
-          style={{ padding: '0 16px', borderBottom: '1px solid var(--line)', gap: 4 }}
+          style={{ padding: '8px 16px', borderBottom: '1px solid var(--line)', gap: 8 }}
         >
-          {tabs.map((t) => (
-            <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
-              style={{
-                border: 'none',
-                background: 'transparent',
-                padding: '12px 4px',
-                margin: '0 8px 0 0',
-                fontSize: 13,
-                fontWeight: tab === t.id ? 600 : 500,
-                color: tab === t.id ? 'var(--ink)' : 'var(--muted)',
-                borderBottom: `2px solid ${tab === t.id ? 'var(--brand)' : 'transparent'}`,
-                cursor: 'pointer',
-                marginBottom: -1,
-              }}
-            >
-              {t.l}{' '}
-              <span className="mono" style={{ fontSize: 11, color: 'var(--muted-2)', marginLeft: 4 }}>
-                {t.n}
-              </span>
-            </button>
-          ))}
+          <div style={{ position: 'relative' }}>
+            <Icon
+              name="search"
+              size={14}
+              style={{ position: 'absolute', left: 10, top: 10, color: 'var(--muted)' }}
+            />
+            <input
+              className="field"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Buscar por nome, cargo, depto…"
+              style={{ width: 260, paddingLeft: 32, height: 34 }}
+            />
+          </div>
           <span className="grow" />
-          <div className="row gap-2" style={{ padding: '8px 0' }}>
-            <div style={{ position: 'relative' }}>
-              <Icon
-                name="search"
-                size={14}
-                style={{ position: 'absolute', left: 10, top: 12, color: 'var(--muted)' }}
-              />
-              <input
-                className="field"
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                placeholder="Buscar por nome, cargo, depto…"
-                style={{ width: 260, paddingLeft: 32, height: 34 }}
-              />
-            </div>
-            <button className="btn sm">
+          <div style={{ position: 'relative' }}>
+            <button ref={filterBtnRef} className="btn sm" onClick={toggleFilter}
+              style={{ background: activeFilterCount > 0 ? 'var(--brand-tint)' : undefined, color: activeFilterCount > 0 ? 'var(--brand)' : undefined, borderColor: activeFilterCount > 0 ? 'var(--brand)' : undefined }}
+            >
               <Icon name="filter" size={13} /> Filtros
+              {activeFilterCount > 0 && (
+                <span style={{ background: 'var(--brand)', color: 'var(--brand-ink)', borderRadius: 20, fontSize: 10, fontWeight: 700, padding: '1px 6px', marginLeft: 4 }}>
+                  {activeFilterCount}
+                </span>
+              )}
             </button>
+          </div>
+          {filterOpen && (
+            <FilterPanel
+              filters={filters}
+              onChange={handleFilterChange}
+              onClear={clearFilters}
+              anchorRect={filterRect}
+              onClose={() => setFilterOpen(false)}
+            />
+          )}
             <div
               className="row"
               style={{ border: '1px solid var(--line)', borderRadius: 7, overflow: 'hidden' }}
@@ -882,7 +992,6 @@ export function EmployeesList({ setRoute, setRouteParam, setRouteLabel, companyI
                 <Icon name="folder" size={13} />
               </button>
             </div>
-          </div>
         </div>
 
         {/* Selection bar */}

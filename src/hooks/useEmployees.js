@@ -49,8 +49,8 @@ export async function updateCompany(id, data) {
 // FUNCIONÁRIOS
 // ============================================================
 
-// Lista de funcionários com filtro opcional por status, busca textual e empresa
-export function useEmployees({ status, search, companyId } = {}) {
+// Lista de funcionários com filtro opcional por status, busca textual, empresa e datas
+export function useEmployees({ status, search, companyId, admissionFrom, admissionTo } = {}) {
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -70,6 +70,14 @@ export function useEmployees({ status, search, companyId } = {}) {
 
     if (companyId) {
       query = query.eq('company_id', companyId);
+    }
+
+    if (admissionFrom) {
+      query = query.gte('admission', admissionFrom);
+    }
+
+    if (admissionTo) {
+      query = query.lte('admission', admissionTo);
     }
 
     if (search) {
