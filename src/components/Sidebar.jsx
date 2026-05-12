@@ -22,12 +22,6 @@ const NAV = [
     id: 'documents',
     label: 'Documentos',
     icon: 'folder',
-    sub: [
-      { id: 'documents', label: 'Todos documentos' },
-      { id: 'documents-upload', label: 'Upload' },
-      { id: 'documents-pending', label: 'Pendências' },
-      { id: 'documents-sign', label: 'Assinaturas' },
-    ],
   },
   {
     id: 'time',
