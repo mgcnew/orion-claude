@@ -1,37 +1,333 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import Icon from '../components/Icon.jsx';
-import { useAllDocuments } from '../hooks/useEmployees.js';
+import { useAllDocuments, useEmployees } from '../hooks/useEmployees.js';
 import { supabase } from '../lib/supabase.js';
 
 const CATEGORIES = [
-  { id: 'contratos',    name: 'Contratos',       icon: 'doc',         color: '#2A5BFF' },
-  { id: 'rg-cpf',      name: 'RG / CPF',        icon: 'user',        color: '#1F8A5B' },
-  { id: 'holerites',   name: 'Holerites',        icon: 'pdf',         color: '#C58A1B' },
-  { id: 'atestados',   name: 'Atestados',        icon: 'image',       color: '#C2412C' },
-  { id: 'advertencias',name: 'Advertências',     icon: 'alert',       color: '#a855f7' },
-  { id: 'ferias',      name: 'Férias',           icon: 'umbrella',    color: '#0891b2' },
-  { id: 'juridico',    name: 'Jurídico',         icon: 'shield',      color: '#475569' },
-  { id: 'exames',      name: 'Exames Médicos',   icon: 'fingerprint', color: '#db2777' },
-  { id: 'ponto',       name: 'Cartão de Ponto',  icon: 'clock',       color: '#0f766e' },
+  { id: 'contratos',     name: 'Contratos',       icon: 'doc',         color: '#2A5BFF' },
+  { id: 'rg-cpf',       name: 'RG / CPF',         icon: 'user',        color: '#1F8A5B' },
+  { id: 'holerites',    name: 'Holerites',         icon: 'pdf',         color: '#C58A1B' },
+  { id: 'atestados',    name: 'Atestados',         icon: 'image',       color: '#C2412C' },
+  { id: 'advertencias', name: 'Advertências',      icon: 'alert',       color: '#a855f7' },
+  { id: 'ferias',       name: 'Férias',            icon: 'umbrella',    color: '#0891b2' },
+  { id: 'juridico',     name: 'Jurídico',          icon: 'shield',      color: '#475569' },
+  { id: 'exames',       name: 'Exames Médicos',    icon: 'fingerprint', color: '#db2777' },
+  { id: 'ponto',        name: 'Cartão de Ponto',   icon: 'clock',       color: '#0f766e' },
 ];
 
-const STATUS_MAP = {
-  ok:   { label: 'OK',      cls: 'ok'  },
-  warn: { label: 'Atenção', cls: 'warn'},
-  bad:  { label: 'Crítico', cls: 'bad' },
-  pending: { label: 'Pendente', cls: 'warn' },
-  sign:    { label: 'Assinatura', cls: 'info' },
+const DOC_EXTRA_FIELDS = {
+  contratos: [
+    { key: 'tipo_contrato',  label: 'Tipo de contrato',  type: 'select', options: ['CLT', 'PJ', 'Estágio', 'Temporário', 'Intermitente', 'Autônomo'] },
+    { key: 'vigencia_inicio', label: 'Início da vigência', type: 'date' },
+    { key: 'vigencia_fim',    label: 'Fim da vigência',    type: 'date' },
+  ],
+  holerites: [
+    { key: 'mes_ref', label: 'Mês de referência', type: 'select', options: ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'] },
+    { key: 'ano_ref', label: 'Ano',               type: 'text',   placeholder: '2025' },
+  ],
+  atestados: [
+    { key: 'cid',    label: 'CID',                 type: 'text', placeholder: 'ex: A09' },
+    { key: 'dias',   label: 'Dias de afastamento', type: 'text', placeholder: 'ex: 3' },
+    { key: 'medico', label: 'Médico / CRM',        type: 'text', placeholder: 'ex: Dr. Silva CRM-12345' },
+  ],
+  'rg-cpf': [
+    { key: 'tipo_doc', label: 'Tipo',                type: 'select', options: ['RG', 'CPF', 'RNE', 'CNH', 'Passaporte'] },
+    { key: 'numero',   label: 'Número do documento', type: 'text',   placeholder: 'ex: 12.345.678-9' },
+  ],
+  exames: [
+    { key: 'tipo_exame', label: 'Tipo de exame', type: 'select', options: ['Admissional', 'Periódico', 'Demissional', 'Retorno ao trabalho', 'Mudança de função'] },
+    { key: 'resultado',  label: 'Resultado',      type: 'select', options: ['Apto', 'Apto com restrições', 'Inapto'] },
+    { key: 'medico',     label: 'Médico / CRM',   type: 'text',   placeholder: 'ex: Dr. Silva CRM-12345' },
+  ],
+  ferias: [
+    { key: 'aq_inicio',   label: 'Período aquisitivo — de',  type: 'date' },
+    { key: 'aq_fim',      label: 'Período aquisitivo — até', type: 'date' },
+    { key: 'gozo_inicio', label: 'Período de gozo — de',     type: 'date' },
+    { key: 'gozo_fim',    label: 'Período de gozo — até',    type: 'date' },
+  ],
+  advertencias: [
+    { key: 'tipo_adv', label: 'Tipo',   type: 'select', options: ['Verbal', 'Escrita — 1ª', 'Escrita — 2ª', 'Suspensão'] },
+    { key: 'motivo',   label: 'Motivo', type: 'textarea' },
+  ],
+  juridico: [
+    { key: 'tipo_juridico',   label: 'Tipo',           type: 'select', options: ['Processo trabalhista', 'Notificação extrajudicial', 'Acordo', 'Sentença', 'Recurso', 'Outro'] },
+    { key: 'numero_processo', label: 'Nº do processo', type: 'text',   placeholder: 'ex: 0001234-56.2025.5.00.0000' },
+  ],
+  ponto: [
+    { key: 'mes_ref',    label: 'Mês de referência', type: 'select', options: ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'] },
+    { key: 'ano_ref',    label: 'Ano',               type: 'text',   placeholder: '2025' },
+    { key: 'periodo',    label: 'Período',           type: 'select', options: ['Mensal', 'Quinzenal — 1ª', 'Quinzenal — 2ª', 'Semanal'] },
+    { key: 'total_horas', label: 'Total de horas',   type: 'text',   placeholder: 'ex: 176h' },
+  ],
 };
+
+const STATUS_MAP = {
+  ok:      { label: 'OK',          cls: 'ok'   },
+  warn:    { label: 'Atenção',     cls: 'warn' },
+  bad:     { label: 'Crítico',     cls: 'bad'  },
+  pending: { label: 'Pendente',    cls: 'warn' },
+  sign:    { label: 'Assinatura',  cls: 'info' },
+};
+
+// Campo de data com máscara DD/MM/AAAA
+function DateInput({ value, onChange }) {
+  const toDisplay = (iso) => {
+    if (!iso) return '';
+    const [y, m, d] = iso.split('-');
+    return `${d}/${m}/${y}`;
+  };
+  const [display, setDisplay] = useState(() => toDisplay(value));
+  useEffect(() => { setDisplay(toDisplay(value)); }, [value]);
+  const handleChange = (e) => {
+    let raw = e.target.value.replace(/\D/g, '').slice(0, 8);
+    let masked = raw;
+    if (raw.length > 4) masked = raw.slice(0, 2) + '/' + raw.slice(2, 4) + '/' + raw.slice(4);
+    else if (raw.length > 2) masked = raw.slice(0, 2) + '/' + raw.slice(2);
+    setDisplay(masked);
+    if (raw.length === 8) onChange({ target: { value: `${raw.slice(4, 8)}-${raw.slice(2, 4)}-${raw.slice(0, 2)}` } });
+    else onChange({ target: { value: '' } });
+  };
+  return (
+    <input type="text" className="field" value={display} onChange={handleChange}
+      placeholder="DD/MM/AAAA" maxLength={10} inputMode="numeric" />
+  );
+}
 
 function FileIcon({ type, color, size = 32 }) {
   return (
     <div style={{
       width: size, height: size, borderRadius: size * 0.22,
-      background: (color || '#888') + '18',
-      color: color || 'var(--muted)',
+      background: (color || '#888') + '18', color: color || 'var(--muted)',
       display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
     }}>
       <Icon name={type === 'image' ? 'image' : 'pdf'} size={size * 0.5} />
+    </div>
+  );
+}
+
+// ============================================================
+// MODAL — Adicionar Documento (com "Adicionar e continuar")
+// ============================================================
+function AddDocModal({ onClose, onSaved, employees = [] }) {
+  const [step, setStep]     = useState('category');
+  const [cat, setCat]       = useState(null);
+  const [form, setForm]     = useState({ name: '', doc_date: '', employee_id: '', file: null });
+  const [extras, setExtras] = useState({});
+  const [saving, setSaving] = useState(false);
+  const [userId, setUserId] = useState(null);
+  const fileRef = useRef();
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => setUserId(user?.id ?? null));
+    const esc = (e) => e.key === 'Escape' && onClose();
+    window.addEventListener('keydown', esc);
+    return () => window.removeEventListener('keydown', esc);
+  }, [onClose]);
+
+  const catMeta    = CATEGORIES.find(c => c.id === cat);
+  const extraFields = DOC_EXTRA_FIELDS[cat] ?? [];
+  const setEx = (k, v) => setExtras(e => ({ ...e, [k]: v }));
+
+  const resetForm = () => {
+    setForm({ name: '', doc_date: '', employee_id: '', file: null });
+    setExtras({});
+  };
+
+  const doSave = async () => {
+    if (!form.name.trim()) return false;
+    setSaving(true);
+    const notes = Object.keys(extras).length ? JSON.stringify(extras) : null;
+    const file  = form.file;
+
+    let file_url = null;
+    if (file) {
+      const ext  = file.name.split('.').pop();
+      const empId = form.employee_id || 'empresa';
+      const path = `${empId}/${Date.now()}.${ext}`;
+      const { error: uploadErr } = await supabase.storage
+        .from('employee-documents')
+        .upload(path, file, { upsert: false });
+      if (uploadErr) { alert('Erro no upload: ' + uploadErr.message); setSaving(false); return false; }
+      const { data: urlData } = supabase.storage.from('employee-documents').getPublicUrl(path);
+      file_url = urlData?.publicUrl ?? null;
+    }
+
+    const row = {
+      employee_id:  form.employee_id || null,
+      name:         form.name.trim(),
+      category:     cat,
+      doc_date:     form.doc_date || null,
+      notes,
+      file_url,
+      size: file ? `${(file.size / 1024).toFixed(0)} KB` : null,
+      type: file ? (file.type?.includes('image') ? 'image' : 'pdf') : 'pdf',
+      status: 'ok',
+      uploaded_by: userId,
+    };
+
+    const { error } = await supabase.from('documents').insert(row);
+    setSaving(false);
+    if (error) { alert('Erro: ' + error.message); return false; }
+    onSaved?.();
+    return true;
+  };
+
+  const handleSave = async () => {
+    const ok = await doSave();
+    if (ok) onClose();
+  };
+
+  const handleSaveAndContinue = async () => {
+    const ok = await doSave();
+    if (ok) { resetForm(); setStep('category'); setCat(null); }
+  };
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 400,
+      background: 'rgba(0,0,0,.5)', backdropFilter: 'blur(4px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      padding: 'clamp(8px,2vw,24px)',
+    }} onClick={onClose}>
+      <div style={{
+        width: '100%', maxWidth: step === 'category' ? 560 : 500,
+        background: 'var(--surface)', borderRadius: 16,
+        boxShadow: '0 32px 80px rgba(0,0,0,.25)',
+        overflow: 'hidden', display: 'flex', flexDirection: 'column',
+        maxHeight: 'calc(100vh - 32px)',
+      }} onClick={e => e.stopPropagation()}>
+
+        {/* Header */}
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--line)', display: 'flex', alignItems: 'center', gap: 10 }}>
+          {step === 'form' && (
+            <button className="btn ghost icon sm" onClick={() => setStep('category')}>
+              <Icon name="chevron-left" size={14} />
+            </button>
+          )}
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 15, fontWeight: 700 }}>
+              {step === 'category' ? 'Novo documento' : catMeta?.name}
+            </div>
+            {step === 'form' && (
+              <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 1 }}>Preencha os dados do documento</div>
+            )}
+          </div>
+          <button className="btn ghost icon sm" onClick={onClose}><Icon name="x" size={15} /></button>
+        </div>
+
+        <div style={{ overflowY: 'auto', flex: 1, minHeight: 0 }}>
+          {step === 'category' ? (
+            <div style={{ padding: 20, display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+              {CATEGORIES.map(c => (
+                <button
+                  key={c.id}
+                  onClick={() => { setCat(c.id); resetForm(); setStep('form'); }}
+                  style={{
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                    gap: 8, padding: '16px 10px', borderRadius: 10, cursor: 'pointer',
+                    border: '1px solid var(--line)', background: 'var(--surface)', textAlign: 'center',
+                    transition: 'border-color .15s, background .15s',
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = c.color; e.currentTarget.style.background = c.color + '10'; }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--line)'; e.currentTarget.style.background = 'var(--surface)'; }}
+                >
+                  <div style={{ width: 38, height: 38, borderRadius: 9, background: c.color + '1f', color: c.color, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Icon name={c.icon} size={17} />
+                  </div>
+                  <span style={{ fontSize: 12, fontWeight: 600, lineHeight: 1.3 }}>{c.name}</span>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
+
+              {/* Funcionário / Empresa */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.6 }}>Pertence a *</label>
+                <select
+                  className="field"
+                  value={form.employee_id}
+                  onChange={e => setForm(f => ({ ...f, employee_id: e.target.value }))}
+                >
+                  <option value="">— Empresa (sem vínculo com funcionário) —</option>
+                  {employees.map(emp => (
+                    <option key={emp.id} value={emp.id}>{emp.name}{emp.dept ? ` · ${emp.dept}` : ''}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Nome */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.6 }}>Nome do documento *</label>
+                <input className="field" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="ex: Contrato de trabalho João" />
+              </div>
+
+              {/* Data */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.6 }}>Data do documento</label>
+                <DateInput value={form.doc_date} onChange={e => setForm(f => ({ ...f, doc_date: e.target.value }))} />
+              </div>
+
+              {/* Campos extras por categoria */}
+              {extraFields.map(field => (
+                <div key={field.key} style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                  <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.6 }}>{field.label}</label>
+                  {field.type === 'select' ? (
+                    <select className="field" value={extras[field.key] ?? ''} onChange={e => setEx(field.key, e.target.value)}>
+                      <option value="">Selecione…</option>
+                      {field.options.map(o => <option key={o} value={o}>{o}</option>)}
+                    </select>
+                  ) : field.type === 'date' ? (
+                    <DateInput value={extras[field.key] ?? ''} onChange={e => setEx(field.key, e.target.value)} />
+                  ) : field.type === 'textarea' ? (
+                    <textarea className="field" rows={3} style={{ resize: 'vertical' }} value={extras[field.key] ?? ''} onChange={e => setEx(field.key, e.target.value)} placeholder={field.placeholder} />
+                  ) : (
+                    <input className="field" value={extras[field.key] ?? ''} onChange={e => setEx(field.key, e.target.value)} placeholder={field.placeholder} />
+                  )}
+                </div>
+              ))}
+
+              {/* Arquivo */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.6 }}>Arquivo</label>
+                <input ref={fileRef} type="file" style={{ display: 'none' }} onChange={e => setForm(f => ({ ...f, file: e.target.files?.[0] ?? null }))} />
+                <div
+                  style={{ border: '1.5px dashed var(--line)', borderRadius: 8, padding: '14px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, background: form.file ? 'var(--brand-tint)' : 'transparent' }}
+                  onClick={() => fileRef.current?.click()}
+                >
+                  <Icon name={form.file ? 'check' : 'upload'} size={16} style={{ color: form.file ? 'var(--brand)' : 'var(--muted)', flexShrink: 0 }} />
+                  <span style={{ fontSize: 13, color: form.file ? 'var(--ink)' : 'var(--muted)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {form.file ? form.file.name : 'Clique para selecionar um arquivo'}
+                  </span>
+                  {form.file && <span style={{ fontSize: 11, color: 'var(--muted)', flexShrink: 0 }}>{(form.file.size / 1024).toFixed(0)} KB</span>}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {step === 'form' && (
+          <div style={{ padding: '14px 20px', borderTop: '1px solid var(--line)', display: 'flex', gap: 8 }}>
+            <button className="btn ghost" onClick={onClose}>Cancelar</button>
+            <span style={{ flex: 1 }} />
+            <button
+              className="btn"
+              onClick={handleSaveAndContinue}
+              disabled={saving || !form.name.trim()}
+              title="Salva e abre um novo documento"
+            >
+              <Icon name="plus" size={13} /> Adicionar e continuar
+            </button>
+            <button
+              className="btn primary"
+              onClick={handleSave}
+              disabled={saving || !form.name.trim()}
+            >
+              {saving ? 'Salvando…' : 'Salvar'}
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -42,27 +338,25 @@ export default function DocumentsScreen({ addToast }) {
   const [view, setView]         = useState('list');
   const [search, setSearch]     = useState('');
   const [dragOver, setDragOver] = useState(false);
-  const [uploading, setUploading] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [selected, setSelected] = useState(new Set());
-  const [userId, setUserId]     = useState(null);
-  const fileInputRef = useRef();
+  const [showAddModal, setShowAddModal] = useState(false);
 
   const { documents: raw, loading, error, refetch } = useAllDocuments();
-
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => setUserId(user?.id ?? null));
-  }, []);
+  const { employees } = useEmployees();
 
   const docs = raw.map(d => ({
     id: d.id,
     name: d.name,
     cat: d.category,
     size: d.size,
-    who: d.employees?.name || 'Sistema',
-    date: new Date(d.created_at).toLocaleDateString('pt-BR'),
+    who: d.employees?.name || 'Empresa',
+    date: d.doc_date
+      ? new Date(d.doc_date + 'T00:00:00').toLocaleDateString('pt-BR')
+      : new Date(d.created_at).toLocaleDateString('pt-BR'),
     type: d.type || 'pdf',
     status: d.status || 'ok',
+    file_url: d.file_url,
   }));
 
   const catCounts = CATEGORIES.reduce((acc, c) => {
@@ -77,26 +371,10 @@ export default function DocumentsScreen({ addToast }) {
     if (tab === 'pending' && d.status !== 'pending' && d.status !== 'warn') return false;
     if (tab === 'sign'    && d.status !== 'sign')    return false;
     if (cat && d.cat !== cat) return false;
-    if (search && !d.name.toLowerCase().includes(search.toLowerCase())) return false;
+    if (search && !d.name.toLowerCase().includes(search.toLowerCase()) &&
+        !d.who.toLowerCase().includes(search.toLowerCase())) return false;
     return true;
   });
-
-  const handleUpload = useCallback(async (files) => {
-    if (!files?.length) return;
-    setUploading(true);
-    const file = files[0];
-    const { error: upErr } = await supabase.from('documents').insert({
-      name: file.name || `Documento_${Date.now()}.pdf`,
-      category: cat || CATEGORIES[0].id,
-      size: file.size ? `${(file.size / 1024 / 1024).toFixed(1)} MB` : '—',
-      type: file.type?.includes('image') ? 'image' : 'pdf',
-      status: 'ok',
-      uploaded_by: userId,
-    });
-    if (upErr) addToast({ kind: 'bad', msg: 'Erro ao fazer upload: ' + upErr.message });
-    else { addToast({ kind: 'ok', msg: `${file.name || 'Arquivo'} enviado` }); refetch(); }
-    setUploading(false);
-  }, [cat, addToast, refetch, userId]);
 
   const handleDelete = useCallback(async () => {
     if (!selected.size) return;
@@ -115,7 +393,7 @@ export default function DocumentsScreen({ addToast }) {
   const onDrop = (e) => {
     e.preventDefault();
     setDragOver(false);
-    handleUpload(e.dataTransfer.files);
+    setShowAddModal(true);
   };
 
   const toggleSelect = (id) => {
@@ -133,47 +411,40 @@ export default function DocumentsScreen({ addToast }) {
       onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) setDragOver(false); }}
       onDrop={onDrop}
     >
-      {/* ── Drag overlay ── */}
+      {/* Drag overlay */}
       {dragOver && (
         <div style={{
           position: 'absolute', inset: 0, zIndex: 50,
-          background: 'var(--brand-tint)',
-          border: '2px dashed var(--brand)',
-          borderRadius: 12,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: 'var(--brand-tint)', border: '2px dashed var(--brand)',
+          borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center',
           flexDirection: 'column', gap: 10, backdropFilter: 'blur(2px)',
         }}>
           <Icon name="upload" size={40} style={{ color: 'var(--brand)' }} />
-          <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--brand)' }}>Solte para fazer upload</div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--brand)' }}>Solte para adicionar documento</div>
           <div style={{ fontSize: 13, color: 'var(--muted)' }}>PDF, JPG, PNG, DOCX até 20 MB</div>
         </div>
       )}
 
-      {/* ── Sidebar ── */}
+      {/* Sidebar */}
       <aside style={{
-        width: 220, flexShrink: 0,
-        borderRight: '1px solid var(--line)',
-        background: 'var(--surface)',
-        display: 'flex', flexDirection: 'column',
-        overflowY: 'auto',
-        padding: '16px 0',
+        width: 220, flexShrink: 0, borderRight: '1px solid var(--line)',
+        background: 'var(--surface)', display: 'flex', flexDirection: 'column',
+        overflowY: 'auto', padding: '16px 0',
       }}>
         <div style={{ padding: '0 14px 12px', fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.8 }}>
           Documentos
         </div>
 
-        {/* Nav items */}
         {[
-          { id: 'all',     label: 'Todos',              icon: 'folder',   n: docs.length },
-          { id: 'pending', label: 'Pendentes',          icon: 'alert',    n: pending.length, accent: pending.length > 0 },
-          { id: 'sign',    label: 'Aguard. assinatura', icon: 'edit',     n: sign.length,    accent: sign.length > 0 },
+          { id: 'all',     label: 'Todos',              icon: 'folder', n: docs.length },
+          { id: 'pending', label: 'Pendentes',          icon: 'alert',  n: pending.length, accent: pending.length > 0 },
+          { id: 'sign',    label: 'Aguard. assinatura', icon: 'edit',   n: sign.length,    accent: sign.length > 0 },
         ].map(item => (
           <button
             key={item.id}
             onClick={() => { setTab(item.id); setCat(null); }}
             style={{
-              display: 'flex', alignItems: 'center', gap: 9,
-              padding: '7px 14px',
+              display: 'flex', alignItems: 'center', gap: 9, padding: '7px 14px',
               border: 'none', background: tab === item.id && !cat ? 'var(--hover)' : 'transparent',
               borderRadius: 0, cursor: 'pointer', width: '100%', textAlign: 'left',
               color: tab === item.id && !cat ? 'var(--ink)' : 'var(--muted)',
@@ -204,19 +475,14 @@ export default function DocumentsScreen({ addToast }) {
             key={c.id}
             onClick={() => { setCat(cat === c.id ? null : c.id); setTab('all'); }}
             style={{
-              display: 'flex', alignItems: 'center', gap: 9,
-              padding: '7px 14px',
-              border: 'none',
-              background: cat === c.id ? c.color + '14' : 'transparent',
+              display: 'flex', alignItems: 'center', gap: 9, padding: '7px 14px',
+              border: 'none', background: cat === c.id ? c.color + '14' : 'transparent',
               borderRadius: 0, cursor: 'pointer', width: '100%', textAlign: 'left',
               color: cat === c.id ? c.color : 'var(--muted)',
               fontSize: 13, fontWeight: cat === c.id ? 600 : 400,
             }}
           >
-            <span style={{
-              width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
-              background: cat === c.id ? c.color : 'var(--muted-2)',
-            }} />
+            <span style={{ width: 6, height: 6, borderRadius: '50%', flexShrink: 0, background: cat === c.id ? c.color : 'var(--muted-2)' }} />
             <span style={{ flex: 1 }}>{c.name}</span>
             <span style={{ fontSize: 11, color: 'var(--muted-2)' }}>{catCounts[c.id] || 0}</span>
           </button>
@@ -224,23 +490,13 @@ export default function DocumentsScreen({ addToast }) {
 
         <div style={{ flex: 1 }} />
 
-        {/* Upload button */}
         <div style={{ padding: '12px 14px 0' }}>
-          <input
-            ref={fileInputRef}
-            type="file"
-            multiple
-            style={{ display: 'none' }}
-            onChange={e => handleUpload(e.target.files)}
-          />
           <button
             className="btn primary"
             style={{ width: '100%', justifyContent: 'center' }}
-            onClick={() => fileInputRef.current?.click()}
-            disabled={uploading}
+            onClick={() => setShowAddModal(true)}
           >
-            <Icon name={uploading ? 'loader' : 'upload'} size={14} />
-            {uploading ? 'Enviando…' : 'Upload'}
+            <Icon name="plus" size={14} /> Novo documento
           </button>
           <div style={{ fontSize: 11, color: 'var(--muted)', textAlign: 'center', marginTop: 6 }}>
             ou arraste para a tela
@@ -248,15 +504,13 @@ export default function DocumentsScreen({ addToast }) {
         </div>
       </aside>
 
-      {/* ── Main content ── */}
+      {/* Main content */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden' }}>
 
         {/* Header */}
         <div style={{
-          padding: '14px 20px',
-          borderBottom: '1px solid var(--line)',
-          background: 'var(--surface)',
-          display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0,
+          padding: '14px 20px', borderBottom: '1px solid var(--line)',
+          background: 'var(--surface)', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0,
         }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 15, fontWeight: 700 }}>
@@ -267,29 +521,23 @@ export default function DocumentsScreen({ addToast }) {
             </div>
           </div>
 
-          {/* Search */}
           <div style={{ position: 'relative' }}>
             <Icon name="search" size={13} style={{ position: 'absolute', left: 9, top: 10, color: 'var(--muted)' }} />
             <input
               className="field"
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder="Buscar documentos…"
-              style={{ width: 220, paddingLeft: 30, height: 34, fontSize: 13 }}
+              placeholder="Buscar por nome ou funcionário…"
+              style={{ width: 240, paddingLeft: 30, height: 34, fontSize: 13 }}
             />
           </div>
 
-          {/* View toggle */}
           <div style={{ display: 'flex', border: '1px solid var(--line)', borderRadius: 7, overflow: 'hidden' }}>
             {[['list','dashboard'],['grid','folder']].map(([v, icon]) => (
               <button
                 key={v}
                 onClick={() => setView(v)}
-                style={{
-                  border: 'none', padding: '6px 9px', cursor: 'pointer',
-                  background: view === v ? 'var(--hover)' : 'transparent',
-                  color: 'var(--ink)',
-                }}
+                style={{ border: 'none', padding: '6px 9px', cursor: 'pointer', background: view === v ? 'var(--hover)' : 'transparent', color: 'var(--ink)' }}
               >
                 <Icon name={icon} size={13} />
               </button>
@@ -299,20 +547,11 @@ export default function DocumentsScreen({ addToast }) {
 
         {/* Selection bar */}
         {selected.size > 0 && (
-          <div style={{
-            padding: '8px 20px', background: 'var(--brand-tint)',
-            borderBottom: '1px solid var(--line)',
-            display: 'flex', alignItems: 'center', gap: 10, fontSize: 13,
-          }}>
+          <div style={{ padding: '8px 20px', background: 'var(--brand-tint)', borderBottom: '1px solid var(--line)', display: 'flex', alignItems: 'center', gap: 10, fontSize: 13 }}>
             <strong>{selected.size} selecionados</strong>
             <span style={{ flex: 1 }} />
             <button className="btn sm"><Icon name="download" size={13} /> Baixar</button>
-            <button
-              className="btn sm"
-              style={{ color: 'var(--bad)', borderColor: 'var(--bad)' }}
-              onClick={handleDelete}
-              disabled={deleting}
-            >
+            <button className="btn sm" style={{ color: 'var(--bad)', borderColor: 'var(--bad)' }} onClick={handleDelete} disabled={deleting}>
               <Icon name="trash" size={13} /> {deleting ? 'Excluindo…' : 'Excluir'}
             </button>
             <button className="btn ghost sm icon" onClick={() => setSelected(new Set())}>
@@ -338,9 +577,7 @@ export default function DocumentsScreen({ addToast }) {
             <div style={{ padding: 64, textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>
               <Icon name="folder" size={32} style={{ opacity: 0.3, marginBottom: 12 }} />
               <div style={{ fontWeight: 600, marginBottom: 4 }}>Nenhum documento</div>
-              <div style={{ fontSize: 12 }}>
-                {search ? 'Tente outro termo de busca' : 'Faça upload ou altere o filtro'}
-              </div>
+              <div style={{ fontSize: 12 }}>{search ? 'Tente outro termo de busca' : 'Clique em "Novo documento" para começar'}</div>
             </div>
           ) : view === 'list' ? (
             <ListView docs={filtered} categories={CATEGORIES} selected={selected} onToggle={toggleSelect} />
@@ -349,6 +586,14 @@ export default function DocumentsScreen({ addToast }) {
           )}
         </div>
       </div>
+
+      {showAddModal && (
+        <AddDocModal
+          employees={employees}
+          onClose={() => setShowAddModal(false)}
+          onSaved={() => { refetch(); addToast({ kind: 'ok', msg: 'Documento adicionado' }); }}
+        />
+      )}
     </div>
   );
 }
@@ -363,7 +608,7 @@ function ListView({ docs, categories, selected, onToggle }) {
           </th>
           <th style={{ padding: '9px 16px', textAlign: 'left', fontWeight: 600 }}>Nome</th>
           <th style={{ padding: '9px 16px', textAlign: 'left', fontWeight: 600 }}>Categoria</th>
-          <th style={{ padding: '9px 16px', textAlign: 'left', fontWeight: 600 }}>Enviado por</th>
+          <th style={{ padding: '9px 16px', textAlign: 'left', fontWeight: 600 }}>Funcionário</th>
           <th style={{ padding: '9px 16px', textAlign: 'left', fontWeight: 600 }}>Data</th>
           <th style={{ padding: '9px 16px', textAlign: 'left', fontWeight: 600 }}>Tamanho</th>
           <th style={{ padding: '9px 16px', textAlign: 'left', fontWeight: 600 }}>Status</th>
@@ -387,17 +632,12 @@ function ListView({ docs, categories, selected, onToggle }) {
               <td style={{ padding: '10px 16px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <FileIcon type={f.type} color={cm?.color} size={30} />
-                  <span style={{ fontWeight: 500, maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span>
+                  <span style={{ fontWeight: 500, maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span>
                 </div>
               </td>
               <td style={{ padding: '10px 16px' }}>
                 {cm && (
-                  <span style={{
-                    display: 'inline-flex', alignItems: 'center', gap: 5,
-                    fontSize: 11.5, fontWeight: 500,
-                    color: cm.color, background: cm.color + '14',
-                    padding: '2px 8px', borderRadius: 20,
-                  }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 500, color: cm.color, background: cm.color + '14', padding: '2px 8px', borderRadius: 20 }}>
                     <span style={{ width: 5, height: 5, borderRadius: '50%', background: cm.color }} />
                     {cm.name}
                   </span>
@@ -405,15 +645,22 @@ function ListView({ docs, categories, selected, onToggle }) {
               </td>
               <td style={{ padding: '10px 16px', color: 'var(--muted)', fontSize: 12.5 }}>{f.who}</td>
               <td style={{ padding: '10px 16px', color: 'var(--muted)', fontSize: 12.5 }}>{f.date}</td>
-              <td style={{ padding: '10px 16px', color: 'var(--muted)', fontSize: 12.5 }}>{f.size}</td>
+              <td style={{ padding: '10px 16px', color: 'var(--muted)', fontSize: 12.5 }}>{f.size ?? '—'}</td>
               <td style={{ padding: '10px 16px' }}>
                 <span className={`pill ${st.cls}`} style={{ fontSize: 11 }}>{st.label}</span>
               </td>
               <td style={{ padding: '10px 16px' }}>
                 <div style={{ display: 'flex', gap: 2 }}>
-                  <button className="btn ghost icon sm"><Icon name="eye" size={13} /></button>
-                  <button className="btn ghost icon sm"><Icon name="download" size={13} /></button>
-                  <button className="btn ghost icon sm"><Icon name="more-v" size={13} /></button>
+                  {f.file_url && (
+                    <a href={f.file_url} target="_blank" rel="noreferrer">
+                      <button className="btn ghost icon sm"><Icon name="eye" size={13} /></button>
+                    </a>
+                  )}
+                  {f.file_url && (
+                    <a href={f.file_url} download>
+                      <button className="btn ghost icon sm"><Icon name="download" size={13} /></button>
+                    </a>
+                  )}
                 </div>
               </td>
             </tr>
@@ -426,53 +673,30 @@ function ListView({ docs, categories, selected, onToggle }) {
 
 function GridView({ docs, categories }) {
   return (
-    <div style={{
-      padding: 20,
-      display: 'grid',
-      gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
-      gap: 12,
-      alignContent: 'start',
-    }}>
+    <div style={{ padding: 20, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 12, alignContent: 'start' }}>
       {docs.map(f => {
         const cm = categories.find(c => c.id === f.cat);
         return (
           <div
             key={f.id}
-            style={{
-              background: 'var(--surface)',
-              border: '1px solid var(--line)',
-              borderRadius: 10,
-              padding: 14,
-              cursor: 'pointer',
-              transition: 'box-shadow .15s',
-            }}
+            style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 10, padding: 14, cursor: 'pointer', transition: 'box-shadow .15s' }}
             onMouseEnter={e => e.currentTarget.style.boxShadow = '0 2px 12px rgba(0,0,0,.08)'}
             onMouseLeave={e => e.currentTarget.style.boxShadow = 'none'}
           >
-            {/* Thumbnail */}
-            <div style={{
-              height: 80, borderRadius: 7, marginBottom: 10,
-              background: (cm?.color || '#888') + '10',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              position: 'relative',
-              border: '1px solid ' + (cm?.color || 'var(--line)') + '22',
-            }}>
-              <Icon name={f.type === 'image' ? 'image' : 'pdf'} size={30} style={{ color: cm?.color || 'var(--muted-2)' }} />
-              <span style={{
-                position: 'absolute', top: 5, right: 5,
-                fontSize: 9, fontWeight: 700, letterSpacing: 0.3,
-                padding: '1px 5px', borderRadius: 4,
-                background: 'var(--surface)', border: '1px solid var(--line)',
-                color: 'var(--muted)',
-              }}>
+            <div style={{ height: 80, borderRadius: 7, marginBottom: 10, background: (cm?.color || '#888') + '10', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', border: '1px solid ' + (cm?.color || 'var(--line)') + '22' }}>
+              {f.file_url && f.type === 'image' ? (
+                <img src={f.file_url} alt={f.name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 7 }} />
+              ) : (
+                <Icon name={f.type === 'image' ? 'image' : 'pdf'} size={30} style={{ color: cm?.color || 'var(--muted-2)' }} />
+              )}
+              <span style={{ position: 'absolute', top: 5, right: 5, fontSize: 9, fontWeight: 700, letterSpacing: 0.3, padding: '1px 5px', borderRadius: 4, background: 'var(--surface)', border: '1px solid var(--line)', color: 'var(--muted)' }}>
                 {f.type.toUpperCase()}
               </span>
             </div>
-            <div style={{ fontSize: 12.5, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 4 }}>
-              {f.name}
-            </div>
-            <div style={{ fontSize: 11, color: 'var(--muted)', display: 'flex', justifyContent: 'space-between' }}>
-              <span>{f.size}</span>
+            <div style={{ fontSize: 12.5, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 2 }}>{f.name}</div>
+            <div style={{ fontSize: 11, color: 'var(--muted)' }}>{f.who}</div>
+            <div style={{ fontSize: 11, color: 'var(--muted)', display: 'flex', justifyContent: 'space-between', marginTop: 2 }}>
+              <span>{f.size ?? '—'}</span>
               <span>{f.date}</span>
             </div>
           </div>
