@@ -2,6 +2,7 @@ import { useState, useEffect, Fragment, useMemo } from 'react';
 import Icon from '../components/Icon.jsx';
 import Avatar from '../components/Avatar.jsx';
 import * as D from '../data/mock.js';
+import { supabase } from '../lib/supabase.js';
 import {
   createEmployee,
   useEmployees,
@@ -1418,41 +1419,94 @@ function EmpresasTab({ addToast }) {
   const { companies, loading, refetch } = useCompanies();
   const [showNew, setShowNew] = useState(false);
   const [editTarget, setEditTarget] = useState(null);
-  const [form, setForm] = useState({ name: '', slug: '' });
+  const BLANK_FORM = { name: '', slug: '', address: '', number: '', logo_url: '' };
+  const [form, setForm] = useState(BLANK_FORM);
+  const [logoFile, setLogoFile] = useState(null);
+  const [logoPreview, setLogoPreview] = useState(null);
   const [saving, setSaving] = useState(false);
+  const logoInputRef = useMemo(() => ({ current: null }), []);
 
   const slugify = (name) =>
     name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 
+  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+
   const openNew = () => {
-    setForm({ name: '', slug: '' });
+    setForm(BLANK_FORM);
+    setLogoFile(null);
+    setLogoPreview(null);
     setEditTarget(null);
     setShowNew(true);
   };
 
   const openEdit = (c) => {
-    setForm({ name: c.name, slug: c.slug || '' });
+    setForm({
+      name: c.name,
+      slug: c.slug || '',
+      address: c.address || '',
+      number: c.number || '',
+      logo_url: c.logo_url || '',
+    });
+    setLogoFile(null);
+    setLogoPreview(c.logo_url || null);
     setEditTarget(c);
     setShowNew(true);
+  };
+
+  const handleLogoChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setLogoFile(file);
+    setLogoPreview(URL.createObjectURL(file));
+  };
+
+  const uploadLogo = async (companyId) => {
+    if (!logoFile) return form.logo_url || null;
+    const ext = logoFile.name.split('.').pop();
+    const path = `${companyId}.${ext}`;
+    const { error } = await supabase.storage
+      .from('company-logos')
+      .upload(path, logoFile, { upsert: true });
+    if (error) throw error;
+    const { data } = supabase.storage.from('company-logos').getPublicUrl(path);
+    return data.publicUrl;
   };
 
   const handleSave = async () => {
     if (!form.name.trim()) return;
     setSaving(true);
-    const payload = {
-      name: form.name.trim(),
-      slug: form.slug.trim() || slugify(form.name.trim()),
-    };
-    const { error } = editTarget
-      ? await updateCompany(editTarget.id, payload)
-      : await createCompany(payload);
-    setSaving(false);
-    if (error) {
-      addToast({ kind: 'err', msg: error.message });
-    } else {
+    try {
+      const slug = form.slug.trim() || slugify(form.name.trim());
+
+      if (editTarget) {
+        const logo_url = await uploadLogo(editTarget.id);
+        const { error } = await updateCompany(editTarget.id, {
+          name: form.name.trim(), slug,
+          address: form.address.trim() || null,
+          number: form.number.trim() || null,
+          logo_url,
+        });
+        if (error) throw error;
+      } else {
+        const { created, error } = await createCompany({
+          name: form.name.trim(), slug,
+          address: form.address.trim() || null,
+          number: form.number.trim() || null,
+        });
+        if (error) throw error;
+        if (logoFile && created) {
+          const logo_url = await uploadLogo(created.id);
+          await updateCompany(created.id, { logo_url });
+        }
+      }
+
       addToast({ kind: 'ok', msg: editTarget ? 'Empresa atualizada' : 'Empresa criada' });
       setShowNew(false);
       refetch();
+    } catch (err) {
+      addToast({ kind: 'err', msg: err.message });
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -1484,29 +1538,32 @@ function EmpresasTab({ addToast }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {companies.map((c) => (
             <div key={c.id} className="card" style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 14 }}>
-              <div
-                style={{
-                  width: 38, height: 38, borderRadius: 10, flexShrink: 0,
-                  background: 'linear-gradient(135deg, var(--brand) 0%, var(--brand-700) 100%)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  color: 'var(--brand-ink)', fontWeight: 700, fontSize: 14,
-                }}
-              >
-                {c.name.charAt(0).toUpperCase()}
+              {/* Logo ou inicial */}
+              <div style={{
+                width: 42, height: 42, borderRadius: 10, flexShrink: 0, overflow: 'hidden',
+                background: 'linear-gradient(135deg, var(--brand) 0%, var(--brand-700) 100%)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                {c.logo_url
+                  ? <img src={c.logo_url} alt={c.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  : <span style={{ color: 'var(--brand-ink)', fontWeight: 700, fontSize: 16 }}>{c.name.charAt(0).toUpperCase()}</span>
+                }
               </div>
               <div className="grow" style={{ minWidth: 0 }}>
-                <div style={{ fontWeight: 600, fontSize: 13.5 }}>{c.name}</div>
-                <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
-                  /{c.slug || '—'}
+                <div style={{ fontWeight: 600, fontSize: 13.5, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  {c.name}
                   {!c.active && (
                     <span style={{
-                      marginLeft: 8, fontSize: 10.5, fontWeight: 700,
+                      fontSize: 10.5, fontWeight: 700,
                       background: 'var(--surface-2)', color: 'var(--muted)',
                       border: '1px solid var(--line)', borderRadius: 4, padding: '1px 6px',
-                    }}>
-                      INATIVA
-                    </span>
+                    }}>INATIVA</span>
                   )}
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
+                  {c.address
+                    ? `${c.address}${c.number ? ', ' + c.number : ''}`
+                    : `/${c.slug || '—'}`}
                 </div>
               </div>
               <div className="row gap-2">
@@ -1544,40 +1601,118 @@ function EmpresasTab({ addToast }) {
         >
           <div
             style={{
-              width: '100%', maxWidth: 440,
+              width: '100%', maxWidth: 520,
               background: 'var(--surface)', borderRadius: 14,
               boxShadow: '0 24px 60px rgba(0,0,0,.2)',
-              padding: 24,
+              display: 'flex', flexDirection: 'column',
+              maxHeight: 'calc(100dvh - 48px)', overflow: 'hidden',
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 18 }}>
-              {editTarget ? 'Editar empresa' : 'Nova empresa'}
+            {/* Header */}
+            <div style={{ padding: '18px 22px 16px', borderBottom: '1px solid var(--line)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ fontSize: 15, fontWeight: 700 }}>
+                {editTarget ? 'Editar empresa' : 'Nova empresa'}
+              </div>
+              <button className="btn ghost icon sm" onClick={() => setShowNew(false)}>
+                <Icon name="x" size={15} />
+              </button>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+
+            {/* Body scrollável */}
+            <div style={{ overflowY: 'auto', padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+              {/* Upload de logo */}
+              <div>
+                <label className="label">Logo da empresa</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 4 }}>
+                  <div
+                    style={{
+                      width: 64, height: 64, borderRadius: 12, overflow: 'hidden', flexShrink: 0,
+                      background: logoPreview ? 'transparent' : 'var(--surface-2)',
+                      border: '2px dashed var(--line)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      cursor: 'pointer',
+                    }}
+                    onClick={() => logoInputRef.current?.click()}
+                    title="Clique para selecionar"
+                  >
+                    {logoPreview
+                      ? <img src={logoPreview} alt="logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      : <Icon name="building" size={22} style={{ color: 'var(--muted)' }} />
+                    }
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <button className="btn sm" onClick={() => logoInputRef.current?.click()}>
+                      <Icon name="upload" size={13} /> {logoPreview ? 'Trocar imagem' : 'Selecionar logo'}
+                    </button>
+                    {logoPreview && (
+                      <button
+                        className="btn ghost sm"
+                        style={{ marginLeft: 6, color: 'var(--bad)' }}
+                        onClick={() => { setLogoFile(null); setLogoPreview(null); set('logo_url', ''); }}
+                      >
+                        Remover
+                      </button>
+                    )}
+                    <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 5 }}>
+                      PNG, JPG ou WebP · máx 2 MB
+                    </div>
+                  </div>
+                </div>
+                <input
+                  ref={(el) => { logoInputRef.current = el; }}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                  style={{ display: 'none' }}
+                  onChange={handleLogoChange}
+                />
+              </div>
+
+              {/* Nome */}
               <div>
                 <label className="label">Nome da empresa *</label>
                 <input
                   className="field"
                   value={form.name}
+                  autoFocus
                   onChange={(e) => {
                     const name = e.target.value;
-                    setForm((f) => ({
-                      ...f,
-                      name,
-                      slug: f.slug || slugify(name),
-                    }));
+                    setForm((f) => ({ ...f, name, slug: f.slug || slugify(name) }));
                   }}
                   placeholder="Ex: Empresa João LTDA"
-                  autoFocus
                 />
               </div>
+
+              {/* Endereço + Número */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 120px', gap: 10 }}>
+                <div>
+                  <label className="label">Endereço</label>
+                  <input
+                    className="field"
+                    value={form.address}
+                    onChange={(e) => set('address', e.target.value)}
+                    placeholder="Rua, Av., Beco…"
+                  />
+                </div>
+                <div>
+                  <label className="label">Número</label>
+                  <input
+                    className="field"
+                    value={form.number}
+                    onChange={(e) => set('number', e.target.value)}
+                    placeholder="Ex: 1000"
+                  />
+                </div>
+              </div>
+
+              {/* Slug */}
               <div>
                 <label className="label">Identificador (slug)</label>
                 <input
                   className="field"
                   value={form.slug}
-                  onChange={(e) => setForm((f) => ({ ...f, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') }))}
+                  onChange={(e) => set('slug', e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
                   placeholder="empresa-joao"
                 />
                 <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>
@@ -1585,7 +1720,9 @@ function EmpresasTab({ addToast }) {
                 </div>
               </div>
             </div>
-            <div className="row" style={{ justifyContent: 'flex-end', gap: 8, marginTop: 22 }}>
+
+            {/* Footer */}
+            <div style={{ padding: '14px 22px', borderTop: '1px solid var(--line)', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
               <button className="btn" onClick={() => setShowNew(false)}>Cancelar</button>
               <button className="btn primary" onClick={handleSave} disabled={saving || !form.name.trim()}>
                 {saving ? 'Salvando…' : editTarget ? 'Salvar alterações' : 'Criar empresa'}
