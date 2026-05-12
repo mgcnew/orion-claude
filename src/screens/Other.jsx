@@ -742,12 +742,66 @@ function useReportData(reportId, filters, employees, warnings, vacations, docume
   }, [reportId, filters, employees, warnings, vacations, documents, timecards]);
 }
 
+function FilterModal({ report, filters, setFilters, employees, depts, companies, onClose, onClear }) {
+  return (
+    <div
+      style={{ position: 'fixed', inset: 0, zIndex: 400, background: 'rgba(0,0,0,.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
+      onClick={onClose}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          background: 'var(--surface)', borderRadius: 'var(--radius-lg)',
+          boxShadow: '0 8px 40px rgba(0,0,0,.18)', border: '1px solid var(--line)',
+          width: '100%', maxWidth: 400,
+          display: 'flex', flexDirection: 'column',
+          maxHeight: 'calc(100dvh - 32px)',
+        }}
+      >
+        {/* Header */}
+        <div style={{ flexShrink: 0, padding: '16px 20px 14px', borderBottom: '1px solid var(--line)', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <Icon name="filter" size={15} style={{ color: 'var(--brand)' }} />
+          <span style={{ fontSize: 14.5, fontWeight: 700, flex: 1 }}>Filtros</span>
+          <span style={{ fontSize: 11.5, color: 'var(--muted)', flex: 1 }}>
+            {report.label}
+          </span>
+          <button className="btn ghost icon sm" onClick={onClose}>
+            <Icon name="x" size={14} />
+          </button>
+        </div>
+
+        {/* Body (scrollable) */}
+        <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, padding: '18px 20px' }}>
+          <ReportFilters
+            report={report}
+            filters={filters}
+            setFilters={setFilters}
+            employees={employees}
+            depts={depts}
+            companies={companies}
+          />
+        </div>
+
+        {/* Footer */}
+        <div style={{
+          flexShrink: 0, padding: '12px 20px',
+          borderTop: '1px solid var(--line)',
+          display: 'flex', justifyContent: 'flex-end', gap: 8,
+        }}>
+          <button className="btn ghost sm" onClick={onClear}>Limpar filtros</button>
+          <button className="btn primary sm" onClick={onClose}>Aplicar</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function ReportsScreen({ addToast }) {
   const [selectedId, setSelectedId]     = useState('headcount');
   const [filters, setFilters]           = useState({});
   const [history, setHistory]           = useState([]);
   const [catalogOpen, setCatalogOpen]   = useState(true);
-  const [filtersOpen, setFiltersOpen]   = useState(true);
+  const [filterModalOpen, setFilterModalOpen] = useState(false);
 
   const { employees, loading: empLoading } = useEmployees();
   const { warnings,  loading: warnLoading } = useAllWarnings();
@@ -774,6 +828,7 @@ export function ReportsScreen({ addToast }) {
   const activeFiltersCount = Object.values(filters).filter(v => v).length;
 
   return (
+    <>
     <div className="fade-up" style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
 
       {/* ── Catálogo (toggle) ── */}
@@ -800,9 +855,9 @@ export function ReportsScreen({ addToast }) {
               {group.items.map(r => {
                 const active = r.id === selectedId;
                 return (
-                  <button key={r.id} onClick={() => selectReport(r.id)} style={{
-                    width: '100%', display: 'flex', alignItems: 'center', gap: 8,
-                    padding: '7px 10px', borderRadius: 7, border: 'none', margin: '0 4px', width: 'calc(100% - 8px)',
+                  <button key={r.id} onClick={() => selectReport(r.id)} title={r.label} style={{
+                    display: 'flex', alignItems: 'center', gap: 8,
+                    padding: '7px 10px', borderRadius: 7, border: 'none', margin: '1px 4px', width: 'calc(100% - 8px)',
                     background: active ? 'var(--brand-tint)' : 'transparent',
                     color: active ? 'var(--brand)' : 'var(--ink-soft)',
                     fontWeight: active ? 600 : 400, fontSize: 13, cursor: 'pointer', textAlign: 'left',
@@ -810,7 +865,7 @@ export function ReportsScreen({ addToast }) {
                   onMouseEnter={e => { if (!active) e.currentTarget.style.background = 'var(--hover)'; }}
                   onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent'; }}>
                     <Icon name={r.icon} size={14} style={{ color: active ? 'var(--brand)' : group.color, flexShrink: 0 }} />
-                    <span style={{ lineHeight: 1.3 }}>{r.label}</span>
+                    <span style={{ lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.label}</span>
                   </button>
                 );
               })}
@@ -852,7 +907,7 @@ export function ReportsScreen({ addToast }) {
             <div style={{ display: 'flex', gap: 6, flexShrink: 0, flexWrap: 'wrap' }}>
               <button
                 className="btn sm"
-                onClick={() => setFiltersOpen(o => !o)}
+                onClick={() => setFilterModalOpen(true)}
                 style={{ position: 'relative' }}
               >
                 <Icon name="filter" size={13} />
@@ -906,33 +961,8 @@ export function ReportsScreen({ addToast }) {
           )}
         </div>
 
-        {/* Corpo: filtros (drawer lateral) + tabela */}
+        {/* Corpo: tabela */}
         <div style={{ flex: 1, display: 'flex', overflow: 'hidden', minHeight: 0 }}>
-
-          {/* Painel de filtros (recolhível) */}
-          {filtersOpen && (
-            <div style={{
-              width: 220, flexShrink: 0,
-              borderRight: '1px solid var(--line)',
-              overflowY: 'auto', padding: '16px 14px',
-              display: 'flex', flexDirection: 'column', gap: 0,
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', marginBottom: 14 }}>
-                <span style={{ fontSize: 12.5, fontWeight: 700, flex: 1 }}>Filtros</span>
-                <button className="btn ghost icon sm" onClick={() => setFiltersOpen(false)}>
-                  <Icon name="x" size={13} />
-                </button>
-              </div>
-              <ReportFilters
-                report={selected}
-                filters={filters}
-                setFilters={setFilters}
-                employees={employees}
-                depts={depts}
-                companies={companies}
-              />
-            </div>
-          )}
 
           {/* Tabela de dados */}
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
@@ -1001,6 +1031,19 @@ export function ReportsScreen({ addToast }) {
         </div>
       </div>
     </div>
+    {filterModalOpen && (
+      <FilterModal
+        report={selected}
+        filters={filters}
+        setFilters={setFilters}
+        employees={employees}
+        depts={depts}
+        companies={companies}
+        onClose={() => setFilterModalOpen(false)}
+        onClear={() => { setFilters({}); }}
+      />
+    )}
+    </>
   );
 }
 
