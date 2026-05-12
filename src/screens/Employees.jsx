@@ -1882,6 +1882,7 @@ const DOC_CATEGORIES = [
   { id: 'ferias',       name: 'Férias',          icon: 'umbrella',    color: '#0891b2' },
   { id: 'advertencias', name: 'Advertências',    icon: 'alert',       color: '#a855f7' },
   { id: 'juridico',     name: 'Jurídico',        icon: 'shield',      color: '#475569' },
+  { id: 'ponto',        name: 'Cartão de Ponto', icon: 'clock',       color: '#0f766e' },
 ];
 
 // Campos extras por categoria — armazenados como JSON em notes
@@ -1922,6 +1923,12 @@ const DOC_EXTRA_FIELDS = {
   juridico: [
     { key: 'tipo_juridico',    label: 'Tipo',           type: 'select', options: ['Processo trabalhista', 'Notificação extrajudicial', 'Acordo', 'Sentença', 'Recurso', 'Outro'] },
     { key: 'numero_processo',  label: 'Nº do processo', type: 'text',   placeholder: 'ex: 0001234-56.2025.5.00.0000' },
+  ],
+  ponto: [
+    { key: 'mes_ref',    label: 'Mês de referência', type: 'select', options: ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'] },
+    { key: 'ano_ref',    label: 'Ano',               type: 'text',   placeholder: '2025' },
+    { key: 'periodo',    label: 'Período',           type: 'select', options: ['Mensal', 'Quinzenal — 1ª', 'Quinzenal — 2ª', 'Semanal'] },
+    { key: 'total_horas', label: 'Total de horas',   type: 'text',   placeholder: 'ex: 176h' },
   ],
 };
 
