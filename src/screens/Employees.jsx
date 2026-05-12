@@ -1951,12 +1951,26 @@ function UploadDocModal({ employeeId, onClose, onSaved }) {
     setSaving(true);
     const notes = Object.keys(extras).length ? JSON.stringify(extras) : null;
     const file = form.file;
+
+    let file_url = null;
+    if (file) {
+      const ext = file.name.split('.').pop();
+      const path = `${employeeId}/${Date.now()}.${ext}`;
+      const { error: uploadErr } = await supabase.storage
+        .from('employee-documents')
+        .upload(path, file, { upsert: false });
+      if (uploadErr) { alert('Erro no upload: ' + uploadErr.message); setSaving(false); return; }
+      const { data: urlData } = supabase.storage.from('employee-documents').getPublicUrl(path);
+      file_url = urlData?.publicUrl ?? null;
+    }
+
     const row = {
       employee_id: employeeId,
       name: form.name.trim(),
       category: cat,
       doc_date: form.doc_date || null,
       notes,
+      file_url,
       size: file ? `${(file.size / 1024).toFixed(0)} KB` : null,
       type: file ? (file.type?.includes('image') ? 'image' : 'pdf') : 'pdf',
       status: 'ok',
@@ -2129,11 +2143,31 @@ function DocPreviewModal({ doc, onClose }) {
 
         <div style={{ overflowY: 'auto', flex: 1, minHeight: 0, padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
 
-          {/* Preview placeholder */}
-          <div style={{ borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--line)', height: 160, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, color: 'var(--muted)' }}>
-            <Icon name={doc.type === 'image' ? 'image' : 'pdf'} size={32} style={{ opacity: 0.4 }} />
-            <span style={{ fontSize: 12 }}>{doc.size ?? 'Arquivo não armazenado localmente'}</span>
-          </div>
+          {/* Preview do arquivo */}
+          {doc.file_url ? (
+            doc.type === 'image' ? (
+              <div style={{ borderRadius: 10, overflow: 'hidden', border: '1px solid var(--line)', background: 'var(--surface-2)', maxHeight: 340, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <img
+                  src={doc.file_url}
+                  alt={doc.name}
+                  style={{ maxWidth: '100%', maxHeight: 340, objectFit: 'contain', display: 'block' }}
+                />
+              </div>
+            ) : (
+              <div style={{ borderRadius: 10, overflow: 'hidden', border: '1px solid var(--line)', height: 400 }}>
+                <iframe
+                  src={doc.file_url}
+                  title={doc.name}
+                  style={{ width: '100%', height: '100%', border: 'none' }}
+                />
+              </div>
+            )
+          ) : (
+            <div style={{ borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--line)', height: 120, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, color: 'var(--muted)' }}>
+              <Icon name={doc.type === 'image' ? 'image' : 'pdf'} size={28} style={{ opacity: 0.3 }} />
+              <span style={{ fontSize: 12 }}>Arquivo não disponível</span>
+            </div>
+          )}
 
           {/* Dados base */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
