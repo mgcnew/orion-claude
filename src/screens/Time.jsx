@@ -42,6 +42,65 @@ function fmtDate(iso) {
   return `${d}/${m}/${y}`;
 }
 
+// ── Input de horário 24h ──────────────────────────────────────
+// Aceita: "8" → 08:00 | "800" → 08:00 | "0800" → 08:00 | "13" → 13:00 | "1830" → 18:30
+function TimeInput24h({ value, onChange, placeholder = 'ex: 0800', style }) {
+  const [text, setText] = useState(value || '');
+
+  useEffect(() => { setText(value || ''); }, [value]);
+
+  const toHHMM = (raw) => {
+    const d = raw.replace(/\D/g, '');
+    if (!d) return '';
+    let h, m;
+    if (d.length <= 2) { h = parseInt(d); m = 0; }
+    else { h = parseInt(d.slice(0, d.length - 2)); m = parseInt(d.slice(-2)); }
+    if (isNaN(h) || isNaN(m) || h > 23 || m > 59) return '';
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+  };
+
+  const handleChange = (e) => {
+    const raw = e.target.value.replace(/[^\d:]/g, '').slice(0, 5);
+    setText(raw);
+    const digits = raw.replace(/\D/g, '');
+    if (digits.length === 4) {
+      const fmt = toHHMM(digits);
+      if (fmt) { setText(fmt); onChange(fmt); return; }
+    }
+    if (!raw) onChange('');
+  };
+
+  const handleBlur = () => {
+    if (!text.trim()) { onChange(''); return; }
+    const fmt = toHHMM(text);
+    setText(fmt || '');
+    onChange(fmt || '');
+  };
+
+  return (
+    <input
+      type="text"
+      className="field"
+      value={text}
+      onChange={handleChange}
+      onBlur={handleBlur}
+      placeholder={placeholder}
+      maxLength={5}
+      inputMode="numeric"
+      style={{ fontFamily: 'monospace', letterSpacing: 1.5, textAlign: 'center', ...style }}
+    />
+  );
+}
+
+// Deriva o label do período pelo horário de entrada
+function getPeriodLabel(inTime, index) {
+  if (!inTime) return index === 0 ? 'Manhã' : index === 1 ? 'Tarde' : `Extra ${index - 1}`;
+  const h = parseInt(inTime.split(':')[0]);
+  if (h < 12) return 'Manhã';
+  if (h < 18) return 'Tarde';
+  return 'Noturno / Extra';
+}
+
 // Extrai minutos de strings como "2h30", "2h", "2.5", "150m"
 function parseExtraHoursToMins(str) {
   if (!str) return 0;
@@ -226,44 +285,52 @@ function CartaoModal({ employees, onClose, onSave }) {
 
           {/* Períodos */}
           <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-            <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-              <span style={{ fontSize:11, fontWeight:700, color:'var(--muted)', textTransform:'uppercase', letterSpacing:0.6, flex:1 }}>Horários</span>
-              <span style={{ fontSize:11, color:'var(--muted)', flex:1, textAlign:'center' }}>Entrada</span>
-              <span style={{ fontSize:11, color:'var(--muted)', flex:1, textAlign:'center' }}>Saída</span>
-              <div style={{ width:28 }} />
-            </div>
+            <span style={{ fontSize:11, fontWeight:700, color:'var(--muted)', textTransform:'uppercase', letterSpacing:0.6 }}>
+              Horários <span style={{ fontSize:10, fontWeight:400, textTransform:'none', letterSpacing:0 }}>— digite no formato 24h (ex: 0800, 1300, 1830)</span>
+            </span>
 
             {periods.map((p, i) => {
-              const isExtra  = i >= 2;
-              const label    = i === 0 ? 'Período 1' : i === 1 ? 'Período 2' : `Extra ${i - 1}`;
-              const pMins    = periodsWorkedMins([p]);
-              const isValid  = p.in && p.out;
+              const isExtra = i >= 2;
+              const label   = getPeriodLabel(p.in, i);
+              const pMins   = periodsWorkedMins([p]);
+              const accent  = isExtra ? '#7c3aed' : 'var(--brand)';
               return (
-                <div key={i} style={{ display:'flex', alignItems:'center', gap:8 }}>
-                  <div style={{ flex:1, display:'flex', alignItems:'center', gap:6 }}>
-                    <span style={{ width:8, height:8, borderRadius:'50%', background: isExtra ? '#7c3aed' : 'var(--brand)', flexShrink:0 }} />
-                    <span style={{ fontSize:12, fontWeight:600, color: isExtra ? '#7c3aed' : 'var(--ink)', whiteSpace:'nowrap' }}>{label}</span>
-                    {isValid && pMins > 0 && (
-                      <span style={{ fontSize:10, color:'var(--muted)', marginLeft:2 }}>{minutesToHM(pMins)}</span>
+                <div key={i} style={{ background: 'var(--surface-2)', border: '1px solid var(--line)', borderRadius: 10, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {/* Cabeçalho da linha */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: accent, flexShrink: 0 }} />
+                    <span style={{ fontSize: 12, fontWeight: 700, color: accent, flex: 1 }}>{label}</span>
+                    {pMins > 0 && (
+                      <span style={{ fontSize: 11, color: 'var(--muted)', background: 'var(--surface)', padding: '2px 8px', borderRadius: 20, border: '1px solid var(--line)' }}>
+                        {minutesToHM(pMins)}
+                      </span>
+                    )}
+                    {isExtra && (
+                      <button className="btn ghost icon sm" onClick={() => removePeriod(i)} title="Remover" style={{ width: 24, height: 24, padding: 0 }}>
+                        <Icon name="x" size={11} />
+                      </button>
                     )}
                   </div>
-                  <input
-                    type="time" className="field"
-                    value={p.in} onChange={e => updatePeriod(i, 'in', e.target.value)}
-                    style={{ flex:1, height:36, fontSize:13, textAlign:'center' }}
-                  />
-                  <input
-                    type="time" className="field"
-                    value={p.out} onChange={e => updatePeriod(i, 'out', e.target.value)}
-                    style={{ flex:1, height:36, fontSize:13, textAlign:'center' }}
-                  />
-                  {isExtra ? (
-                    <button className="btn ghost icon sm" onClick={() => removePeriod(i)} title="Remover" style={{ width:28, height:28, padding:0, flexShrink:0 }}>
-                      <Icon name="x" size={12} />
-                    </button>
-                  ) : (
-                    <div style={{ width:28 }} />
-                  )}
+                  {/* Inputs de horário */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: 8, alignItems: 'center' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.5, textAlign: 'center' }}>Entrada</span>
+                      <TimeInput24h
+                        value={p.in}
+                        onChange={v => updatePeriod(i, 'in', v)}
+                        style={{ height: 40, fontSize: 15, fontWeight: 700 }}
+                      />
+                    </div>
+                    <Icon name="chevron-right" size={14} style={{ color: 'var(--muted)', marginTop: 18 }} />
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.5, textAlign: 'center' }}>Saída</span>
+                      <TimeInput24h
+                        value={p.out}
+                        onChange={v => updatePeriod(i, 'out', v)}
+                        style={{ height: 40, fontSize: 15, fontWeight: 700 }}
+                      />
+                    </div>
+                  </div>
                 </div>
               );
             })}
@@ -440,8 +507,8 @@ function AjusteModal({ employees, onClose, onSave }) {
         </FieldRow>
         <FieldRow label="Data *"><input type="date" className="field" value={form.date} onChange={e => set('date',e.target.value)} /></FieldRow>
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
-          <FieldRow label="Entrada"><input type="time" className="field" value={form.time_in} onChange={e => set('time_in',e.target.value)} /></FieldRow>
-          <FieldRow label="Saída"><input type="time" className="field" value={form.time_out} onChange={e => set('time_out',e.target.value)} /></FieldRow>
+          <FieldRow label="Entrada"><TimeInput24h value={form.time_in}  onChange={v => set('time_in',  v)} /></FieldRow>
+          <FieldRow label="Saída">  <TimeInput24h value={form.time_out} onChange={v => set('time_out', v)} /></FieldRow>
         </div>
         <FieldRow label="Motivo"><textarea className="field" rows={2} value={form.notes} onChange={e => set('notes',e.target.value)} placeholder="Ex: Esqueceu de registrar saída…" style={{ resize:'vertical' }} /></FieldRow>
         <div style={{ display:'flex', gap:8, justifyContent:'flex-end', marginTop:4 }}>
