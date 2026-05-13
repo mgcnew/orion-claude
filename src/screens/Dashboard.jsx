@@ -313,14 +313,6 @@ export default function Dashboard({ setRoute, addToast, activeCompany }) {
             <strong style={{ color: 'var(--ink-soft)' }}>{data.pendingDocsCount} documentos</strong> para revisar hoje.
           </p>
         </div>
-        <div className="row gap-2" style={{ flexWrap: 'wrap' }}>
-          <button className="btn" onClick={() => setRoute('reports')}>
-            <Icon name="chart" size={15} /> Relatórios
-          </button>
-          <button className="btn primary" onClick={() => setRoute('employees-new')}>
-            <Icon name="plus" size={15} /> Novo funcionário
-          </button>
-        </div>
       </div>
 
       {/* KPI row */}
