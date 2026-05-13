@@ -606,13 +606,29 @@ function exportResumo(title, rows, isEmployee) {
   win.document.close();
 }
 
+// ── Cálculo de fechamento — altere APENAS esta função para mudar a lógica ──
+// Parâmetros:
+//   salary         — salário base mensal (R$)
+//   extraMins      — total de minutos extras no período
+//   overtimePercent — adicional sobre o valor da hora (ex: 50 = 50%)
+//   workloadHours  — divisor mensal para obter valor/hora (CLT padrão = 220h)
+//   discounts      — array de { label, value } com descontos manuais
+function calcFechamento({ salary, extraMins, overtimePercent, workloadHours = 220, discounts = [] }) {
+  const hourlyRate   = salary / workloadHours;
+  const extraHours   = extraMins / 60;
+  const extraValue   = hourlyRate * extraHours * (1 + overtimePercent / 100);
+  const totalDisc    = discounts.reduce((s, d) => s + (Number(d.value) || 0), 0);
+  return { hourlyRate, extraValue, totalDisc, total: salary + extraValue - totalDisc };
+}
+
 // ── Tela principal ────────────────────────────────────────────
 const TABS = [
-  { id:'jornada', label:'Jornada',       icon:'clock'     },
-  { id:'extras',  label:'Horas extras',  icon:'sparkle'   },
-  { id:'faltas',  label:'Faltas',        icon:'alert'     },
-  { id:'banco',   label:'Banco de horas',icon:'chart'     },
-  { id:'resumo',  label:'Resumo',        icon:'dashboard' },
+  { id:'jornada',    label:'Jornada',       icon:'clock'     },
+  { id:'extras',     label:'Horas extras',  icon:'sparkle'   },
+  { id:'faltas',     label:'Faltas',        icon:'alert'     },
+  { id:'banco',      label:'Banco de horas',icon:'chart'     },
+  { id:'resumo',     label:'Resumo',        icon:'dashboard' },
+  { id:'fechamento', label:'Fechamento',    icon:'doc'       },
 ];
 
 const NEW_ACTIONS = [
@@ -976,6 +992,20 @@ export function TimeScreen({ addToast, activeCompany }) {
         </div>
       )}
 
+      {/* ── Fechamento ── */}
+      {tab==='fechamento' && (
+        <FechamentoTab
+          selectedEmp={selectedEmp}
+          employees={employees}
+          empId={empId}
+          setEmpId={setEmpId}
+          month={month}
+          setMonth={setMonth}
+          extraMins={stats.extraMins}
+          workDays={workDays}
+        />
+      )}
+
     </div>
 
     {modal==='cartao' && <CartaoModal    employees={employees} onClose={() => setModal(null)} onSave={handleSaved} />}
@@ -983,6 +1013,233 @@ export function TimeScreen({ addToast, activeCompany }) {
     {modal==='extra'  && <HoraExtraModal employees={employees} onClose={() => setModal(null)} onSave={handleSaved} />}
     {modal==='ajuste' && <AjusteModal    employees={employees} onClose={() => setModal(null)} onSave={handleSaved} />}
     </>
+  );
+}
+
+// ── Calculadora de Fechamento ─────────────────────────────────
+function FechamentoTab({ selectedEmp, employees, empId, setEmpId, month, setMonth, extraMins, workDays }) {
+  const [overtimePercent, setOvertimePercent] = useState(50);
+  const [workloadHours,   setWorkloadHours]   = useState(220);
+  const [discounts,       setDiscounts]       = useState([]);
+  const [discLabel,       setDiscLabel]       = useState('');
+  const [discValue,       setDiscValue]       = useState('');
+
+  const salary = selectedEmp?.salary ? Number(selectedEmp.salary) : null;
+  const result = salary != null ? calcFechamento({ salary, extraMins, overtimePercent, workloadHours, discounts }) : null;
+
+  function addDiscount() {
+    if (!discLabel.trim() || !discValue) return;
+    setDiscounts(d => [...d, { id: Date.now(), label: discLabel.trim(), value: Number(discValue) }]);
+    setDiscLabel(''); setDiscValue('');
+  }
+
+  function removeDiscount(id) {
+    setDiscounts(d => d.filter(x => x.id !== id));
+  }
+
+  function exportPDF() {
+    if (!result || !selectedEmp) return;
+    const brl = v => v.toLocaleString('pt-BR', { style:'currency', currency:'BRL' });
+    const win = window.open('', '_blank');
+    win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8">
+      <title>Fechamento — ${selectedEmp.name}</title>
+      <style>
+        body { font-family: Arial, sans-serif; padding: 40px; color: #111; }
+        h2 { margin: 0 0 4px; font-size: 20px; }
+        .sub { color: #666; font-size: 13px; margin-bottom: 24px; }
+        table { width: 100%; border-collapse: collapse; font-size: 14px; }
+        td { padding: 10px 12px; border-bottom: 1px solid #e5e7eb; }
+        td:last-child { text-align: right; font-weight: 600; }
+        .total td { font-size: 16px; font-weight: 700; border-top: 2px solid #111; border-bottom: none; }
+        .disc td { color: #dc2626; }
+        .extra td:last-child { color: #7c3aed; }
+      </style></head><body>
+      <h2>Fechamento de ${fmtMonth(month)}</h2>
+      <div class="sub">${selectedEmp.name} · ${selectedEmp.role || ''} · ${selectedEmp.contract || 'CLT'}</div>
+      <table>
+        <tr><td>Salário base</td><td>${brl(salary)}</td></tr>
+        <tr class="extra"><td>Horas extras (${minutesToHM(extraMins)} × ${overtimePercent}% adicional)</td><td>+ ${brl(result.extraValue)}</td></tr>
+        ${discounts.map(d => `<tr class="disc"><td>${d.label}</td><td>− ${brl(Number(d.value))}</td></tr>`).join('')}
+        <tr class="total"><td>TOTAL</td><td>${brl(result.total)}</td></tr>
+      </table>
+      <p style="font-size:11px;color:#999;margin-top:32px">Gerado em ${new Date().toLocaleString('pt-BR')}</p>
+      <script>window.onload=()=>window.print()<\/script>
+      </body></html>`);
+    win.document.close();
+  }
+
+  const brl = v => v.toLocaleString('pt-BR', { style:'currency', currency:'BRL' });
+
+  return (
+    <div style={{ display:'flex', flexDirection:'column', gap:16, maxWidth:680 }}>
+
+      {/* Aviso se não houver funcionário */}
+      {!empId && (
+        <div style={{ padding:'20px 24px', background:'var(--surface)', border:'1px solid var(--line)', borderRadius:10, display:'flex', alignItems:'center', gap:12 }}>
+          <Icon name="user" size={18} style={{ color:'var(--muted)', flexShrink:0 }} />
+          <div>
+            <div style={{ fontWeight:600, fontSize:13.5, marginBottom:2 }}>Selecione um funcionário</div>
+            <div style={{ fontSize:12.5, color:'var(--muted)' }}>Use o filtro acima para escolher o funcionário que deseja calcular o fechamento.</div>
+          </div>
+        </div>
+      )}
+
+      {empId && (
+        <>
+          {/* Card do funcionário */}
+          <div style={{ padding:'16px 20px', background:'var(--surface)', border:'1px solid var(--line)', borderRadius:10 }}>
+            <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+              <Avatar name={selectedEmp?.name || ''} hue={selectedEmp?.hue ?? 215} size={40} />
+              <div>
+                <div style={{ fontWeight:700, fontSize:15 }}>{selectedEmp?.name}</div>
+                <div style={{ fontSize:12.5, color:'var(--muted)', marginTop:2 }}>
+                  {[selectedEmp?.role, selectedEmp?.dept, selectedEmp?.contract].filter(Boolean).join(' · ')}
+                </div>
+              </div>
+              {salary == null && (
+                <span className="pill warn" style={{ marginLeft:'auto', fontSize:11 }}>Salário não cadastrado</span>
+              )}
+            </div>
+          </div>
+
+          {salary == null ? (
+            <div style={{ padding:'24px', textAlign:'center', color:'var(--muted)', fontSize:13, background:'var(--surface)', border:'1px solid var(--line)', borderRadius:10 }}>
+              Cadastre o salário do funcionário na tela de Funcionários para usar a calculadora.
+            </div>
+          ) : (
+            <>
+              {/* Parâmetros do cálculo */}
+              <div style={{ padding:'16px 20px', background:'var(--surface)', border:'1px solid var(--line)', borderRadius:10 }}>
+                <div style={{ fontSize:11, fontWeight:700, color:'var(--muted)', textTransform:'uppercase', letterSpacing:0.6, marginBottom:12 }}>Parâmetros do cálculo</div>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+                  <div>
+                    <label style={{ fontSize:12, fontWeight:600, display:'block', marginBottom:4 }}>
+                      Adicional hora extra (%)
+                      <span style={{ fontSize:11, color:'var(--muted)', fontWeight:400, marginLeft:4 }}>CLT padrão: 50%</span>
+                    </label>
+                    <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                      <input
+                        type="number" min={0} max={200} step={5}
+                        className="field"
+                        value={overtimePercent}
+                        onChange={e => setOvertimePercent(Number(e.target.value))}
+                        style={{ width:90 }}
+                      />
+                      <div style={{ display:'flex', gap:4 }}>
+                        {[50, 75, 100].map(p => (
+                          <button key={p} className={`btn sm${overtimePercent===p?' primary':''}`} onClick={() => setOvertimePercent(p)}>{p}%</button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  <div>
+                    <label style={{ fontSize:12, fontWeight:600, display:'block', marginBottom:4 }}>
+                      Horas mensais (divisor)
+                      <span style={{ fontSize:11, color:'var(--muted)', fontWeight:400, marginLeft:4 }}>CLT: 220h</span>
+                    </label>
+                    <input
+                      type="number" min={1} max={300}
+                      className="field"
+                      value={workloadHours}
+                      onChange={e => setWorkloadHours(Number(e.target.value))}
+                      style={{ width:90 }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Breakdown */}
+              <div style={{ background:'var(--surface)', border:'1px solid var(--line)', borderRadius:10, overflow:'hidden' }}>
+                <div style={{ padding:'10px 20px', borderBottom:'1px solid var(--line)', fontSize:11, fontWeight:700, color:'var(--muted)', textTransform:'uppercase', letterSpacing:0.6 }}>
+                  Composição do fechamento — {fmtMonth(month)}
+                </div>
+                <div style={{ padding:'0 0 4px' }}>
+                  {/* Salário base */}
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'12px 20px', borderBottom:'1px solid var(--line-soft)' }}>
+                    <div>
+                      <div style={{ fontWeight:500, fontSize:13.5 }}>Salário base</div>
+                      <div style={{ fontSize:11.5, color:'var(--muted)', marginTop:1 }}>
+                        Valor/hora: {brl(result.hourlyRate)} (÷ {workloadHours}h mensais)
+                      </div>
+                    </div>
+                    <span style={{ fontWeight:700, fontSize:15 }}>{brl(salary)}</span>
+                  </div>
+
+                  {/* Horas extras */}
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'12px 20px', borderBottom:'1px solid var(--line-soft)' }}>
+                    <div>
+                      <div style={{ fontWeight:500, fontSize:13.5 }}>
+                        Horas extras
+                        {extraMins > 0 && <span style={{ marginLeft:8, fontSize:11.5, color:'#7c3aed', fontWeight:600 }}>{minutesToHM(extraMins)}</span>}
+                      </div>
+                      <div style={{ fontSize:11.5, color:'var(--muted)', marginTop:1 }}>
+                        {extraMins > 0
+                          ? `${brl(result.hourlyRate)} × ${(extraMins/60).toFixed(2)}h × ${100 + overtimePercent}%`
+                          : 'Nenhuma hora extra registrada neste período'}
+                      </div>
+                    </div>
+                    <span style={{ fontWeight:700, fontSize:15, color: result.extraValue > 0 ? '#7c3aed' : 'var(--muted)' }}>
+                      {result.extraValue > 0 ? `+ ${brl(result.extraValue)}` : '—'}
+                    </span>
+                  </div>
+
+                  {/* Descontos */}
+                  {discounts.map(d => (
+                    <div key={d.id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px 20px', borderBottom:'1px solid var(--line-soft)' }}>
+                      <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                        <span style={{ fontWeight:500, fontSize:13.5, color:'#dc2626' }}>{d.label}</span>
+                        <button className="btn ghost icon sm" onClick={() => removeDiscount(d.id)} title="Remover">
+                          <Icon name="x" size={12} />
+                        </button>
+                      </div>
+                      <span style={{ fontWeight:700, fontSize:15, color:'#dc2626' }}>− {brl(Number(d.value))}</span>
+                    </div>
+                  ))}
+
+                  {/* Adicionar desconto */}
+                  <div style={{ display:'flex', gap:8, padding:'10px 20px', borderBottom:'1px solid var(--line-soft)', alignItems:'center' }}>
+                    <Icon name="minus" size={13} style={{ color:'var(--muted)', flexShrink:0 }} />
+                    <input
+                      className="field"
+                      placeholder="Descrição do desconto"
+                      value={discLabel}
+                      onChange={e => setDiscLabel(e.target.value)}
+                      style={{ flex:1, height:32, fontSize:12.5 }}
+                      onKeyDown={e => e.key==='Enter' && addDiscount()}
+                    />
+                    <input
+                      className="field"
+                      type="number" min={0} step={0.01}
+                      placeholder="R$ 0,00"
+                      value={discValue}
+                      onChange={e => setDiscValue(e.target.value)}
+                      style={{ width:110, height:32, fontSize:12.5 }}
+                      onKeyDown={e => e.key==='Enter' && addDiscount()}
+                    />
+                    <button className="btn sm" onClick={addDiscount} disabled={!discLabel.trim()||!discValue}>
+                      <Icon name="plus" size={12} /> Adicionar
+                    </button>
+                  </div>
+
+                  {/* Total */}
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'14px 20px', background:'var(--surface-2)' }}>
+                    <span style={{ fontWeight:700, fontSize:15, textTransform:'uppercase', letterSpacing:0.3 }}>Total estimado</span>
+                    <span style={{ fontWeight:800, fontSize:22, letterSpacing:-0.5, color:'var(--brand)' }}>{brl(result.total)}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Exportar */}
+              <div style={{ display:'flex', justifyContent:'flex-end', gap:8 }}>
+                <button className="btn" onClick={exportPDF}>
+                  <Icon name="download" size={14} /> Exportar PDF
+                </button>
+              </div>
+            </>
+          )}
+        </>
+      )}
+    </div>
   );
 }
 
