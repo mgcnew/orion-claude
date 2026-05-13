@@ -860,6 +860,16 @@ export async function promoteUserToCompany(userId, companyId, role = 'Operaciona
   return { error };
 }
 
+// Remove acesso de um usuário a uma empresa
+export async function revokeUserCompany(userId, companyId) {
+  const { error } = await supabase
+    .from('user_companies')
+    .delete()
+    .eq('user_id', userId)
+    .eq('company_id', companyId);
+  return { error };
+}
+
 // Vincula employee.user_id após promoção/convite aceito
 export async function linkEmployeeUser(employeeId, userId) {
   const { error } = await supabase

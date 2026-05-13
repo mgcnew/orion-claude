@@ -26,6 +26,7 @@ import {
   findProfileByEmail,
   promoteUserToCompany,
   linkEmployeeUser,
+  revokeUserCompany,
 } from '../hooks/useEmployees.js';
 import { MODULES, ROLES, ROLE_TEMPLATES, usePermissions } from '../lib/permissions.jsx';
 import { SendInviteModal } from './Auth.jsx';
@@ -55,6 +56,7 @@ export function PermissionsScreen({ addToast, embedded, activeCompany: propCompa
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
   const [promoting, setPromoting] = useState(null);
+  const [revoking, setRevoking] = useState(false);
 
   const { employees: companyEmployees } = useEmployees({ companyId });
 
@@ -107,6 +109,18 @@ export function PermissionsScreen({ addToast, embedded, activeCompany: propCompa
     logAudit(companyId, 'EXCLUIU', `Convite: ${selectedInvite?.email}`);
     setActiveId(null);
     refetchInvites();
+  };
+
+  const handleRevoke = async () => {
+    if (!selected || !companyId) return;
+    setRevoking(true);
+    const { error } = await revokeUserCompany(selected.user_id, companyId);
+    setRevoking(false);
+    if (error) { addToast({ kind: 'warn', msg: 'Erro ao revogar acesso: ' + error.message }); return; }
+    logAudit(companyId, 'EXCLUIU', `Acesso revogado: ${selected.profile?.name ?? selected.user_id}`);
+    addToast({ kind: 'ok', msg: `Acesso de ${selected.profile?.name ?? 'usuário'} revogado.` });
+    setActiveId(null);
+    refetch();
   };
 
   const q = search.toLowerCase();
@@ -432,6 +446,15 @@ export function PermissionsScreen({ addToast, embedded, activeCompany: propCompa
                   </div>
                 ))}
               </div>
+              <div className="h-line" style={{ margin: '12px 0' }} />
+              <button
+                className="btn"
+                style={{ color: 'var(--bad)', borderColor: 'var(--bad)', fontSize: 13 }}
+                disabled={revoking}
+                onClick={handleRevoke}
+              >
+                <Icon name="x" size={14} /> {revoking ? 'Revogando…' : 'Revogar acesso ao sistema'}
+              </button>
             </div>
           ) : (
             <div className="card" style={{ padding: 48, textAlign: 'center', color: 'var(--muted)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
