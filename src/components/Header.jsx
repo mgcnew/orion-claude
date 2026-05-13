@@ -56,6 +56,8 @@ export default function Header({
   routeLabel,
   isAdmin,
   onInvite,
+  profile,
+  onOpenProfile,
 }) {
   const crumbs = buildCrumbs(route, routeLabel);
 
@@ -170,16 +172,27 @@ export default function Header({
         </button>
       </div>
 
-      <div
+      <button
         className="row gap-2 orion-userchip"
+        onClick={onOpenProfile}
         style={{
           paddingLeft: 10,
           borderLeft: '1px solid var(--line)',
           marginLeft: 2,
           flexShrink: 0,
+          background: 'none',
+          border: 'none',
+          borderLeft: '1px solid var(--line)',
+          cursor: 'pointer',
+          borderRadius: 8,
+          padding: '4px 8px 4px 10px',
+          transition: 'background .12s',
         }}
+        onMouseEnter={e => e.currentTarget.style.background = 'var(--hover)'}
+        onMouseLeave={e => e.currentTarget.style.background = 'none'}
+        title="Meu perfil"
       >
-        <Avatar name={userName || 'U'} size={30} hue={215} />
+        <Avatar name={userName || 'U'} size={30} hue={profile?.avatar_hue ?? 215} url={profile?.avatar_url ?? null} />
         <div className="orion-userchip-text" style={{ lineHeight: 1.15 }}>
           <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap' }}>
             {userName
@@ -190,7 +203,7 @@ export default function Header({
             {userEmail || ''}
           </div>
         </div>
-      </div>
+      </button>
     </header>
   );
 }

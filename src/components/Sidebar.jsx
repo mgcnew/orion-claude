@@ -69,7 +69,7 @@ function Logo({ collapsed }) {
   );
 }
 
-export default function Sidebar({ route, setRoute, collapsed, setCollapsed, userName, userEmail, isAdmin, onLogout, companies = [], activeCompany, setActiveCompany }) {
+export default function Sidebar({ route, setRoute, collapsed, setCollapsed, userName, userEmail, isAdmin, onLogout, companies = [], activeCompany, setActiveCompany, profile, onOpenProfile }) {
   const { can } = usePermissions();
   const [open, setOpen] = useState({
     employees: route.startsWith('employees'),
@@ -295,7 +295,7 @@ export default function Sidebar({ route, setRoute, collapsed, setCollapsed, user
             >
               <Icon name="chevron-right" size={16} />
             </button>
-            <Avatar name={userName || 'U'} size={30} hue={215} />
+            <Avatar name={userName || 'U'} size={30} hue={profile?.avatar_hue ?? 215} url={profile?.avatar_url ?? null} />
           </div>
         ) : (
           <div
@@ -305,9 +305,12 @@ export default function Sidebar({ route, setRoute, collapsed, setCollapsed, user
               borderRadius: 10,
               background: 'var(--surface-2)',
               border: '1px solid var(--line)',
+              cursor: onOpenProfile ? 'pointer' : 'default',
             }}
+            onClick={onOpenProfile}
+            title={onOpenProfile ? 'Meu perfil' : undefined}
           >
-            <Avatar name={userName || 'U'} size={32} hue={215} />
+            <Avatar name={userName || 'U'} size={32} hue={profile?.avatar_hue ?? 215} url={profile?.avatar_url ?? null} />
             <div className="grow" style={{ minWidth: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <span style={{

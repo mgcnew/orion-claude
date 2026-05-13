@@ -9,6 +9,7 @@ import CommandPalette from './components/CommandPalette.jsx';
 import NotificationsPanel from './components/NotificationsPanel.jsx';
 import Toasts from './components/Toasts.jsx';
 import TweaksPanel from './components/TweaksPanel.jsx';
+import ProfilePanel from './components/ProfilePanel.jsx';
 import Icon from './components/Icon.jsx';
 
 import { LoginScreen, InviteScreen, SendInviteModal, CompleteRegistrationScreen } from './screens/Auth.jsx';
@@ -55,6 +56,8 @@ export default function App() {
   const [toasts, setToasts] = useState([]);
   const [activeCompany, setActiveCompany] = useState(null); // null = todas as empresas
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [userProfile, setUserProfile] = useState(null);
   const { companies } = useCompanies();
 
   // Supabase auth state
@@ -62,12 +65,18 @@ export default function App() {
     supabase.auth.getSession().then(({ data: { session: s } }) => {
       setSession(s);
       setAuthLoading(false);
+      if (s?.user) {
+        supabase.from('profiles').select('*').eq('id', s.user.id).maybeSingle()
+          .then(({ data }) => { if (data) setUserProfile(data); });
+      }
     });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, s) => {
       setSession(s);
       setAuthLoading(false);
       if (event === 'SIGNED_IN' && s?.user) {
         logAudit(null, 'LOGIN', s.user.email);
+        supabase.from('profiles').select('*').eq('id', s.user.id).maybeSingle()
+          .then(({ data }) => { if (data) setUserProfile(data); });
       }
       if (event === 'USER_UPDATED') {
         setIsInviteFlow(false);
@@ -229,6 +238,8 @@ export default function App() {
         companies={companies}
         activeCompany={activeCompany}
         setActiveCompany={setActiveCompany}
+        profile={userProfile}
+        onOpenProfile={() => setProfileOpen(true)}
       />
       <main
         style={{
@@ -253,6 +264,8 @@ export default function App() {
           isAdmin={isAdmin}
           routeLabel={routeLabel}
           onInvite={() => setInviteOpen(true)}
+          profile={userProfile}
+          onOpenProfile={() => setProfileOpen(true)}
         />
         <div style={{ flex: 1, overflowY: 'auto' }} key={route.startsWith('settings') ? 'settings' : route}>
           {renderScreen()}
@@ -265,6 +278,12 @@ export default function App() {
         setRoute={(r) => setRoute(r)}
       />
       <NotificationsPanel open={notifOpen} onClose={() => setNotifOpen(false)} />
+      <ProfilePanel
+        open={profileOpen}
+        onClose={() => setProfileOpen(false)}
+        profile={userProfile}
+        onProfileUpdate={(updated) => setUserProfile(updated)}
+      />
 
       <Toasts toasts={toasts} />
 

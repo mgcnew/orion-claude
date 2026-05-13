@@ -1,4 +1,14 @@
-export default function Avatar({ name, size = 32, hue = 220 }) {
+export default function Avatar({ name = '', size = 32, hue = 220, url = null }) {
+  if (url) {
+    return (
+      <div style={{
+        width: size, height: size, borderRadius: '50%', flexShrink: 0,
+        overflow: 'hidden', boxShadow: '0 0 0 2px var(--surface)',
+      }}>
+        <img src={url} alt={name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      </div>
+    );
+  }
   const initials = name
     .split(' ')
     .filter(Boolean)
