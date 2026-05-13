@@ -265,7 +265,7 @@ function greeting(name) {
   const h = new Date().getHours();
   const period = h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite';
   const first = name?.split(' ')[0];
-  return first ? `${period}, ${first}` : period;
+  return first ? `${period}, ${first} 👋` : `${period} 👋`;
 }
 
 export default function Dashboard({ setRoute, addToast, activeCompany, userName }) {
