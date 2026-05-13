@@ -2025,9 +2025,195 @@ function EmpresasTab({ addToast }) {
 }
 
 // ============================================================
+// APARÊNCIA TAB
+// ============================================================
+const PRIMARY_PRESETS = [
+  { color: '#2A5BFF', name: 'Azul Orion'       },
+  { color: '#1E3A8A', name: 'Azul espacial'    },
+  { color: '#0EA5E9', name: 'Ciano'            },
+  { color: '#10B981', name: 'Verde corporativo'},
+  { color: '#7C3AED', name: 'Roxo'             },
+  { color: '#F97316', name: 'Laranja'          },
+  { color: '#E11D48', name: 'Vermelho'         },
+  { color: '#475569', name: 'Grafite'          },
+];
+
+function SettingRow({ label, description, children }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 24, padding: '18px 0', borderBottom: '1px solid var(--line-soft)' }}>
+      <div style={{ minWidth: 0 }}>
+        <div style={{ fontSize: 13.5, fontWeight: 600, marginBottom: 2 }}>{label}</div>
+        {description && <div style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.5 }}>{description}</div>}
+      </div>
+      <div style={{ flexShrink: 0 }}>{children}</div>
+    </div>
+  );
+}
+
+function SegControl({ options, value, onChange }) {
+  return (
+    <div style={{ display: 'flex', background: 'var(--surface-2)', border: '1px solid var(--line)', borderRadius: 8, padding: 3, gap: 2 }}>
+      {options.map(o => (
+        <button
+          key={o.value}
+          onClick={() => onChange(o.value)}
+          style={{
+            padding: '5px 14px', border: 'none', borderRadius: 6, fontSize: 12.5, fontWeight: 500, cursor: 'pointer',
+            background: value === o.value ? 'var(--surface)' : 'transparent',
+            color: value === o.value ? 'var(--ink)' : 'var(--muted)',
+            boxShadow: value === o.value ? '0 1px 3px rgba(0,0,0,.08)' : 'none',
+            transition: 'all .12s',
+          }}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function AparenciaTab({ tweaks, setTweak }) {
+  const [customColor, setCustomColor] = useState(tweaks.primary);
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+      {/* Tema */}
+      <div className="card" style={{ padding: '4px 24px 8px' }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', letterSpacing: 1, textTransform: 'uppercase', padding: '16px 0 4px' }}>Geral</div>
+        <SettingRow label="Tema" description="Alterna entre modo claro e escuro em toda a interface.">
+          <SegControl
+            value={tweaks.theme}
+            onChange={v => setTweak('theme', v)}
+            options={[{ value: 'light', label: '☀ Claro' }, { value: 'dark', label: '◑ Escuro' }]}
+          />
+        </SettingRow>
+        <SettingRow label="Tamanho do texto" description="Afeta o tamanho base das fontes em toda a plataforma.">
+          <SegControl
+            value={tweaks.fontSize}
+            onChange={v => setTweak('fontSize', v)}
+            options={[{ value: 'sm', label: 'Pequeno' }, { value: 'md', label: 'Padrão' }, { value: 'lg', label: 'Grande' }]}
+          />
+        </SettingRow>
+        <SettingRow label="Sidebar padrão" description="Define se a barra lateral inicia expandida ou colapsada.">
+          <SegControl
+            value={tweaks.sidebarDefault}
+            onChange={v => setTweak('sidebarDefault', v)}
+            options={[{ value: 'expanded', label: 'Expandida' }, { value: 'collapsed', label: 'Colapsada' }]}
+          />
+        </SettingRow>
+      </div>
+
+      {/* Cor primária */}
+      <div className="card" style={{ padding: '4px 24px 20px' }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', letterSpacing: 1, textTransform: 'uppercase', padding: '16px 0 4px' }}>Cor da marca</div>
+        <SettingRow
+          label="Cor primária"
+          description="Aplicada em botões, links, destaques e elementos interativos."
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <input
+              type="color"
+              value={tweaks.primary}
+              onChange={e => { setCustomColor(e.target.value); setTweak('primary', e.target.value); }}
+              style={{ width: 36, height: 36, border: '1px solid var(--line)', borderRadius: 8, cursor: 'pointer', padding: 2, background: 'var(--surface)' }}
+              title="Cor personalizada"
+            />
+            <span style={{ fontSize: 12, color: 'var(--muted)', fontFamily: 'monospace' }}>{tweaks.primary.toUpperCase()}</span>
+          </div>
+        </SettingRow>
+        <div style={{ paddingBottom: 4 }}>
+          <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 10 }}>Paletas predefinidas</div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {PRIMARY_PRESETS.map(p => (
+              <button
+                key={p.color}
+                title={p.name}
+                onClick={() => setTweak('primary', p.color)}
+                style={{
+                  width: 32, height: 32, borderRadius: 8, border: 'none',
+                  background: p.color, cursor: 'pointer',
+                  outline: tweaks.primary === p.color ? `3px solid ${p.color}` : 'none',
+                  outlineOffset: 2,
+                  boxShadow: tweaks.primary === p.color ? `0 0 0 1px var(--surface)` : '0 1px 3px rgba(0,0,0,.15)',
+                  transform: tweaks.primary === p.color ? 'scale(1.15)' : 'scale(1)',
+                  transition: 'transform .12s, outline .12s',
+                }}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Layout */}
+      <div className="card" style={{ padding: '4px 24px 8px' }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', letterSpacing: 1, textTransform: 'uppercase', padding: '16px 0 4px' }}>Layout</div>
+        <SettingRow
+          label="Raio dos cantos"
+          description={`Arredondamento dos elementos de interface. Atual: ${tweaks.radius}px`}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ display: 'flex', gap: 6 }}>
+              {[{ v: 4, l: 'Reto' }, { v: 10, l: 'Padrão' }, { v: 16, l: 'Redondo' }].map(o => (
+                <button
+                  key={o.v}
+                  onClick={() => setTweak('radius', o.v)}
+                  style={{
+                    padding: '5px 12px', border: '1px solid var(--line)', fontSize: 12, cursor: 'pointer',
+                    background: tweaks.radius === o.v ? 'var(--brand-tint)' : 'var(--surface-2)',
+                    color: tweaks.radius === o.v ? 'var(--brand)' : 'var(--muted)',
+                    fontWeight: tweaks.radius === o.v ? 600 : 400,
+                    borderRadius: o.v,
+                    transition: 'all .12s',
+                  }}
+                >
+                  {o.l}
+                </button>
+              ))}
+            </div>
+            <input
+              type="range" min={4} max={20} step={1}
+              value={tweaks.radius}
+              onChange={e => setTweak('radius', Number(e.target.value))}
+              style={{ width: 80, accentColor: 'var(--brand)' }}
+            />
+            <span style={{ fontSize: 12, color: 'var(--muted)', width: 32, textAlign: 'right', fontFamily: 'monospace' }}>{tweaks.radius}px</span>
+          </div>
+        </SettingRow>
+        <SettingRow label="Densidade" description="Controla o espaçamento entre elementos e o tamanho dos componentes.">
+          <SegControl
+            value={tweaks.density}
+            onChange={v => setTweak('density', v)}
+            options={[{ value: 'compact', label: 'Compacto' }, { value: 'comfortable', label: 'Confortável' }]}
+          />
+        </SettingRow>
+      </div>
+
+      {/* Preview */}
+      <div className="card" style={{ padding: 20 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 14 }}>Pré-visualização</div>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+          <button className="btn primary" style={{ gap: 6 }}><Icon name="plus" size={13} /> Novo item</button>
+          <button className="btn">Secundário</button>
+          <button className="btn ghost">Ghost</button>
+          <span className="pill good">Ativo</span>
+          <span className="pill warn">Pendente</span>
+          <span className="pill bad">Erro</span>
+          <div style={{ display: 'flex', gap: 6, marginTop: 8, width: '100%' }}>
+            <input className="input" placeholder="Campo de texto…" style={{ maxWidth: 220 }} readOnly />
+            <select className="input" style={{ maxWidth: 160 }}><option>Seletor</option></select>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  );
+}
+
+// ============================================================
 // SETTINGS (with Permissions as a tab)
 // ============================================================
-export function SettingsScreen({ initialTab, addToast, setRoute, activeCompany }) {
+export function SettingsScreen({ initialTab, addToast, setRoute, activeCompany, tweaks, setTweak }) {
   const [tab, setTab] = useState(initialTab || 'empresas');
   useEffect(() => {
     if (initialTab) setTab(initialTab);
@@ -2093,29 +2279,7 @@ export function SettingsScreen({ initialTab, addToast, setRoute, activeCompany }
 
       {tab === 'empresas' && <EmpresasTab addToast={addToast} />}
 
-      {tab === 'aparencia' && (
-        <div className="card" style={{ padding: 24 }}>
-          <h3 style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 700 }}>Aparência</h3>
-          <p style={{ margin: '0 0 16px', fontSize: 12.5, color: 'var(--muted)' }}>
-            Use o painel de <strong>Tweaks</strong> (canto inferior direito) para escolher cor
-            primária, modo claro/escuro e densidade.
-          </p>
-          <div
-            className="row gap-3"
-            style={{
-              padding: 14,
-              background: 'var(--surface-2)',
-              borderRadius: 10,
-              border: '1px solid var(--line-soft)',
-            }}
-          >
-            <Icon name="sparkle" size={18} style={{ color: 'var(--brand)' }} />
-            <div className="grow" style={{ fontSize: 13 }}>
-              Personalização disponível: cor primária, tema, raio dos cantos e densidade.
-            </div>
-          </div>
-        </div>
-      )}
+      {tab === 'aparencia' && tweaks && <AparenciaTab tweaks={tweaks} setTweak={setTweak} />}
 
       {tab === 'seguranca' && (
         <div className="card" style={{ padding: 24 }}>

@@ -31,10 +31,12 @@ import { useTweaks } from './hooks/useTweaks.js';
 import { darken, hexToRgba, isLight } from './lib/color.js';
 
 const TWEAK_DEFAULTS = {
-  primary: '#2A5BFF',
-  theme: 'light',
-  density: 'comfortable',
-  radius: 10,
+  primary:   '#2A5BFF',
+  theme:     'light',
+  density:   'comfortable',
+  radius:    10,
+  fontSize:  'md',
+  sidebarDefault: 'expanded',
 };
 
 export default function App() {
@@ -50,7 +52,7 @@ export default function App() {
   const [routeParam, setRouteParam] = useState(null);   // ex: employee UUID
   const [routeLabel, setRouteLabel] = useState(null);   // ex: employee name (para breadcrumb)
   const [routeIntent, setRouteIntent] = useState(null); // ex: 'new', 'upload', 'new-warn'
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(() => tweaks.sidebarDefault === 'collapsed');
   const [mobileOpen, setMobileOpen] = useState(false);
   const [cmdOpen, setCmdOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
@@ -96,7 +98,7 @@ export default function App() {
     document.documentElement.classList.toggle('dark', tweaks.theme === 'dark');
   }, [tweaks.theme]);
 
-  // Apply primary color + radius
+  // Apply primary color, radius & font size
   useEffect(() => {
     const root = document.documentElement.style;
     root.setProperty('--brand', tweaks.primary);
@@ -105,7 +107,9 @@ export default function App() {
     root.setProperty('--brand-ink', isLight(tweaks.primary) ? '#0B0D11' : '#FFFFFF');
     root.setProperty('--radius', tweaks.radius + 'px');
     root.setProperty('--radius-lg', tweaks.radius + 4 + 'px');
-  }, [tweaks.primary, tweaks.radius]);
+    const fz = tweaks.fontSize === 'sm' ? '13px' : tweaks.fontSize === 'lg' ? '15px' : '14px';
+    document.documentElement.style.setProperty('--font-size-base', fz);
+  }, [tweaks.primary, tweaks.radius, tweaks.fontSize]);
 
   // Cmd/Ctrl+K palette · ESC closes overlays
   useEffect(() => {
@@ -197,13 +201,13 @@ export default function App() {
     if (route.startsWith('time')) return <TimeScreen addToast={addToast} activeCompany={activeCompany} />;
     if (route === 'permissions' || route === 'settings-permissions')
       return (
-        <SettingsScreen initialTab="permissoes" addToast={addToast} setRoute={setRoute} activeCompany={activeCompany} />
+        <SettingsScreen initialTab="permissoes" addToast={addToast} setRoute={setRoute} activeCompany={activeCompany} tweaks={tweaks} setTweak={setTweak} />
       );
     if (route === 'audit') return <AuditScreen activeCompany={activeCompany} />;
     if (route === 'justice') return <JusticeScreen addToast={addToast} activeCompany={activeCompany} />;
     if (route === 'reports') return <ReportsScreen addToast={addToast} activeCompany={activeCompany} />;
     if (route === 'settings')
-      return <SettingsScreen addToast={addToast} setRoute={setRoute} activeCompany={activeCompany} />;
+      return <SettingsScreen addToast={addToast} setRoute={setRoute} activeCompany={activeCompany} tweaks={tweaks} setTweak={setTweak} />;
     if (route === 'rh' || route.startsWith('rh-'))
       return <RHScreen addToast={addToast} activeCompany={activeCompany} route={route} openModal={routeIntent === 'new-warn'} />;
     return <Dashboard setRoute={setRoute} addToast={addToast} />;
