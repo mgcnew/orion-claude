@@ -17,6 +17,8 @@ import {
   useCompanies,
   createCompany,
   updateCompany,
+  useAuditLog,
+  logAudit,
 } from '../hooks/useEmployees.js';
 
 // ============================================================
@@ -241,17 +243,39 @@ export function PermissionsScreen({ addToast, embedded }) {
 // ============================================================
 // AUDIT
 // ============================================================
-export function AuditScreen() {
-  const actionColor = {
-    EDITOU: 'info',
-    UPLOAD: 'info',
-    ACESSOU: '',
-    GEROU: 'ok',
-    EXPORT: 'warn',
-    LOGIN: '',
-    EXCLUIU: 'bad',
-    ASSINOU: 'ok',
-  };
+const ACTION_COLOR = {
+  EDITOU: 'info', UPLOAD: 'info', ACESSOU: '', GEROU: 'ok',
+  EXPORT: 'warn', LOGIN: '', EXCLUIU: 'bad', ASSINOU: 'ok', CRIOU: 'ok',
+};
+const DAYS_OPTIONS = [
+  { label: 'Hoje',         value: 1 },
+  { label: 'Últimos 7 dias', value: 7 },
+  { label: '30 dias',      value: 30 },
+  { label: 'Trimestre',    value: 90 },
+];
+
+export function AuditScreen({ activeCompany }) {
+  const [days, setDays] = useState(30);
+  const [q, setQ]       = useState('');
+  const { logs, loading, refetch } = useAuditLog({ companyId: activeCompany?.id, days });
+
+  const today = new Date().toDateString();
+  const filtered = q
+    ? logs.filter(l => [l.who, l.action, l.target].join(' ').toLowerCase().includes(q.toLowerCase()))
+    : logs;
+
+  const todayCount   = logs.filter(l => new Date(l.created_at).toDateString() === today).length;
+  const uniqueActors = new Set(logs.map(l => l.who)).size;
+  const exportCount  = logs.filter(l => l.action === 'EXPORT').length;
+  const deleteCount  = logs.filter(l => l.action === 'EXCLUIU').length;
+
+  const kpis = [
+    { l: 'Eventos no período', v: logs.length,    k: '' },
+    { l: 'Eventos hoje',       v: todayCount,      k: '' },
+    { l: 'Atores únicos',      v: uniqueActors,    k: '' },
+    { l: 'Exportações',        v: exportCount,     k: exportCount > 0 ? 'warn' : '' },
+    { l: 'Exclusões',          v: deleteCount,     k: deleteCount > 0 ? 'bad'  : '' },
+  ];
 
   return (
     <div className="fade-up" style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -265,112 +289,97 @@ export function AuditScreen() {
           </p>
         </div>
         <div className="row gap-2">
-          <select className="field" style={{ width: 160, height: 36 }}>
-            <option>Últimos 7 dias</option>
-            <option>30 dias</option>
-            <option>Trimestre</option>
+          <input
+            className="field"
+            style={{ width: 200, height: 36 }}
+            placeholder="Buscar por usuário, ação…"
+            value={q}
+            onChange={e => setQ(e.target.value)}
+          />
+          <select
+            className="field"
+            style={{ width: 160, height: 36 }}
+            value={days}
+            onChange={e => { setDays(Number(e.target.value)); }}
+          >
+            {DAYS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
-          <button className="btn">
-            <Icon name="filter" size={14} /> Filtros
-          </button>
-          <button className="btn">
-            <Icon name="download" size={14} /> Exportar log
+          <button className="btn" onClick={refetch}>
+            <Icon name="refresh" size={14} />
           </button>
         </div>
       </div>
 
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
-          gap: 12,
-        }}
-      >
-        {[
-          { l: 'Eventos hoje', v: '1.247', k: '' },
-          { l: 'Acessos únicos', v: '84', k: '' },
-          { l: 'Exportações', v: '12', k: 'warn' },
-          { l: 'Exclusões', v: '3', k: 'bad' },
-          { l: 'Edições críticas', v: '7', k: 'info' },
-          { l: 'Tentativas falhas', v: '2', k: 'warn' },
-        ].map((s, i) => (
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
+        {kpis.map((s, i) => (
           <div key={i} className="card" style={{ padding: 14 }}>
-            <div
-              style={{
-                fontSize: 11,
-                color: 'var(--muted)',
-                textTransform: 'uppercase',
-                letterSpacing: 0.6,
-                fontWeight: 600,
-              }}
-            >
+            <div style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.6, fontWeight: 600 }}>
               {s.l}
             </div>
             <div className="row" style={{ marginTop: 6, alignItems: 'baseline', gap: 8 }}>
               <div className="mono" style={{ fontSize: 22, fontWeight: 700 }}>
-                {s.v}
+                {loading ? '—' : s.v}
               </div>
-              {s.k && (
-                <span className={`pill ${s.k}`} style={{ fontSize: 10 }}>
-                  •
-                </span>
-              )}
+              {s.k && <span className={`pill ${s.k}`} style={{ fontSize: 10 }}>•</span>}
             </div>
           </div>
         ))}
       </div>
 
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13.5 }}>
-          <thead>
-            <tr
-              style={{
-                background: 'var(--surface-2)',
-                color: 'var(--muted)',
-                fontSize: 11,
-                textTransform: 'uppercase',
-                letterSpacing: 0.6,
-              }}
-            >
-              <th style={{ textAlign: 'left', padding: '10px 16px', fontWeight: 600 }}>Quando</th>
-              <th style={{ textAlign: 'left', padding: '10px 16px', fontWeight: 600 }}>Quem</th>
-              <th style={{ textAlign: 'left', padding: '10px 16px', fontWeight: 600 }}>Ação</th>
-              <th style={{ textAlign: 'left', padding: '10px 16px', fontWeight: 600 }}>Alvo</th>
-              <th style={{ textAlign: 'left', padding: '10px 16px', fontWeight: 600 }}>IP</th>
-              <th style={{ textAlign: 'left', padding: '10px 16px', fontWeight: 600 }}>Dispositivo</th>
-            </tr>
-          </thead>
-          <tbody>
-            {D.auditLog.map((l, i) => (
-              <tr key={i} style={{ borderTop: '1px solid var(--line-soft)' }}>
-                <td style={{ padding: '10px 16px' }} className="mono">
-                  {l.when}
-                </td>
-                <td style={{ padding: '10px 16px' }}>
-                  <div className="row gap-2">
-                    <Avatar name={l.who} size={26} hue={i * 60 + 30} />
-                    <span style={{ fontWeight: 500 }}>{l.who}</span>
-                  </div>
-                </td>
-                <td style={{ padding: '10px 16px' }}>
-                  <span
-                    className={`pill ${actionColor[l.action] || ''}`}
-                    style={{ fontFamily: 'JetBrains Mono', fontSize: 10.5 }}
-                  >
-                    {l.action}
-                  </span>
-                </td>
-                <td style={{ padding: '10px 16px' }}>{l.target}</td>
-                <td style={{ padding: '10px 16px' }} className="mono">
-                  <span style={{ color: 'var(--muted)' }}>{l.ip}</span>
-                </td>
-                <td style={{ padding: '10px 16px' }}>
-                  <span style={{ color: 'var(--muted)', fontSize: 12 }}>{l.device}</span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        {loading ? (
+          <div style={{ padding: 40, display: 'flex', justifyContent: 'center' }}>
+            <div className="spinner" />
+          </div>
+        ) : filtered.length === 0 ? (
+          <div style={{ padding: '48px 20px', textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>
+            {q ? 'Nenhum evento encontrado para essa busca.' : 'Nenhum evento de auditoria no período.'}
+          </div>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <thead>
+                <tr style={{ background: 'var(--surface-2)', color: 'var(--muted)', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.6 }}>
+                  <th style={{ textAlign: 'left', padding: '10px 16px', fontWeight: 600, whiteSpace: 'nowrap' }}>Quando</th>
+                  <th style={{ textAlign: 'left', padding: '10px 16px', fontWeight: 600 }}>Quem</th>
+                  <th style={{ textAlign: 'left', padding: '10px 16px', fontWeight: 600 }}>Ação</th>
+                  <th style={{ textAlign: 'left', padding: '10px 16px', fontWeight: 600 }}>Alvo</th>
+                  <th style={{ textAlign: 'left', padding: '10px 16px', fontWeight: 600 }}>IP</th>
+                  <th style={{ textAlign: 'left', padding: '10px 16px', fontWeight: 600 }}>Dispositivo</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((l, i) => (
+                  <tr key={l.id} style={{ borderTop: '1px solid var(--line-soft)' }}
+                    onMouseEnter={e => e.currentTarget.style.background = 'var(--hover)'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                    <td style={{ padding: '10px 16px', fontFamily: 'monospace', fontSize: 12, whiteSpace: 'nowrap', color: 'var(--muted)' }}>
+                      {new Date(l.created_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                    </td>
+                    <td style={{ padding: '10px 16px' }}>
+                      <div className="row gap-2">
+                        <Avatar name={l.who || '?'} size={26} hue={i * 60 + 30} />
+                        <span style={{ fontWeight: 500 }}>{l.who || '—'}</span>
+                      </div>
+                    </td>
+                    <td style={{ padding: '10px 16px' }}>
+                      <span className={`pill ${ACTION_COLOR[l.action] || ''}`} style={{ fontFamily: 'monospace', fontSize: 10.5 }}>
+                        {l.action}
+                      </span>
+                    </td>
+                    <td style={{ padding: '10px 16px', color: 'var(--ink-soft)' }}>{l.target || '—'}</td>
+                    <td style={{ padding: '10px 16px', fontFamily: 'monospace', fontSize: 12 }}>
+                      <span style={{ color: 'var(--muted)' }}>{l.ip || '—'}</span>
+                    </td>
+                    <td style={{ padding: '10px 16px' }}>
+                      <span style={{ color: 'var(--muted)', fontSize: 12 }}>{l.device || '—'}</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -800,18 +809,18 @@ function FilterModal({ report, filters, setFilters, employees, depts, companies,
   );
 }
 
-export function ReportsScreen({ addToast }) {
+export function ReportsScreen({ addToast, activeCompany }) {
   const [selectedId, setSelectedId]     = useState('headcount');
   const [filters, setFilters]           = useState({});
   const [history, setHistory]           = useState([]);
   const [catalogOpen, setCatalogOpen]   = useState(true);
   const [filterModalOpen, setFilterModalOpen] = useState(false);
 
-  const { employees, loading: empLoading } = useEmployees();
-  const { warnings,  loading: warnLoading } = useAllWarnings();
-  const { vacations, loading: vacLoading  } = useAllVacations();
-  const { documents, loading: docLoading  } = useAllDocuments();
-  const { timecards, loading: tcLoading   } = useAllTimecards();
+  const { employees, loading: empLoading } = useEmployees({ companyId: activeCompany?.id });
+  const { warnings,  loading: warnLoading } = useAllWarnings(activeCompany?.id);
+  const { vacations, loading: vacLoading  } = useAllVacations(activeCompany?.id);
+  const { documents, loading: docLoading  } = useAllDocuments(activeCompany?.id);
+  const { timecards, loading: tcLoading   } = useAllTimecards(activeCompany?.id);
 
   const loading = empLoading || warnLoading || vacLoading || docLoading || tcLoading;
   const selected = ALL_REPORTS.find(r => r.id === selectedId);
@@ -1961,15 +1970,15 @@ export function SettingsScreen({ initialTab, addToast, setRoute }) {
 // ============================================================
 // RH - WARNINGS (ADVERTÊNCIAS)
 // ============================================================
-export function WarningsScreen({ addToast }) {
+export function WarningsScreen({ addToast, activeCompany }) {
   const [filter, setFilter] = useState('todas');
   const [q, setQ] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [newWarn, setNewWarn] = useState({ employee_id: '', type: 'Advertência verbal', severity: 'verbal', description: '' });
   const [saving, setSaving] = useState(false);
 
-  const { warnings: allWarnings, loading, refetch } = useAllWarnings();
-  const { employees: activeEmployees } = useEmployees({ status: 'ativo' });
+  const { warnings: allWarnings, loading, refetch } = useAllWarnings(activeCompany?.id);
+  const { employees: activeEmployees } = useEmployees({ status: 'ativo', companyId: activeCompany?.id });
 
   const typeLabel = { verbal: 'Verbal', escrita: 'Escrita', suspensao: 'Suspensão' };
   const typeKind  = { verbal: 'warn', escrita: 'bad', suspensao: 'bad' };
@@ -2182,6 +2191,8 @@ export function WarningsScreen({ addToast }) {
                   if (error) {
                     addToast({ kind: 'warn', msg: 'Erro: ' + error.message });
                   } else {
+                    const empName = employees.find(e => e.id === newWarn.employee_id)?.name || newWarn.employee_id;
+                    logAudit(activeCompany?.id, 'CRIOU', `Advertência: ${empName}`);
                     setShowModal(false);
                     addToast({ kind: 'ok', msg: 'Advertência registrada com sucesso!' });
                     setNewWarn({ employee_id: '', type: 'Advertência verbal', severity: 'verbal', description: '' });
@@ -2202,10 +2213,10 @@ export function WarningsScreen({ addToast }) {
 // ============================================================
 // RH - VACATIONS (FÉRIAS)
 // ============================================================
-export function VacationScreen({ addToast }) {
+export function VacationScreen({ addToast, activeCompany }) {
   const [filter, setFilter] = useState('todas');
-  const { vacations: allVacations, loading, refetch } = useAllVacations();
-  const { employees } = useEmployees();
+  const { vacations: allVacations, loading, refetch } = useAllVacations(activeCompany?.id);
+  const { employees } = useEmployees({ companyId: activeCompany?.id });
   const activeEmployees = employees.filter((e) => e.status === 'ativo');
 
   const [showModal, setShowModal] = useState(false);
@@ -2214,15 +2225,16 @@ export function VacationScreen({ addToast }) {
   const [docs, setDocs] = useState([]);
 
   const approve = async (id) => {
+    const empName = allVacations.find(v => v.id === id)?.employees?.name || id;
     const { error } = await updateVacationStatus(id, 'aprovado');
     if (error) addToast({ kind: 'warn', msg: 'Erro: ' + error.message });
-    else { addToast({ kind: 'ok', msg: 'Férias aprovadas' }); refetch(); }
+    else { logAudit(activeCompany?.id, 'EDITOU', `Férias aprovadas: ${empName}`); addToast({ kind: 'ok', msg: 'Férias aprovadas' }); refetch(); }
   };
   const reject = async (id) => {
-
+    const empName = allVacations.find(v => v.id === id)?.employees?.name || id;
     const { error } = await updateVacationStatus(id, 'recusado');
     if (error) addToast({ kind: 'warn', msg: 'Erro: ' + error.message });
-    else { addToast({ kind: 'warn', msg: 'Férias recusadas' }); refetch(); }
+    else { logAudit(activeCompany?.id, 'EDITOU', `Férias recusadas: ${empName}`); addToast({ kind: 'warn', msg: 'Férias recusadas' }); refetch(); }
   };
 
   const statusKind = { aprovado: 'ok', pendente: 'warn', concluído: 'info', concluido: 'info', recusado: 'bad' };
@@ -2520,6 +2532,8 @@ export function VacationScreen({ addToast }) {
                         addToast({ kind: 'warn', msg: 'Aviso: Erro ao anexar documentos.' });
                       }
                     }
+                    const empName = activeEmployees.find(e => e.id === newVacation.employee_id)?.name || newVacation.employee_id;
+                    logAudit(activeCompany?.id, 'CRIOU', `Férias: ${empName}`);
                     setShowModal(false);
                     setSaving(false);
                     addToast({ kind: 'ok', msg: 'Solicitação registrada com sucesso!' });

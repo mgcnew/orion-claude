@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import Icon from '../components/Icon.jsx';
-import { useAllDocuments, useEmployees } from '../hooks/useEmployees.js';
+import { useAllDocuments, useEmployees, logAudit } from '../hooks/useEmployees.js';
 import { supabase } from '../lib/supabase.js';
 
 const CATEGORIES = [
@@ -109,7 +109,7 @@ function FileIcon({ type, color, size = 32 }) {
 // ============================================================
 // MODAL — Adicionar Documento (com "Adicionar e continuar")
 // ============================================================
-function AddDocModal({ onClose, onSaved, employees = [] }) {
+function AddDocModal({ onClose, onSaved, employees = [], companyId = null }) {
   const [step, setStep]     = useState('category');
   const [cat, setCat]       = useState(null);
   const [form, setForm]     = useState({ name: '', doc_date: '', employee_id: '', file: null });
@@ -155,6 +155,7 @@ function AddDocModal({ onClose, onSaved, employees = [] }) {
 
     const row = {
       employee_id:  form.employee_id || null,
+      company_id:   companyId,
       name:         form.name.trim(),
       category:     cat,
       doc_date:     form.doc_date || null,
@@ -169,6 +170,7 @@ function AddDocModal({ onClose, onSaved, employees = [] }) {
     const { error } = await supabase.from('documents').insert(row);
     setSaving(false);
     if (error) { alert('Erro: ' + error.message); return false; }
+    logAudit(companyId, 'UPLOAD', `Documento: ${form.name.trim()}`);
     onSaved?.();
     return true;
   };
@@ -417,11 +419,10 @@ export default function DocumentsScreen({ addToast, activeCompany }) {
   const [filterRect, setFilterRect]     = useState(null);
   const filterBtnRef = useRef();
 
-  const { documents: raw, loading, error, refetch } = useAllDocuments();
+  const { documents: raw, loading, error, refetch } = useAllDocuments(activeCompany?.id);
   const { employees } = useEmployees({ companyId: activeCompany?.id });
 
   const docs = raw
-    .filter(d => !activeCompany || d.employees?.company_id === activeCompany.id || (!d.employee_id))
     .map(d => ({
       id: d.id,
       name: d.name,
@@ -621,6 +622,7 @@ export default function DocumentsScreen({ addToast, activeCompany }) {
       {showAddModal && (
         <AddDocModal
           employees={employees}
+          companyId={activeCompany?.id ?? null}
           onClose={() => setShowAddModal(false)}
           onSaved={() => { refetch(); addToast({ kind: 'ok', msg: 'Documento adicionado' }); }}
         />

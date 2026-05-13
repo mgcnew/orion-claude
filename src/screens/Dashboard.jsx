@@ -116,7 +116,7 @@ function formatDatePtBR(date) {
   return `${days[date.getDay()]}, ${date.getDate()} de ${months[date.getMonth()]} de ${date.getFullYear()}`;
 }
 
-export function useDashboardData() {
+export function useDashboardData(companyId) {
   const [data, setData] = useState({
     counts: { ativo: 0, férias: 0, afastado: 0, desligado: 0 },
     totalEmployees: 0,
@@ -138,6 +138,9 @@ export function useDashboardData() {
       const currentMonth = today.getMonth();
       const currentYear = today.getFullYear();
 
+      let empQuery = supabase.from('employees').select('*');
+      if (companyId) empQuery = empQuery.eq('company_id', companyId);
+
       const [
         { data: employees },
         { data: documents },
@@ -146,13 +149,15 @@ export function useDashboardData() {
         { data: activities },
         { data: onboardingPending }
       ] = await Promise.all([
-        supabase.from('employees').select('*'),
+        empQuery,
         supabase.from('documents').select('*'),
         supabase.from('employee_warnings').select('*, employees(name)'),
         supabase.from('employee_vacations').select('*, employees(name)'),
         supabase.from('activities').select('*').order('created_at', { ascending: false }).limit(10),
-        supabase.from('onboarding_docs').select('id').eq('status', 'pending')
+        supabase.from('onboarding_docs').select('id, employee_id').eq('status', 'pending')
       ]);
+
+      const employeeIds = new Set((employees ?? []).map(e => e.id));
 
       // Calculate employee counts
       const statusCounts = { ativo: 0, férias: 0, afastado: 0, desligado: 0 };
@@ -163,15 +168,21 @@ export function useDashboardData() {
       });
       const totalEmployees = employees?.length || 0;
 
-      // Pending documents (regular + onboarding checklist)
-      const pendingDocs = documents?.filter(d => d.status === 'pendente' || d.status === 'warn') || [];
-      const pendingDocsCount = pendingDocs.length + (onboardingPending?.length ?? 0);
+      // Pending documents (regular + onboarding checklist), filtered by company if needed
+      const pendingDocs = (documents ?? []).filter(d =>
+        (d.status === 'pendente' || d.status === 'warn') && (!companyId || employeeIds.has(d.employee_id))
+      );
+      const pendingOnboarding = (onboardingPending ?? []).filter(d =>
+        !companyId || employeeIds.has(d.employee_id)
+      );
+      const pendingDocsCount = pendingDocs.length + pendingOnboarding.length;
 
-      // Warnings this month
-      const warningsThisMonth = warnings?.filter(w => {
+      // Warnings this month, filtered by company if needed
+      const warningsThisMonth = (warnings ?? []).filter(w => {
+        if (companyId && !employeeIds.has(w.employee_id)) return false;
         const d = new Date(w.date);
         return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
-      }) || [];
+      });
       const warningsCount = warningsThisMonth.length;
 
       // Admissions/Absences Series (last 12 months)
@@ -224,7 +235,9 @@ export function useDashboardData() {
       if (warningsCount > 0) {
         alerts.push({ kind: 'bad', icon: 'alert', title: `${warningsCount} advertências recentes`, sub: 'Atenção necessária' });
       }
-      const vacationsPending = vacations?.filter(v => v.status === 'pendente') || [];
+      const vacationsPending = (vacations ?? []).filter(v =>
+        v.status === 'pendente' && (!companyId || employeeIds.has(v.employee_id))
+      );
       if (vacationsPending.length > 0) {
         alerts.push({ kind: 'info', icon: 'umbrella', title: `${vacationsPending.length} solicitações de férias`, sub: 'Aprovação pendente' });
       }
@@ -243,13 +256,13 @@ export function useDashboardData() {
       setLoading(false);
     }
     fetchData();
-  }, []);
+  }, [companyId]);
 
   return { data, loading };
 }
 
-export default function Dashboard({ setRoute, addToast }) {
-  const { data, loading } = useDashboardData();
+export default function Dashboard({ setRoute, addToast, activeCompany }) {
+  const { data, loading } = useDashboardData(activeCompany?.id);
   const today = new Date();
   
   // Last 12 months array for chart labels

@@ -2,7 +2,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import Icon from '../components/Icon.jsx';
 import Avatar from '../components/Avatar.jsx';
-import { useEmployees, useEmployee, useEmployeeCounts, useEmployeeWarnings, useEmployeeVacations, useEmployeeDocuments, useEmployeeHistory, useEmployeeTimeEntries, clockIn, clockOut, createEmployee, updateEmployee, updateEmployeeStatus, createDocuments, useCompanies, useOnboardingDocs, createOnboardingDocs, markOnboardingDocUploaded, useAllPendingOnboarding } from '../hooks/useEmployees.js';
+import { useEmployees, useEmployee, useEmployeeCounts, useEmployeeWarnings, useEmployeeVacations, useEmployeeDocuments, useEmployeeHistory, useEmployeeTimeEntries, clockIn, clockOut, createEmployee, updateEmployee, updateEmployeeStatus, createDocuments, useCompanies, useOnboardingDocs, createOnboardingDocs, markOnboardingDocUploaded, useAllPendingOnboarding, logAudit } from '../hooks/useEmployees.js';
 import { supabase } from '../lib/supabase.js';
 
 // ── Checklist de admissão ─────────────────────────────────────
@@ -188,6 +188,7 @@ export function NewEmployeeModal({ onClose, onCreated }) {
     setSaving(true);
     const payload = {
       name: form.name, role: form.role, dept: form.dept, company: form.company,
+      company_id: form.company_id || null,
       contract: form.contract, admission: form.admission,
       salary: form.salary ? parseFloat(form.salary) : null,
       cost_center: form.cost_center, workload: form.workload, regime: form.regime,
@@ -200,6 +201,7 @@ export function NewEmployeeModal({ onClose, onCreated }) {
     const { created, error } = await createEmployee(payload);
     if (error) { setSaving(false); alert('Erro ao salvar: ' + error.message); return; }
     if (created) {
+      logAudit(created.company_id, 'CRIOU', `Funcionário: ${created.name}`);
       const { data: { user } } = await supabase.auth.getUser();
       if (docFiles.length > 0) {
         await createDocuments(
@@ -211,6 +213,7 @@ export function NewEmployeeModal({ onClose, onCreated }) {
             type: f.type?.includes('image') ? 'image' : 'pdf',
           })),
           user?.id ?? null,
+          form.company_id || null,
         );
       }
       if (form.generate_checklist) {
@@ -591,6 +594,7 @@ export function AfastamentoModal({ employee, onClose, onSaved }) {
     const { error } = await updateEmployeeStatus(employee.id, 'afastado');
     setSaving(false);
     if (error) { alert('Erro: ' + error.message); return; }
+    logAudit(employee.company_id, 'EDITOU', `Afastamento: ${employee.name}`);
     onSaved?.();
     onClose();
   };
@@ -652,6 +656,7 @@ export function DesligamentoModal({ employee, onClose, onSaved }) {
     const { error } = await updateEmployeeStatus(employee.id, 'desligado');
     setSaving(false);
     if (error) { alert('Erro: ' + error.message); return; }
+    logAudit(employee.company_id, 'EXCLUIU', `Desligamento: ${employee.name}`);
     onSaved?.();
     onClose();
   };
@@ -719,6 +724,7 @@ export function ReativacaoModal({ employee, onClose, onSaved }) {
     const { error } = await updateEmployeeStatus(employee.id, 'ativo');
     setSaving(false);
     if (error) { alert('Erro: ' + error.message); return; }
+    logAudit(employee.company_id, 'EDITOU', `Reativação: ${employee.name}`);
     onSaved?.();
     onClose();
   };
@@ -966,7 +972,7 @@ export function EmployeesList({ setRoute, setRouteParam, setRouteLabel, companyI
   const [filterRect, setFilterRect] = useState(null);
   const filterBtnRef = useRef();
 
-  const { counts, refetch: refetchCounts } = useEmployeeCounts();
+  const { counts, refetch: refetchCounts } = useEmployeeCounts(companyId);
   const { employees: filtered, loading, refetch } = useEmployees({
     status: filters.status !== 'todos' ? filters.status : undefined,
     search: q || undefined,
@@ -1463,6 +1469,7 @@ function EditEmployeeModal({ employee, onClose, onSaved }) {
     });
     setSaving(false);
     if (error) { alert('Erro ao salvar: ' + error.message); return; }
+    logAudit(employee.company_id, 'EDITOU', `Funcionário: ${form.name}`);
     onSaved?.();
     onClose();
   };

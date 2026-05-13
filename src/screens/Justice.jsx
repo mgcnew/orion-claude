@@ -1,14 +1,19 @@
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import Icon from '../components/Icon.jsx';
 import Avatar from '../components/Avatar.jsx';
 import OrionGlyph from '../components/OrionGlyph.jsx';
-import { useEmployees, useAllWarnings, useAllVacations, useAllDocuments, useAllTimecards } from '../hooks/useEmployees.js';
+import {
+  useEmployees, useAllWarnings, useAllVacations, useAllDocuments, useAllTimecards,
+  useLaborCases, createLaborCase, updateLaborCase,
+  useJusticeHistory, createJusticeHistoryEntry,
+  logAudit,
+} from '../hooks/useEmployees.js';
+import { supabase } from '../lib/supabase.js';
 
 // ── helpers ──────────────────────────────────────────────────
 const fmtDate = (d) => d ? new Date(d + 'T00:00').toLocaleDateString('pt-BR') : '—';
 const isUrgent = (d) => { if (!d) return false; const diff = new Date(d + 'T00:00') - Date.now(); return diff >= 0 && diff < 7 * 86400000; };
 
-// ── mock data ─────────────────────────────────────────────────
 const JUSTICE_TEMPLATES = [
   { id: 'ato-admissao', title: 'Termo de admissão',          cat: 'Contratos',     pages: 3, icon: 'user' },
   { id: 'rescisao',     title: 'Termo de rescisão (TRCT)',   cat: 'Rescisões',     pages: 4, icon: 'x' },
@@ -22,55 +27,7 @@ const JUSTICE_TEMPLATES = [
   { id: 'preposto',     title: 'Carta de preposição',        cat: 'Processos',     pages: 1, icon: 'scale' },
 ];
 
-const PROCESSES_MOCK = [
-  {
-    id: 1, num: '0021345-67.2025.5.02.0042', autor: 'Carlos Mendes Souza',
-    vara: '42ª VT — São Paulo/SP', fase: 'Audiência', status: 'warn',
-    proxima: '2026-05-21', responsavel: 'Dra. Ana Lima', criado_por: 'Mariana Oliveira',
-    criado_em: '2025-08-14', pedidos: 'Horas extras, FGTS, rescisão indireta',
-    valor_causa: 'R$ 48.000,00',
-    notas: [
-      { autor: 'Mariana O.', data: '2026-04-10', texto: 'Preposto designado: João Costa.' },
-      { autor: 'Dra. Ana Lima', data: '2026-04-28', texto: 'Documentos de ponto encaminhados ao escritório.' },
-    ],
-    docs: ['Cartão ponto — 2024', 'Advertência formal — 03/2024', 'CTPS — página de contrato'],
-  },
-  {
-    id: 2, num: '0019874-22.2025.5.02.0011', autor: 'Patrícia A. Lima',
-    vara: '11ª VT — São Paulo/SP', fase: 'Sentença', status: 'info',
-    proxima: null, responsavel: 'Dr. Paulo Ferreira', criado_por: 'Mariana Oliveira',
-    criado_em: '2025-07-03', pedidos: 'Diferenças salariais, 13º proporcional',
-    valor_causa: 'R$ 12.500,00',
-    notas: [{ autor: 'Dr. Paulo Ferreira', data: '2026-03-15', texto: 'Defesa apresentada. Aguardando sentença.' }],
-    docs: ['Contracheques 2024', 'Contrato de trabalho'],
-  },
-  {
-    id: 3, num: '0017650-09.2024.5.02.0028', autor: 'Roberto F. Andrade',
-    vara: '28ª VT — São Paulo/SP', fase: 'Encerrado', status: 'ok',
-    proxima: null, responsavel: 'Dra. Ana Lima', criado_por: 'Mariana Oliveira',
-    criado_em: '2024-09-22', pedidos: 'Aviso prévio, seguro desemprego',
-    valor_causa: 'R$ 8.200,00',
-    notas: [{ autor: 'Dra. Ana Lima', data: '2025-01-10', texto: 'Acordo homologado. Processo encerrado.' }],
-    docs: ['TRCT assinado', 'Acordo extrajudicial'],
-  },
-  {
-    id: 4, num: '0024112-44.2026.5.02.0008', autor: 'Joana M. Carvalho',
-    vara: '08ª VT — Guarulhos/SP', fase: 'Notificação', status: 'bad',
-    proxima: '2026-05-12', responsavel: 'Dr. Paulo Ferreira', criado_por: 'Mariana Oliveira',
-    criado_em: '2026-04-30', pedidos: 'Assédio moral, danos morais',
-    valor_causa: 'R$ 90.000,00',
-    notas: [{ autor: 'Mariana O.', data: '2026-05-01', texto: 'Prazo curto para resposta. Prioridade máxima.' }],
-    docs: [],
-  },
-];
-
-const HISTORY_MOCK = [
-  { id: 1, d: '08/05/2026', t: 'Termo de admissão',    f: 'Beatriz Almeida',  e: 'Mariana O.', s: 'Assinado',   k: 'ok',   proc: '—' },
-  { id: 2, d: '06/05/2026', t: 'Advertência formal',   f: 'Lucas Fonseca',    e: 'Mariana O.', s: 'Pendente',   k: 'warn', proc: '—' },
-  { id: 3, d: '04/05/2026', t: 'Aviso de férias',      f: 'Patrícia A. Lima', e: 'Mariana O.', s: 'Assinado',   k: 'ok',   proc: '0019874' },
-  { id: 4, d: '30/04/2026', t: 'Termo de rescisão',    f: 'Carlos M. Souza',  e: 'Mariana O.', s: 'Assinado',   k: 'ok',   proc: '0021345' },
-  { id: 5, d: '28/04/2026', t: 'Acordo extrajudicial', f: 'Roberto Andrade',  e: 'Mariana O.', s: 'Homologado', k: 'info', proc: '0017650' },
-];
+const FASES = ['Notificação','Contestação','Audiência','Instrução','Alegações','Sentença','Recurso','Encerrado'];
 
 // ── RowMenu ───────────────────────────────────────────────────
 function RowMenu({ items }) {
@@ -142,20 +99,33 @@ function InfoField({ label, value, span }) {
 }
 
 // ── ProcessSlideOver ──────────────────────────────────────────
-function ProcessSlideOver({ process: proc, onClose, onUpdate, addToast }) {
+function ProcessSlideOver({ process: proc, onClose, onSaved, addToast }) {
   const [editFase, setEditFase] = useState(proc.fase);
   const [editProxima, setEditProxima] = useState(proc.proxima || '');
   const [nota, setNota] = useState('');
   const [editing, setEditing] = useState(false);
-  const [notas, setNotas] = useState(proc.notas);
+  const [saving, setSaving] = useState(false);
+  const [notas, setNotas] = useState(proc.notas ?? []);
 
-  const fases = ['Notificação','Contestação','Audiência','Instrução','Alegações','Sentença','Recurso','Encerrado'];
-
-  const saveNota = () => {
+  const saveNota = async () => {
     if (!nota.trim()) return;
-    setNotas(n => [...n, { autor: 'Você', data: new Date().toISOString().slice(0,10), texto: nota }]);
-    setNota('');
-    addToast({ kind: 'ok', msg: 'Nota adicionada' });
+    const updated = [...notas, { autor: 'Você', data: new Date().toISOString().slice(0, 10), texto: nota }];
+    const { error } = await updateLaborCase(proc.id, { notas: updated });
+    if (!error) { logAudit(proc.company_id, 'EDITOU', `Nota no processo: ${proc.num}`); setNotas(updated); setNota(''); addToast({ kind: 'ok', msg: 'Nota adicionada' }); onSaved?.(); }
+    else addToast({ kind: 'bad', msg: 'Erro ao salvar nota' });
+  };
+
+  const saveFase = async () => {
+    setSaving(true);
+    const { error } = await updateLaborCase(proc.id, { fase: editFase, proxima: editProxima || null });
+    setSaving(false);
+    if (!error) { logAudit(proc.company_id, 'EDITOU', `Processo: ${proc.num}`); setEditing(false); addToast({ kind: 'ok', msg: 'Processo atualizado' }); onSaved?.(); }
+    else addToast({ kind: 'bad', msg: 'Erro ao atualizar' });
+  };
+
+  const encerrar = async () => {
+    const { error } = await updateLaborCase(proc.id, { fase: 'Encerrado', status: 'ok' });
+    if (!error) { addToast({ kind: 'warn', msg: 'Processo encerrado' }); onSaved?.(); onClose(); }
   };
 
   return (
@@ -168,7 +138,6 @@ function ProcessSlideOver({ process: proc, onClose, onUpdate, addToast }) {
         boxShadow: '-8px 0 40px rgba(0,0,0,.12)',
         display: 'flex', flexDirection: 'column',
       }}>
-        {/* header */}
         <div style={{ flexShrink: 0, padding: '16px 20px', borderBottom: '1px solid var(--line)', display: 'flex', alignItems: 'flex-start', gap: 12 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.7, marginBottom: 5 }}>Processo</div>
@@ -177,9 +146,7 @@ function ProcessSlideOver({ process: proc, onClose, onUpdate, addToast }) {
           <button className="btn ghost icon sm" onClick={onClose}><Icon name="x" size={15} /></button>
         </div>
 
-        {/* body */}
         <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 20 }}>
-
           <div>
             <SectionTitle>Dados</SectionTitle>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -199,7 +166,7 @@ function ProcessSlideOver({ process: proc, onClose, onUpdate, addToast }) {
                   <div>
                     <label className="label">Fase</label>
                     <select className="field" value={editFase} onChange={e => setEditFase(e.target.value)}>
-                      {fases.map(f => <option key={f}>{f}</option>)}
+                      {FASES.map(f => <option key={f}>{f}</option>)}
                     </select>
                   </div>
                   <div>
@@ -209,7 +176,9 @@ function ProcessSlideOver({ process: proc, onClose, onUpdate, addToast }) {
                 </div>
                 <div style={{ display: 'flex', gap: 8 }}>
                   <button className="btn ghost sm" onClick={() => setEditing(false)}>Cancelar</button>
-                  <button className="btn primary sm" onClick={() => { onUpdate?.({ fase: editFase, proxima: editProxima }); setEditing(false); addToast({ kind: 'ok', msg: 'Processo atualizado' }); }}>Salvar</button>
+                  <button className="btn primary sm" disabled={saving} onClick={saveFase}>
+                    {saving ? 'Salvando…' : 'Salvar'}
+                  </button>
                 </div>
               </div>
             ) : (
@@ -229,22 +198,18 @@ function ProcessSlideOver({ process: proc, onClose, onUpdate, addToast }) {
           </div>
 
           <div>
-            <SectionTitle>Documentos vinculados ({proc.docs.length})</SectionTitle>
-            {proc.docs.length === 0
+            <SectionTitle>Documentos vinculados ({(proc.doc_names ?? []).length})</SectionTitle>
+            {(proc.doc_names ?? []).length === 0
               ? <p style={{ fontSize: 12.5, color: 'var(--muted)', margin: '0 0 8px' }}>Nenhum documento vinculado.</p>
               : <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginBottom: 8 }}>
-                  {proc.docs.map((doc, i) => (
+                  {(proc.doc_names ?? []).map((doc, i) => (
                     <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '8px 12px', borderRadius: 8, background: 'var(--surface-2)', border: '1px solid var(--line-soft)' }}>
                       <Icon name="doc" size={13} style={{ color: 'var(--muted)', flexShrink: 0 }} />
                       <span style={{ flex: 1, fontSize: 12.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc}</span>
-                      <button className="btn ghost icon sm" title="Baixar"><Icon name="download" size={12} /></button>
                     </div>
                   ))}
                 </div>
             }
-            <button className="btn ghost sm" onClick={() => addToast({ kind: 'ok', msg: 'Abrindo seletor de documentos…' })}>
-              <Icon name="plus" size={12} /> Vincular documento
-            </button>
           </div>
 
           <div>
@@ -272,21 +237,17 @@ function ProcessSlideOver({ process: proc, onClose, onUpdate, addToast }) {
           </div>
 
           <div style={{ fontSize: 11.5, color: 'var(--muted)', paddingTop: 10, borderTop: '1px solid var(--line-soft)' }}>
-            Aberto por <strong>{proc.criado_por}</strong> em {fmtDate(proc.criado_em)}
+            Aberto por <strong>{proc.criado_por}</strong> em {fmtDate(proc.created_at?.slice(0, 10))}
           </div>
         </div>
 
-        {/* footer */}
         <div style={{ flexShrink: 0, padding: '12px 20px', borderTop: '1px solid var(--line)', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <button className="btn ghost sm" onClick={() => addToast({ kind: 'ok', msg: 'Exportando PDF do processo…' })}>
+          <button className="btn ghost sm" onClick={() => addToast({ kind: 'ok', msg: 'Exportando PDF…' })}>
             <Icon name="download" size={13} /> PDF
-          </button>
-          <button className="btn ghost sm" onClick={() => addToast({ kind: 'ok', msg: 'Imprimindo…' })}>
-            <Icon name="print" size={13} /> Imprimir
           </button>
           {proc.fase !== 'Encerrado' && (
             <button className="btn sm" style={{ marginLeft: 'auto', color: 'var(--danger)', border: '1px solid var(--danger)', background: 'transparent' }}
-              onClick={() => { onClose(); addToast({ kind: 'warn', msg: 'Processo marcado como encerrado' }); }}>
+              onClick={encerrar}>
               Encerrar
             </button>
           )}
@@ -297,10 +258,31 @@ function ProcessSlideOver({ process: proc, onClose, onUpdate, addToast }) {
 }
 
 // ── NewProcessModal ───────────────────────────────────────────
-function NewProcessModal({ onClose, addToast }) {
-  const [form, setForm] = useState({ num: '', autor: '', vara: '', fase: 'Notificação', responsavel: '', pedidos: '', valor: '', proxima: '' });
+function NewProcessModal({ onClose, onSaved, addToast, companyId }) {
+  const [form, setForm] = useState({ num: '', autor: '', vara: '', fase: 'Notificação', responsavel: '', pedidos: '', valor_causa: '', proxima: '' });
+  const [saving, setSaving] = useState(false);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
-  const fases = ['Notificação','Contestação','Audiência','Instrução','Alegações','Sentença','Recurso'];
+
+  const handleSave = async () => {
+    if (!form.num.trim() || !form.autor.trim()) return;
+    setSaving(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    const { error } = await createLaborCase({
+      ...form,
+      proxima: form.proxima || null,
+      company_id: companyId ?? null,
+      criado_por: user?.email ?? 'Sistema',
+      status: 'warn',
+      notas: [],
+      doc_names: [],
+    });
+    setSaving(false);
+    if (error) { addToast({ kind: 'bad', msg: 'Erro ao cadastrar: ' + error.message }); return; }
+    logAudit(companyId, 'CRIOU', `Processo: ${form.num}`);
+    addToast({ kind: 'ok', msg: 'Processo cadastrado' });
+    onSaved?.();
+    onClose();
+  };
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 500, background: 'rgba(0,0,0,.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
@@ -317,12 +299,12 @@ function NewProcessModal({ onClose, addToast }) {
         </div>
         <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div>
-            <label className="label">Número do processo</label>
+            <label className="label">Número do processo *</label>
             <input className="field" placeholder="0000000-00.0000.5.00.0000" value={form.num} onChange={e => set('num', e.target.value)} style={{ fontFamily: 'monospace' }} />
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
             <div>
-              <label className="label">Reclamante</label>
+              <label className="label">Reclamante *</label>
               <input className="field" placeholder="Nome completo" value={form.autor} onChange={e => set('autor', e.target.value)} />
             </div>
             <div>
@@ -332,7 +314,7 @@ function NewProcessModal({ onClose, addToast }) {
             <div>
               <label className="label">Fase inicial</label>
               <select className="field" value={form.fase} onChange={e => set('fase', e.target.value)}>
-                {fases.map(f => <option key={f}>{f}</option>)}
+                {FASES.filter(f => f !== 'Encerrado').map(f => <option key={f}>{f}</option>)}
               </select>
             </div>
             <div>
@@ -341,7 +323,7 @@ function NewProcessModal({ onClose, addToast }) {
             </div>
             <div>
               <label className="label">Valor da causa</label>
-              <input className="field" placeholder="R$ 0,00" value={form.valor} onChange={e => set('valor', e.target.value)} />
+              <input className="field" placeholder="R$ 0,00" value={form.valor_causa} onChange={e => set('valor_causa', e.target.value)} />
             </div>
             <div>
               <label className="label">Próxima ação</label>
@@ -355,8 +337,8 @@ function NewProcessModal({ onClose, addToast }) {
         </div>
         <div style={{ flexShrink: 0, padding: '12px 20px', borderTop: '1px solid var(--line)', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
           <button className="btn ghost sm" onClick={onClose}>Cancelar</button>
-          <button className="btn primary sm" onClick={() => { addToast({ kind: 'ok', msg: 'Processo cadastrado' }); onClose(); }}>
-            Cadastrar processo
+          <button className="btn primary sm" disabled={saving || !form.num.trim() || !form.autor.trim()} onClick={handleSave}>
+            {saving ? 'Salvando…' : 'Cadastrar processo'}
           </button>
         </div>
       </div>
@@ -391,15 +373,15 @@ function DossieSection({ title, icon, count, color, children, onExport }) {
 }
 
 // ── DossieTab ─────────────────────────────────────────────────
-function DossieTab({ employees, warnings, vacations, documents, timecards, processes, addToast }) {
+function DossieTab({ employees, warnings, vacations, documents, timecards, cases, addToast }) {
   const [empId, setEmpId] = useState('');
   const emp = employees.find(e => e.id === empId);
 
-  const empWarnings  = useMemo(() => warnings.filter(w => w.employee_id === empId),  [warnings,  empId]);
+  const empWarnings  = useMemo(() => warnings.filter(w => w.employee_id === empId),  [warnings, empId]);
   const empVacations = useMemo(() => vacations.filter(v => v.employee_id === empId), [vacations, empId]);
   const empDocuments = useMemo(() => documents.filter(d => d.employee_id === empId), [documents, empId]);
   const empTimecards = useMemo(() => timecards.filter(t => t.employee_id === empId), [timecards, empId]);
-  const empProcesses = useMemo(() => processes.filter(p => emp && p.autor === emp.name), [processes, emp]);
+  const empCases     = useMemo(() => cases.filter(p => emp && p.autor === emp.name),  [cases, emp]);
 
   const statusPill = (s) => s === 'ativo' ? 'ok' : s === 'afastado' ? 'warn' : s === 'desligado' ? 'bad' : 'info';
 
@@ -428,7 +410,6 @@ function DossieTab({ employees, warnings, vacations, documents, timecards, proce
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {/* card funcionário */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px', background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--radius-lg)' }}>
             <Avatar name={emp.name} size={40} hue={215} />
             <div style={{ flex: 1, minWidth: 0 }}>
@@ -454,7 +435,7 @@ function DossieTab({ employees, warnings, vacations, documents, timecards, proce
             onExport={() => addToast({ kind: 'ok', msg: 'Férias exportadas' })}>
             {empVacations.length === 0
               ? <EmptyMsg>Nenhum período de férias registrado.</EmptyMsg>
-              : <SimpleTable cols={['Início','Fim','Status']} rows={empVacations.map(v => [fmtDate(v.start), fmtDate(v.end), v.status || '—'])} />
+              : <SimpleTable cols={['Início','Fim','Status']} rows={empVacations.map(v => [fmtDate(v.period_start), fmtDate(v.period_end), v.status || '—'])} />
             }
           </DossieSection>
 
@@ -466,9 +447,8 @@ function DossieTab({ employees, warnings, vacations, documents, timecards, proce
                   {empDocuments.map(doc => (
                     <div key={doc.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 10px', borderRadius: 7, background: 'var(--surface-2)', border: '1px solid var(--line-soft)' }}>
                       <Icon name="doc" size={13} style={{ color: 'var(--muted)', flexShrink: 0 }} />
-                      <span style={{ flex: 1, fontSize: 12.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc.name || doc.title || 'Documento'}</span>
+                      <span style={{ flex: 1, fontSize: 12.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc.name || 'Documento'}</span>
                       <span style={{ fontSize: 11, color: 'var(--muted)', flexShrink: 0 }}>{doc.category || ''}</span>
-                      <button className="btn ghost icon sm"><Icon name="download" size={12} /></button>
                     </div>
                   ))}
                 </div>
@@ -479,23 +459,16 @@ function DossieTab({ employees, warnings, vacations, documents, timecards, proce
             onExport={() => addToast({ kind: 'ok', msg: 'Ponto exportado' })}>
             {empTimecards.length === 0
               ? <EmptyMsg>Nenhum registro de ponto encontrado.</EmptyMsg>
-              : <div style={{ overflowX: 'auto' }}>
-                  <SimpleTable cols={['Data','Entrada','Saída','Status']}
-                    rows={empTimecards.slice(0,20).map(tc => [fmtDate(tc.date), tc.in || tc.entry || '—', tc.out || tc.exit || '—', tc.status || 'ok'])} />
-                  {empTimecards.length > 20 && (
-                    <div style={{ fontSize: 11.5, color: 'var(--muted)', paddingTop: 8, textAlign: 'center' }}>
-                      Exibindo 20 de {empTimecards.length}. Use "Exportar" para ver todos.
-                    </div>
-                  )}
-                </div>
+              : <SimpleTable cols={['Mês','Horas trabalhadas']}
+                  rows={empTimecards.slice(0, 20).map(tc => [tc.month_year || '—', tc.worked_hours ?? '—'])} />
             }
           </DossieSection>
 
-          {empProcesses.length > 0 && (
-            <DossieSection title="Processos trabalhistas" icon="scale" count={empProcesses.length} color="var(--danger)"
+          {empCases.length > 0 && (
+            <DossieSection title="Processos trabalhistas" icon="scale" count={empCases.length} color="var(--danger)"
               onExport={() => addToast({ kind: 'ok', msg: 'Processos exportados' })}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {empProcesses.map(p => (
+                {empCases.map(p => (
                   <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderRadius: 8, background: 'var(--surface-2)', border: '1px solid var(--line-soft)' }}>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 12, fontFamily: 'monospace', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.num}</div>
@@ -548,43 +521,67 @@ function SimpleTable({ cols, rows }) {
 }
 
 // ── JusticeScreen (main) ──────────────────────────────────────
-export default function JusticeScreen({ addToast }) {
-  const [tab, setTab]                   = useState('processos');
+export default function JusticeScreen({ addToast, activeCompany }) {
+  const [tab, setTab]                     = useState('processos');
   const [activeProcess, setActiveProcess] = useState(null);
   const [showNewProcess, setShowNewProcess] = useState(false);
-  // doc generator
-  const [selected, setSelected]         = useState(null);
-  const [employee, setEmployee]         = useState('Mariana Oliveira');
-  const [reason, setReason]             = useState('');
-  const [city, setCity]                 = useState('São Paulo');
-  const [showPreview, setShowPreview]   = useState(false);
-  // history filter
-  const [histFilter, setHistFilter]     = useState('');
+  const [selected, setSelected]           = useState(null);
+  const [empId, setEmpId]                 = useState('');
+  const [reason, setReason]               = useState('');
+  const [city, setCity]                   = useState('São Paulo');
+  const [showPreview, setShowPreview]     = useState(false);
+  const [histFilter, setHistFilter]       = useState('');
 
-  const { employees } = useEmployees();
-  const { warnings }  = useAllWarnings();
-  const { vacations } = useAllVacations();
-  const { documents } = useAllDocuments();
-  const { timecards } = useAllTimecards();
+  const { employees }              = useEmployees({ companyId: activeCompany?.id });
+  const { warnings }               = useAllWarnings(activeCompany?.id);
+  const { vacations }              = useAllVacations(activeCompany?.id);
+  const { documents }              = useAllDocuments(activeCompany?.id);
+  const { timecards }              = useAllTimecards(activeCompany?.id);
+  const { cases, loading: casesLoading, refetch: refetchCases } = useLaborCases(activeCompany?.id);
+  const { history, refetch: refetchHistory }                    = useJusticeHistory(activeCompany?.id);
 
   const tpl = selected ? JUSTICE_TEMPLATES.find(t => t.id === selected) : null;
-
-  const TABS = [
-    { id: 'processos',   label: 'Processos',   icon: 'scale' },
-    { id: 'dossie',      label: 'Dossiê',       icon: 'users' },
-    { id: 'documentos',  label: 'Gerar documento', icon: 'doc' },
-    { id: 'historico',   label: 'Histórico',    icon: 'history' },
-  ];
+  const selectedEmp = employees.find(e => e.id === empId);
 
   const filteredHistory = useMemo(() =>
-    histFilter ? HISTORY_MOCK.filter(h => h.f.toLowerCase().includes(histFilter.toLowerCase())) : HISTORY_MOCK,
-  [histFilter]);
+    histFilter ? history.filter(h => (h.employees?.name || '').toLowerCase().includes(histFilter.toLowerCase())) : history,
+  [history, histFilter]);
+
+  const handleGenerateDoc = useCallback(async () => {
+    if (!tpl) return;
+    const { data: { user } } = await supabase.auth.getUser();
+    await createJusticeHistoryEntry({
+      company_id: activeCompany?.id ?? null,
+      employee_id: empId || null,
+      template_id: tpl.id,
+      template_title: tpl.title,
+      emitted_by: user?.email ?? 'Sistema',
+      status: 'Pendente',
+    });
+    logAudit(activeCompany?.id, 'GEROU', `Documento: ${tpl.title}`);
+    refetchHistory();
+    setShowPreview(true);
+  }, [tpl, empId, activeCompany, refetchHistory]);
+
+  const TABS = [
+    { id: 'processos',  label: 'Processos',      icon: 'scale' },
+    { id: 'dossie',     label: 'Dossiê',          icon: 'users' },
+    { id: 'documentos', label: 'Gerar documento', icon: 'doc' },
+    { id: 'historico',  label: 'Histórico',       icon: 'history' },
+  ];
+
+  const statusLabel = (fase) => {
+    if (fase === 'Encerrado') return 'ok';
+    if (['Notificação','Contestação'].includes(fase)) return 'bad';
+    if (['Audiência','Instrução','Alegações'].includes(fase)) return 'warn';
+    if (['Sentença','Recurso'].includes(fase)) return 'info';
+    return 'warn';
+  };
 
   return (
     <>
       <div className="fade-up" style={{ padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: 0, maxWidth: 1280, margin: '0 auto', width: '100%', height: '100%', boxSizing: 'border-box' }}>
 
-        {/* header */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20, flexWrap: 'wrap' }}>
           <div style={{ width: 38, height: 38, borderRadius: 10, background: 'var(--brand-tint)', color: 'var(--brand)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             <Icon name="gavel" size={19} />
@@ -605,7 +602,6 @@ export default function JusticeScreen({ addToast }) {
           </div>
         </div>
 
-        {/* tabs */}
         <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid var(--line)', marginBottom: 22, overflowX: 'auto' }}>
           {TABS.map(t => (
             <button key={t.id} onClick={() => setTab(t.id)} style={{
@@ -623,65 +619,78 @@ export default function JusticeScreen({ addToast }) {
 
         {/* ── PROCESSOS ── */}
         {tab === 'processos' && (
-          <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 640 }}>
-                <thead>
-                  <tr style={{ background: 'var(--surface-2)', color: 'var(--muted)', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.6 }}>
-                    {['Processo','Reclamante','Vara','Fase','Próxima ação',''].map((h, i) => (
-                      <th key={i} style={{ textAlign: 'left', padding: '10px 16px', fontWeight: 600, whiteSpace: 'nowrap' }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {PROCESSES_MOCK.map((p, i) => {
-                    const urgent = isUrgent(p.proxima);
-                    return (
-                      <tr key={p.id} style={{ borderTop: '1px solid var(--line-soft)', cursor: 'pointer' }}
-                        onMouseEnter={e => e.currentTarget.style.background = 'var(--hover)'}
-                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                        onClick={() => setActiveProcess(p)}>
-                        <td style={{ padding: '12px 16px' }}>
-                          <span style={{ fontSize: 12, fontFamily: 'monospace', fontWeight: 600 }}>{p.num}</span>
-                        </td>
-                        <td style={{ padding: '12px 16px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-                            <Avatar name={p.autor} size={26} hue={i * 70 + 40} />
-                            <span style={{ fontWeight: 500, whiteSpace: 'nowrap' }}>{p.autor}</span>
-                          </div>
-                        </td>
-                        <td style={{ padding: '12px 16px', color: 'var(--muted)', fontSize: 12.5, whiteSpace: 'nowrap' }}>{p.vara}</td>
-                        <td style={{ padding: '12px 16px' }}>
-                          <span className={`pill ${p.status}`}><span className="dot" />{p.fase}</span>
-                        </td>
-                        <td style={{ padding: '12px 16px', whiteSpace: 'nowrap' }}>
-                          {p.proxima ? (
-                            <span style={{ fontSize: 12.5, color: urgent ? 'var(--danger)' : 'var(--ink)', fontWeight: urgent ? 700 : 400, display: 'flex', alignItems: 'center', gap: 5 }}>
-                              {urgent && <Icon name="alert" size={12} />}
-                              {fmtDate(p.proxima)}
-                            </span>
-                          ) : (
-                            <span style={{ fontSize: 12.5, color: 'var(--muted)' }}>—</span>
-                          )}
-                        </td>
-                        <td style={{ padding: '12px 16px' }} onClick={e => e.stopPropagation()}>
-                          <RowMenu items={[
-                            { label: 'Ver detalhes', icon: 'eye', action: () => setActiveProcess(p) },
-                            { label: 'Ver dossiê', icon: 'users', action: () => setTab('dossie') },
-                            'sep',
-                            { label: 'Exportar PDF', icon: 'download', action: () => addToast({ kind: 'ok', msg: 'PDF exportado' }) },
-                            { label: 'Imprimir', icon: 'print', action: () => addToast({ kind: 'ok', msg: 'Imprimindo…' }) },
-                            p.fase !== 'Encerrado' && 'sep',
-                            p.fase !== 'Encerrado' && { label: 'Encerrar processo', icon: 'x', danger: true, action: () => addToast({ kind: 'warn', msg: 'Processo encerrado' }) },
-                          ].filter(Boolean)} />
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+          casesLoading ? (
+            <div style={{ padding: 40, display: 'flex', justifyContent: 'center' }}><div className="spinner" /></div>
+          ) : cases.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '64px 20px', color: 'var(--muted)' }}>
+              <Icon name="scale" size={38} style={{ opacity: 0.13, display: 'block', margin: '0 auto 14px' }} />
+              <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>Nenhum processo cadastrado</div>
+              <div style={{ fontSize: 12.5, marginBottom: 16 }}>Clique em "Novo processo" para começar.</div>
+              <button className="btn primary sm" onClick={() => setShowNewProcess(true)}>
+                <Icon name="plus" size={13} /> Novo processo
+              </button>
             </div>
-          </div>
+          ) : (
+            <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 640 }}>
+                  <thead>
+                    <tr style={{ background: 'var(--surface-2)', color: 'var(--muted)', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.6 }}>
+                      {['Processo','Reclamante','Vara','Fase','Próxima ação',''].map((h, i) => (
+                        <th key={i} style={{ textAlign: 'left', padding: '10px 16px', fontWeight: 600, whiteSpace: 'nowrap' }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {cases.map((p, i) => {
+                      const urgent = isUrgent(p.proxima);
+                      const st = p.status || statusLabel(p.fase);
+                      return (
+                        <tr key={p.id} style={{ borderTop: '1px solid var(--line-soft)', cursor: 'pointer' }}
+                          onMouseEnter={e => e.currentTarget.style.background = 'var(--hover)'}
+                          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                          onClick={() => setActiveProcess(p)}>
+                          <td style={{ padding: '12px 16px' }}>
+                            <span style={{ fontSize: 12, fontFamily: 'monospace', fontWeight: 600 }}>{p.num}</span>
+                          </td>
+                          <td style={{ padding: '12px 16px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+                              <Avatar name={p.autor} size={26} hue={i * 70 + 40} />
+                              <span style={{ fontWeight: 500, whiteSpace: 'nowrap' }}>{p.autor}</span>
+                            </div>
+                          </td>
+                          <td style={{ padding: '12px 16px', color: 'var(--muted)', fontSize: 12.5, whiteSpace: 'nowrap' }}>{p.vara || '—'}</td>
+                          <td style={{ padding: '12px 16px' }}>
+                            <span className={`pill ${st}`}><span className="dot" />{p.fase}</span>
+                          </td>
+                          <td style={{ padding: '12px 16px', whiteSpace: 'nowrap' }}>
+                            {p.proxima ? (
+                              <span style={{ fontSize: 12.5, color: urgent ? 'var(--danger)' : 'var(--ink)', fontWeight: urgent ? 700 : 400, display: 'flex', alignItems: 'center', gap: 5 }}>
+                                {urgent && <Icon name="alert" size={12} />}
+                                {fmtDate(p.proxima)}
+                              </span>
+                            ) : (
+                              <span style={{ fontSize: 12.5, color: 'var(--muted)' }}>—</span>
+                            )}
+                          </td>
+                          <td style={{ padding: '12px 16px' }} onClick={e => e.stopPropagation()}>
+                            <RowMenu items={[
+                              { label: 'Ver detalhes', icon: 'eye', action: () => setActiveProcess(p) },
+                              { label: 'Ver dossiê', icon: 'users', action: () => setTab('dossie') },
+                              'sep',
+                              { label: 'Exportar PDF', icon: 'download', action: () => addToast({ kind: 'ok', msg: 'PDF exportado' }) },
+                              p.fase !== 'Encerrado' && 'sep',
+                              p.fase !== 'Encerrado' && { label: 'Encerrar processo', icon: 'x', danger: true, action: async () => { await updateLaborCase(p.id, { fase: 'Encerrado', status: 'ok' }); refetchCases(); addToast({ kind: 'warn', msg: 'Processo encerrado' }); } },
+                            ].filter(Boolean)} />
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )
         )}
 
         {/* ── DOSSIÊ ── */}
@@ -692,7 +701,7 @@ export default function JusticeScreen({ addToast }) {
             vacations={vacations}
             documents={documents}
             timecards={timecards}
-            processes={PROCESSES_MOCK}
+            cases={cases}
             addToast={addToast}
           />
         )}
@@ -747,13 +756,14 @@ export default function JusticeScreen({ addToast }) {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                       <div>
                         <label className="label">Funcionário</label>
-                        <select className="field" value={employee} onChange={e => setEmployee(e.target.value)}>
-                          {['Mariana Oliveira','Rafael Carneiro','Beatriz Almeida','Carlos Mendes Souza','Patrícia A. Lima'].map(n => <option key={n}>{n}</option>)}
+                        <select className="field" value={empId} onChange={e => setEmpId(e.target.value)}>
+                          <option value="">— Selecione —</option>
+                          {employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
                         </select>
                       </div>
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 10 }}>
                         <div><label className="label">Cidade</label><input className="field" value={city} onChange={e => setCity(e.target.value)} /></div>
-                        <div style={{ width: 150 }}><label className="label">Data</label><input className="field" type="date" defaultValue="2026-05-12" /></div>
+                        <div style={{ width: 150 }}><label className="label">Data</label><input className="field" type="date" defaultValue={new Date().toISOString().slice(0, 10)} /></div>
                       </div>
                       <div>
                         <label className="label">Motivo / fundamentação</label>
@@ -768,8 +778,8 @@ export default function JusticeScreen({ addToast }) {
                       <div style={{ display: 'flex', gap: 8, marginTop: 8, paddingTop: 14, borderTop: '1px solid var(--line-soft)' }}>
                         <button className="btn sm ghost" onClick={() => setSelected(null)}><Icon name="chevron-left" size={13} /> Voltar</button>
                         <span style={{ flex: 1 }} />
-                        <button className="btn sm" onClick={() => setShowPreview(true)}><Icon name="eye" size={13} /> Pré-visualizar</button>
-                        <button className="btn sm primary" onClick={() => { setShowPreview(true); setTimeout(() => window.print(), 200); }}>
+                        <button className="btn sm" onClick={handleGenerateDoc}><Icon name="eye" size={13} /> Pré-visualizar</button>
+                        <button className="btn sm primary" onClick={async () => { await handleGenerateDoc(); setTimeout(() => window.print(), 200); }}>
                           <Icon name="print" size={13} /> Imprimir / PDF
                         </button>
                       </div>
@@ -782,8 +792,16 @@ export default function JusticeScreen({ addToast }) {
         )}
 
         {tab === 'documentos' && showPreview && tpl && (
-          <PrintPreview tpl={tpl} employee={employee} city={city} reason={reason}
-            onBack={() => setShowPreview(false)} onPrint={() => window.print()} addToast={addToast} />
+          <PrintPreview
+            tpl={tpl}
+            employee={selectedEmp?.name || '—'}
+            city={city}
+            reason={reason}
+            company={activeCompany}
+            onBack={() => setShowPreview(false)}
+            onPrint={() => window.print()}
+            addToast={addToast}
+          />
         )}
 
         {/* ── HISTÓRICO ── */}
@@ -794,63 +812,81 @@ export default function JusticeScreen({ addToast }) {
                 value={histFilter} onChange={e => setHistFilter(e.target.value)} />
               <span style={{ fontSize: 12.5, color: 'var(--muted)' }}>{filteredHistory.length} registro{filteredHistory.length !== 1 ? 's' : ''}</span>
             </div>
-            <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 600 }}>
-                  <thead>
-                    <tr style={{ background: 'var(--surface-2)', color: 'var(--muted)', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.6 }}>
-                      {['Data','Documento','Funcionário','Emitido por','Processo','Status',''].map((h, i) => (
-                        <th key={i} style={{ textAlign: 'left', padding: '10px 16px', fontWeight: 600, whiteSpace: 'nowrap' }}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredHistory.map(r => (
-                      <tr key={r.id} style={{ borderTop: '1px solid var(--line-soft)' }}
-                        onMouseEnter={e => e.currentTarget.style.background = 'var(--hover)'}
-                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                        <td style={{ padding: '11px 16px', fontFamily: 'monospace', fontSize: 12.5 }}>{r.d}</td>
-                        <td style={{ padding: '11px 16px', fontWeight: 500 }}>{r.t}</td>
-                        <td style={{ padding: '11px 16px', color: 'var(--ink-soft)' }}>{r.f}</td>
-                        <td style={{ padding: '11px 16px', color: 'var(--muted)', fontSize: 12.5 }}>{r.e}</td>
-                        <td style={{ padding: '11px 16px', fontFamily: 'monospace', fontSize: 12, color: r.proc === '—' ? 'var(--muted)' : 'var(--brand)' }}>{r.proc}</td>
-                        <td style={{ padding: '11px 16px' }}><span className={`pill ${r.k}`}><span className="dot" />{r.s}</span></td>
-                        <td style={{ padding: '11px 16px' }}>
-                          <RowMenu items={[
-                            { label: 'Visualizar', icon: 'eye', action: () => {} },
-                            { label: 'Baixar PDF', icon: 'download', action: () => addToast({ kind: 'ok', msg: 'PDF baixado' }) },
-                            { label: 'Imprimir', icon: 'print', action: () => addToast({ kind: 'ok', msg: 'Imprimindo…' }) },
-                          ]} />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+            {filteredHistory.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '48px 20px', color: 'var(--muted)', fontSize: 13 }}>
+                Nenhum documento gerado ainda.
               </div>
-            </div>
+            ) : (
+              <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 600 }}>
+                    <thead>
+                      <tr style={{ background: 'var(--surface-2)', color: 'var(--muted)', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.6 }}>
+                        {['Data','Documento','Funcionário','Emitido por','Status',''].map((h, i) => (
+                          <th key={i} style={{ textAlign: 'left', padding: '10px 16px', fontWeight: 600, whiteSpace: 'nowrap' }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredHistory.map(r => (
+                        <tr key={r.id} style={{ borderTop: '1px solid var(--line-soft)' }}
+                          onMouseEnter={e => e.currentTarget.style.background = 'var(--hover)'}
+                          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                          <td style={{ padding: '11px 16px', fontFamily: 'monospace', fontSize: 12.5 }}>
+                            {new Date(r.created_at).toLocaleDateString('pt-BR')}
+                          </td>
+                          <td style={{ padding: '11px 16px', fontWeight: 500 }}>{r.template_title}</td>
+                          <td style={{ padding: '11px 16px', color: 'var(--ink-soft)' }}>{r.employees?.name || '—'}</td>
+                          <td style={{ padding: '11px 16px', color: 'var(--muted)', fontSize: 12.5 }}>{r.emitted_by || '—'}</td>
+                          <td style={{ padding: '11px 16px' }}>
+                            <span className={`pill ${r.status === 'Assinado' ? 'ok' : r.status === 'Homologado' ? 'info' : 'warn'}`}>
+                              <span className="dot" />{r.status}
+                            </span>
+                          </td>
+                          <td style={{ padding: '11px 16px' }}>
+                            <RowMenu items={[
+                              { label: 'Baixar PDF', icon: 'download', action: () => addToast({ kind: 'ok', msg: 'PDF baixado' }) },
+                              { label: 'Imprimir', icon: 'print', action: () => addToast({ kind: 'ok', msg: 'Imprimindo…' }) },
+                            ]} />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
 
-      {/* slide-over e modais fora do fade-up */}
       {activeProcess && (
         <ProcessSlideOver
           process={activeProcess}
           onClose={() => setActiveProcess(null)}
-          onUpdate={() => {}}
+          onSaved={() => { refetchCases(); setActiveProcess(null); }}
           addToast={addToast}
         />
       )}
       {showNewProcess && (
-        <NewProcessModal onClose={() => setShowNewProcess(false)} addToast={addToast} />
+        <NewProcessModal
+          onClose={() => setShowNewProcess(false)}
+          onSaved={refetchCases}
+          addToast={addToast}
+          companyId={activeCompany?.id}
+        />
       )}
     </>
   );
 }
 
 // ── PrintPreview ──────────────────────────────────────────────
-function PrintPreview({ tpl, employee, city, reason, onBack, onPrint, addToast }) {
+function PrintPreview({ tpl, employee, city, reason, company, onBack, onPrint, addToast }) {
   const today = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
+  const companyName = company?.name?.toUpperCase() || 'EMPRESA';
+  const companyCnpj = company?.cnpj || '—';
+  const companyAddress = company?.address || '—';
+
   return (
     <div className="orion-print-shell" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div className="row gap-2 no-print" style={{ padding: '12px 16px', background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 10, position: 'sticky', top: 0, zIndex: 5 }}>
@@ -858,7 +894,7 @@ function PrintPreview({ tpl, employee, city, reason, onBack, onPrint, addToast }
         <span style={{ flex: 1 }} />
         <span style={{ fontSize: 12, color: 'var(--muted)' }}>Pré-visualização A4 · Margens 18mm</span>
         <span style={{ flex: 1 }} />
-        <button className="btn" onClick={() => addToast?.({ kind: 'ok', msg: 'PDF salvo em /justica/' + tpl.id + '.pdf' })}>
+        <button className="btn" onClick={() => addToast?.({ kind: 'ok', msg: 'PDF salvo' })}>
           <Icon name="download" size={14} /> Salvar PDF
         </button>
         <button className="btn primary" onClick={onPrint}><Icon name="print" size={14} /> Imprimir</button>
@@ -871,8 +907,8 @@ function PrintPreview({ tpl, employee, city, reason, onBack, onPrint, addToast }
               <OrionGlyph size={22} />
             </div>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 16, fontWeight: 800, letterSpacing: -0.3 }}>ORION GESTÃO LTDA.</div>
-              <div style={{ fontSize: 10.5, color: '#444', marginTop: 2 }}>CNPJ 12.345.678/0001-90 · Av. Paulista, 1000 — São Paulo/SP</div>
+              <div style={{ fontSize: 16, fontWeight: 800, letterSpacing: -0.3 }}>{companyName}</div>
+              <div style={{ fontSize: 10.5, color: '#444', marginTop: 2 }}>CNPJ {companyCnpj} · {companyAddress}</div>
             </div>
             <div style={{ textAlign: 'right', fontSize: 10.5, color: '#444' }}>
               <div style={{ fontWeight: 700, color: '#0B0D11' }}>Documento {tpl.id.toUpperCase()}</div>
@@ -884,7 +920,7 @@ function PrintPreview({ tpl, employee, city, reason, onBack, onPrint, addToast }
 
           <div style={{ fontSize: 12, textAlign: 'justify' }}>
             <p style={{ margin: '0 0 14px' }}>
-              Pelo presente instrumento particular, de um lado <b>ORION GESTÃO LTDA.</b>, pessoa jurídica de direito privado, inscrita no CNPJ sob o nº 12.345.678/0001-90, com sede na Av. Paulista, 1000, doravante denominada <b>EMPREGADORA</b>, e de outro lado <b>{employee.toUpperCase()}</b>, residente e domiciliado(a) em {city}/SP, doravante denominado(a) <b>EMPREGADO(A)</b>, têm entre si justo e acordado o presente termo.
+              Pelo presente instrumento particular, de um lado <b>{companyName}</b>, pessoa jurídica de direito privado, inscrita no CNPJ sob o nº {companyCnpj}, com sede em {companyAddress}, doravante denominada <b>EMPREGADORA</b>, e de outro lado <b>{employee.toUpperCase()}</b>, residente e domiciliado(a) em {city}/SP, doravante denominado(a) <b>EMPREGADO(A)</b>, têm entre si justo e acordado o presente termo.
             </p>
             <h3 style={{ fontSize: 12.5, fontWeight: 800, margin: '20px 0 8px' }}>CLÁUSULA PRIMEIRA — DO OBJETO</h3>
             <p style={{ margin: '0 0 14px' }}>O presente instrumento tem por objeto formalizar a relação prevista neste documento ({tpl.title.toLowerCase()}), regida pela Consolidação das Leis do Trabalho (Decreto-Lei nº 5.452/1943) e pelas normas convencionais aplicáveis.</p>
@@ -895,7 +931,7 @@ function PrintPreview({ tpl, employee, city, reason, onBack, onPrint, addToast }
             <p style={{ margin: '32px 0 0' }}>E, por estarem assim justos e contratados, firmam o presente em 02 (duas) vias de igual teor, na presença das testemunhas abaixo.</p>
             <p style={{ margin: '20px 0 60px', textAlign: 'right' }}>{city}, {today}.</p>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 50, marginTop: 30 }}>
-              <div style={{ textAlign: 'center' }}><div style={{ borderTop: '1px solid #0B0D11', paddingTop: 8, fontSize: 11 }}><div style={{ fontWeight: 700 }}>ORION GESTÃO LTDA.</div><div style={{ color: '#444', marginTop: 2 }}>Empregadora · CNPJ 12.345.678/0001-90</div></div></div>
+              <div style={{ textAlign: 'center' }}><div style={{ borderTop: '1px solid #0B0D11', paddingTop: 8, fontSize: 11 }}><div style={{ fontWeight: 700 }}>{companyName}</div><div style={{ color: '#444', marginTop: 2 }}>Empregadora · CNPJ {companyCnpj}</div></div></div>
               <div style={{ textAlign: 'center' }}><div style={{ borderTop: '1px solid #0B0D11', paddingTop: 8, fontSize: 11 }}><div style={{ fontWeight: 700 }}>{employee.toUpperCase()}</div><div style={{ color: '#444', marginTop: 2 }}>Empregado(a)</div></div></div>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 50, marginTop: 50 }}>

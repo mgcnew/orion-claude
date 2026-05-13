@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from './lib/supabase.js';
-import { useCompanies } from './hooks/useEmployees.js';
+import { useCompanies, logAudit } from './hooks/useEmployees.js';
 
 import Sidebar from './components/Sidebar.jsx';
 import Header from './components/Header.jsx';
@@ -58,9 +58,12 @@ export default function App() {
       setSession(s);
       setAuthLoading(false);
     });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, s) => {
       setSession(s);
       setAuthLoading(false);
+      if (event === 'SIGNED_IN' && s?.user) {
+        logAudit(null, 'LOGIN', s.user.email);
+      }
     });
     return () => subscription.unsubscribe();
   }, []);
@@ -143,23 +146,23 @@ export default function App() {
 
   // ===== ROUTING =====
   const renderScreen = () => {
-    if (route === 'dashboard') return <Dashboard setRoute={setRoute} addToast={addToast} />;
+    if (route === 'dashboard') return <Dashboard setRoute={setRoute} addToast={addToast} activeCompany={activeCompany} />;
     if (route === 'employees') return <EmployeesList setRoute={setRoute} setRouteParam={setRouteParam} setRouteLabel={setRouteLabel} companyId={activeCompany?.id} />;
     if (route === 'employees-profile') return <EmployeeProfile setRoute={setRoute} employeeId={routeParam} />;
     if (route.startsWith('documents'))
       return <DocumentsScreen addToast={addToast} activeCompany={activeCompany} />;
-    if (route.startsWith('time')) return <TimeScreen addToast={addToast} />;
+    if (route.startsWith('time')) return <TimeScreen addToast={addToast} activeCompany={activeCompany} />;
     if (route === 'permissions' || route === 'settings-permissions')
       return (
         <SettingsScreen initialTab="permissoes" addToast={addToast} setRoute={setRoute} />
       );
-    if (route === 'audit') return <AuditScreen />;
-    if (route === 'justice') return <JusticeScreen addToast={addToast} />;
-    if (route === 'reports') return <ReportsScreen addToast={addToast} />;
+    if (route === 'audit') return <AuditScreen activeCompany={activeCompany} />;
+    if (route === 'justice') return <JusticeScreen addToast={addToast} activeCompany={activeCompany} />;
+    if (route === 'reports') return <ReportsScreen addToast={addToast} activeCompany={activeCompany} />;
     if (route === 'settings')
       return <SettingsScreen addToast={addToast} setRoute={setRoute} />;
-    if (route === 'rh-warn') return <WarningsScreen addToast={addToast} />;
-    if (route === 'rh-vacation') return <VacationScreen addToast={addToast} />;
+    if (route === 'rh-warn') return <WarningsScreen addToast={addToast} activeCompany={activeCompany} />;
+    if (route === 'rh-vacation') return <VacationScreen addToast={addToast} activeCompany={activeCompany} />;
     if (route.startsWith('rh'))
       return (
         <Placeholder

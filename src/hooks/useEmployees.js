@@ -124,19 +124,21 @@ export function useEmployee(id) {
 }
 
 // Contagens por status (para os tabs e KPIs)
-export function useEmployeeCounts() {
+export function useEmployeeCounts(companyId) {
   const [counts, setCounts] = useState({ todos: 0, ativo: 0, férias: 0, afastado: 0, desligado: 0 });
   const [loading, setLoading] = useState(true);
 
   const fetch = useCallback(async () => {
     setLoading(true);
-    const { data } = await supabase.from('employees').select('status');
+    let query = supabase.from('employees').select('status');
+    if (companyId) query = query.eq('company_id', companyId);
+    const { data } = await query;
     if (!data) { setLoading(false); return; }
     const c = { todos: data.length, ativo: 0, férias: 0, afastado: 0, desligado: 0 };
     data.forEach((e) => { if (c[e.status] !== undefined) c[e.status]++; });
     setCounts(c);
     setLoading(false);
-  }, []);
+  }, [companyId]);
 
   useEffect(() => { fetch(); }, [fetch]);
 
@@ -251,7 +253,7 @@ export function useEmployeeDocuments(employeeId) {
 }
 
 // Todos os documentos
-export function useAllDocuments() {
+export function useAllDocuments(companyId) {
   const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -259,15 +261,17 @@ export function useAllDocuments() {
   const fetch = useCallback(async () => {
     setLoading(true);
     setError(null);
-    const { data, error: err } = await supabase
+    let query = supabase
       .from('documents')
-      .select('*, employees(id, name, company_id)')
+      .select('*, employees(id, name)')
       .order('created_at', { ascending: false });
+    if (companyId) query = query.eq('company_id', companyId);
 
+    const { data, error: err } = await query;
     if (err) setError(err.message);
     else setDocuments(data ?? []);
     setLoading(false);
-  }, []);
+  }, [companyId]);
 
   useEffect(() => { fetch(); }, [fetch]);
 
@@ -279,7 +283,7 @@ export function useAllDocuments() {
 // ============================================================
 
 // Todas as advertências com dados do funcionário
-export function useAllWarnings() {
+export function useAllWarnings(companyId) {
   const [warnings, setWarnings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -287,15 +291,17 @@ export function useAllWarnings() {
   const fetch = useCallback(async () => {
     setLoading(true);
     setError(null);
-    const { data, error: err } = await supabase
+    let query = supabase
       .from('employee_warnings')
-      .select('*, employees(id, name, dept, hue)')
+      .select('*, employees!inner(id, name, dept, hue, company_id)')
       .order('date', { ascending: false });
+    if (companyId) query = query.eq('employees.company_id', companyId);
 
+    const { data, error: err } = await query;
     if (err) setError(err.message);
     else setWarnings(data ?? []);
     setLoading(false);
-  }, []);
+  }, [companyId]);
 
   useEffect(() => { fetch(); }, [fetch]);
 
@@ -313,7 +319,7 @@ export async function createWarning(data) {
 }
 
 // Todas as férias (períodos aquisitivos) com dados do funcionário
-export function useAllVacations() {
+export function useAllVacations(companyId) {
   const [vacations, setVacations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -321,15 +327,17 @@ export function useAllVacations() {
   const fetch = useCallback(async () => {
     setLoading(true);
     setError(null);
-    const { data, error: err } = await supabase
+    let query = supabase
       .from('employee_vacations')
-      .select('*, employees(id, name, dept, hue)')
+      .select('*, employees!inner(id, name, dept, hue, company_id)')
       .order('period_start', { ascending: false });
+    if (companyId) query = query.eq('employees.company_id', companyId);
 
+    const { data, error: err } = await query;
     if (err) setError(err.message);
     else setVacations(data ?? []);
     setLoading(false);
-  }, []);
+  }, [companyId]);
 
   useEffect(() => { fetch(); }, [fetch]);
 
@@ -423,10 +431,11 @@ export function useAllPendingOnboarding() {
 }
 
 // Inserir documentos associados a um funcionário
-export async function createDocuments(employee_id, docs, uploaded_by = null) {
+export async function createDocuments(employee_id, docs, uploaded_by = null, company_id = null) {
   if (!docs || docs.length === 0) return { data: null, error: null };
   const docsData = docs.map(d => ({
     employee_id,
+    company_id,
     name: d.name,
     category: d.category || 'contratos',
     size: d.size || '0 KB',
@@ -603,21 +612,23 @@ export function useAllTimeEntries(dateStr) {
   return { entries, loading };
 }
 
-export function useAllTimecards() {
+export function useAllTimecards(companyId) {
   const [timecards, setTimecards] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function load() {
-      const { data, error } = await supabase
+      let query = supabase
         .from('timecards')
-        .select('*, employees(name)')
+        .select('*, employees!inner(name, company_id)')
         .order('created_at', { ascending: false });
+      if (companyId) query = query.eq('employees.company_id', companyId);
+      const { data, error } = await query;
       if (!error && data) setTimecards(data);
       setLoading(false);
     }
     load();
-  }, []);
+  }, [companyId]);
 
   return { timecards, loading, setTimecards };
 }
@@ -631,6 +642,107 @@ export async function createTimecard(data) {
 
   if (error) throw error;
   return res;
+}
+
+// ============================================================
+// AUDITORIA
+// ============================================================
+
+export function useAuditLog({ companyId, days = 30 } = {}) {
+  const [logs, setLogs] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetch = useCallback(async () => {
+    setLoading(true);
+    const since = new Date(Date.now() - days * 86400000).toISOString();
+    let query = supabase
+      .from('audit_log')
+      .select('*')
+      .gte('created_at', since)
+      .order('created_at', { ascending: false })
+      .limit(500);
+    if (companyId) query = query.eq('company_id', companyId);
+    const { data } = await query;
+    setLogs(data ?? []);
+    setLoading(false);
+  }, [companyId, days]);
+
+  useEffect(() => { fetch(); }, [fetch]);
+  return { logs, loading, refetch: fetch };
+}
+
+export async function addAuditEntry({ company_id, who, actor_id, action, target, ip, device }) {
+  await supabase.from('audit_log').insert({ company_id, who, actor_id, action, target, ip, device });
+}
+
+export async function logAudit(company_id, action, target) {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    await supabase.from('audit_log').insert({
+      company_id: company_id || null,
+      who: user?.user_metadata?.name || user?.email || 'Sistema',
+      actor_id: user?.id || null,
+      action,
+      target: target || null,
+    });
+  } catch (_) {}
+}
+
+// ============================================================
+// JUSTIÇA — Processos trabalhistas
+// ============================================================
+
+export function useLaborCases(companyId) {
+  const [cases, setCases] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetch = useCallback(async () => {
+    setLoading(true);
+    let query = supabase.from('labor_cases').select('*').order('created_at', { ascending: false });
+    if (companyId) query = query.eq('company_id', companyId);
+    const { data } = await query;
+    setCases(data ?? []);
+    setLoading(false);
+  }, [companyId]);
+
+  useEffect(() => { fetch(); }, [fetch]);
+  return { cases, loading, refetch: fetch };
+}
+
+export async function createLaborCase(data) {
+  const { data: created, error } = await supabase.from('labor_cases').insert(data).select().single();
+  return { created, error };
+}
+
+export async function updateLaborCase(id, data) {
+  const { error } = await supabase.from('labor_cases').update(data).eq('id', id);
+  return { error };
+}
+
+// JUSTIÇA — Histórico de documentos gerados
+export function useJusticeHistory(companyId) {
+  const [history, setHistory] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetch = useCallback(async () => {
+    setLoading(true);
+    let query = supabase
+      .from('justice_history')
+      .select('*, employees(name)')
+      .order('created_at', { ascending: false });
+    if (companyId) query = query.eq('company_id', companyId);
+    const { data } = await query;
+    setHistory(data ?? []);
+    setLoading(false);
+  }, [companyId]);
+
+  useEffect(() => { fetch(); }, [fetch]);
+  return { history, loading, refetch: fetch };
+}
+
+export async function createJusticeHistoryEntry(data) {
+  const { error } = await supabase.from('justice_history').insert(data);
+  return { error };
 }
 
 // ============================================================

@@ -622,8 +622,8 @@ const NEW_ACTIONS = [
   { id:'ajuste', label:'Ajuste manual de ponto',  icon:'edit'    },
 ];
 
-export function TimeScreen({ addToast }) {
-  const { employees, loading:empLoading } = useEmployees();
+export function TimeScreen({ addToast, activeCompany }) {
+  const { employees, loading:empLoading } = useEmployees({ companyId: activeCompany?.id });
   const [tab,     setTab]     = useState('jornada');
   const [empId,   setEmpId]   = useState('');
   const [month,   setMonth]   = useState(new Date().toISOString().slice(0,7));
