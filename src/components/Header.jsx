@@ -1,6 +1,7 @@
 import { Fragment } from 'react';
 import Icon from './Icon.jsx';
 import Avatar from './Avatar.jsx';
+import SearchBar from './SearchBar.jsx';
 
 function buildCrumbs(route, routeLabel) {
   if (route === 'dashboard') return [{ label: 'Dashboard' }];
@@ -55,6 +56,8 @@ function buildCrumbs(route, routeLabel) {
 export default function Header({
   route,
   setRoute,
+  setRouteParam,
+  setRouteLabel,
   collapsed,
   setCollapsed,
   mobileOpen,
@@ -127,37 +130,7 @@ export default function Header({
       <div className="grow" />
 
       {/* Global search */}
-      <button
-        onClick={openCmd}
-        className="orion-search row gap-2"
-        style={{
-          height: 36,
-          padding: '0 12px',
-          border: '1px solid var(--line)',
-          background: 'var(--surface-2)',
-          borderRadius: 8,
-          color: 'var(--muted)',
-          cursor: 'pointer',
-          minWidth: 0,
-          flexShrink: 1,
-          fontSize: 13,
-        }}
-      >
-        <Icon name="search" size={15} />
-        <span
-          className="orion-search-label"
-          style={{
-            flex: 1,
-            textAlign: 'left',
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-          }}
-        >
-          Buscar funcionários, documentos…
-        </span>
-        <span className="kbd orion-search-kbd">⌘K</span>
-      </button>
+      <SearchBar setRoute={setRoute} setRouteParam={setRouteParam} setRouteLabel={setRouteLabel} />
 
       {isAdmin && onInvite && (
         <button className="btn primary sm" onClick={onInvite} title="Convidar usuário">

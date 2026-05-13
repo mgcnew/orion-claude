@@ -281,6 +281,8 @@ export default function App() {
         <Header
           route={route}
           setRoute={setRoute}
+          setRouteParam={setRouteParam}
+          setRouteLabel={setRouteLabel}
           collapsed={collapsed}
           setCollapsed={setCollapsed}
           mobileOpen={mobileOpen}
