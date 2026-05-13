@@ -77,11 +77,13 @@ export default function Sidebar({ route, setRoute, collapsed, setCollapsed, user
     time: route.startsWith('time'),
     rh: route.startsWith('rh'),
   });
+  const [tip, setTip] = useState(null); // { label, y }
 
   const isActive = (id) =>
     route === id || (id !== 'dashboard' && route.startsWith(id));
 
   return (
+    <>
     <aside
       className="orion-sidebar"
       style={{
@@ -213,12 +215,15 @@ export default function Sidebar({ route, setRoute, collapsed, setCollapsed, user
                 }}
                 onMouseEnter={(e) => {
                   if (!active) e.currentTarget.style.background = 'var(--hover)';
+                  if (collapsed) {
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    setTip({ label: item.label, y: rect.top + rect.height / 2 });
+                  }
                 }}
                 onMouseLeave={(e) => {
                   if (!active) e.currentTarget.style.background = 'transparent';
+                  setTip(null);
                 }}
-                className={collapsed ? 'nav-tip' : undefined}
-                data-tip={collapsed ? item.label : undefined}
               >
                 <Icon name={item.icon} size={18} />
                 {!collapsed && <span style={{ flex: 1 }}>{item.label}</span>}
@@ -335,5 +340,29 @@ export default function Sidebar({ route, setRoute, collapsed, setCollapsed, user
         )}
       </div>
     </aside>
+
+      {/* Tooltip fixo — fora do aside para não ser cortado pelo overflow */}
+      {tip && (
+        <div
+          style={{
+            position: 'fixed',
+            left: 76,
+            top: tip.y,
+            transform: 'translateY(-50%)',
+            background: 'var(--ink)',
+            color: 'var(--bg)',
+            fontSize: 12,
+            fontWeight: 500,
+            padding: '5px 10px',
+            borderRadius: 6,
+            pointerEvents: 'none',
+            whiteSpace: 'nowrap',
+            zIndex: 9999,
+          }}
+        >
+          {tip.label}
+        </div>
+      )}
+    </>
   );
 }
