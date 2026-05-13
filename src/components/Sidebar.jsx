@@ -20,6 +20,7 @@ const NAV = [
   { id: 'rh', label: 'RH', icon: 'briefcase' },
   { id: 'reports', label: 'Relatórios', icon: 'chart' },
   { id: 'justice', label: 'Justiça', icon: 'gavel' },
+  { id: 'clt',     label: 'CLT & Direitos', icon: 'scale' },
   { id: 'section', label: 'ADMINISTRAÇÃO' },
   { id: 'audit',    label: 'Auditoria',       icon: 'history',  perm: ['Administração', 'logs'] },
   { id: 'settings', label: 'Configurações',   icon: 'settings', perm: ['Administração', 'config'] },

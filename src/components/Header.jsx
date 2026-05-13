@@ -36,6 +36,7 @@ function buildCrumbs(route, routeLabel) {
   if (route === 'settings') return [{ label: 'Configurações' }];
   if (route === 'settings-permissions')
     return [{ label: 'Configurações', id: 'settings' }, { label: 'Permissões' }];
+  if (route === 'clt') return [{ label: 'CLT & Direitos' }];
   if (route === 'reports') return [{ label: 'Relatórios' }];
   if (route === 'justice') return [{ label: 'Justiça' }];
   if (route.startsWith('rh')) {

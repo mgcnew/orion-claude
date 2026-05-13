@@ -26,6 +26,7 @@ import {
   Placeholder,
 } from './screens/Other.jsx';
 import RHScreen from './screens/RH.jsx';
+import CLTScreen from './screens/CLT.jsx';
 
 import { useTweaks } from './hooks/useTweaks.js';
 import { darken, hexToRgba, isLight } from './lib/color.js';
@@ -37,6 +38,7 @@ const TWEAK_DEFAULTS = {
   radius:    10,
   fontSize:  'md',
   sidebarDefault: 'expanded',
+  inactivityLock: 'off',
 };
 
 export default function App() {
@@ -128,6 +130,21 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
+  // Inactivity lock
+  useEffect(() => {
+    const minutes = parseInt(tweaks.inactivityLock, 10);
+    if (!session || isNaN(minutes)) return;
+    let timer;
+    const reset = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => supabase.auth.signOut(), minutes * 60 * 1000);
+    };
+    const events = ['mousemove', 'keydown', 'mousedown', 'touchstart'];
+    events.forEach(e => window.addEventListener(e, reset));
+    reset();
+    return () => { clearTimeout(timer); events.forEach(e => window.removeEventListener(e, reset)); };
+  }, [tweaks.inactivityLock, session]);
+
   const addToast = useCallback((t) => {
     const id = Date.now() + Math.random();
     setToasts((ts) => [...ts, { ...t, id }]);
@@ -211,6 +228,7 @@ export default function App() {
       return <SettingsScreen addToast={addToast} setRoute={setRoute} activeCompany={activeCompany} tweaks={tweaks} setTweak={setTweak} />;
     if (route === 'rh' || route.startsWith('rh-'))
       return <RHScreen addToast={addToast} activeCompany={activeCompany} route={route} openModal={routeIntent === 'new-warn'} />;
+    if (route === 'clt') return <CLTScreen />;
     return <Dashboard setRoute={setRoute} addToast={addToast} />;
   };
 

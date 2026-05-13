@@ -2211,6 +2211,218 @@ function AparenciaTab({ tweaks, setTweak }) {
 }
 
 // ============================================================
+// SECURITY TAB
+// ============================================================
+function Toggle({ on, onChange }) {
+  return (
+    <div
+      onClick={() => onChange(!on)}
+      style={{
+        width: 36, height: 20, borderRadius: 10, flexShrink: 0,
+        background: on ? 'var(--brand)' : 'var(--line)',
+        position: 'relative', cursor: 'pointer', transition: 'background .15s',
+      }}
+    >
+      <div style={{
+        position: 'absolute', top: 2, left: on ? 18 : 2,
+        width: 16, height: 16, borderRadius: '50%',
+        background: 'white', boxShadow: '0 1px 3px rgba(0,0,0,.2)',
+        transition: 'left .15s',
+      }} />
+    </div>
+  );
+}
+
+function SegurancaTab({ addToast, tweaks, setTweak }) {
+  const [user, setUser] = useState(null);
+  const [auditRows, setAuditRows] = useState([]);
+  const [loadingAudit, setLoadingAudit] = useState(true);
+
+  // password form
+  const [newPwd, setNewPwd] = useState('');
+  const [confirmPwd, setConfirmPwd] = useState('');
+  const [pwdLoading, setPwdLoading] = useState(false);
+
+  // inactivity lock
+  const lockValue = tweaks?.inactivityLock ?? 'off';
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setUser(data?.user ?? null));
+  }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    setLoadingAudit(true);
+    supabase
+      .from('audit_log')
+      .select('id, action, target, ip, device, created_at')
+      .eq('actor_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(10)
+      .then(({ data }) => { setAuditRows(data ?? []); setLoadingAudit(false); });
+  }, [user]);
+
+  async function handleChangePassword(e) {
+    e.preventDefault();
+    if (newPwd.length < 6) { addToast({ type: 'error', message: 'A senha deve ter ao menos 6 caracteres.' }); return; }
+    if (newPwd !== confirmPwd) { addToast({ type: 'error', message: 'As senhas não coincidem.' }); return; }
+    setPwdLoading(true);
+    const { error } = await supabase.auth.updateUser({ password: newPwd });
+    setPwdLoading(false);
+    if (error) { addToast({ type: 'error', message: error.message }); return; }
+    addToast({ type: 'success', message: 'Senha alterada com sucesso.' });
+    setNewPwd(''); setConfirmPwd('');
+  }
+
+  async function handleTerminateSessions() {
+    const { error } = await supabase.auth.signOut({ scope: 'others' });
+    if (error) { addToast({ type: 'error', message: error.message }); return; }
+    addToast({ type: 'success', message: 'Outras sessões encerradas.' });
+  }
+
+  const SectionTitle = ({ children }) => (
+    <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, color: 'var(--muted-2)', textTransform: 'uppercase', marginBottom: 10 }}>
+      {children}
+    </div>
+  );
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+
+      {/* Sessão atual */}
+      <div className="card" style={{ padding: 20 }}>
+        <SectionTitle>Sessão atual</SectionTitle>
+        <div className="row gap-3" style={{ alignItems: 'center' }}>
+          <div style={{ width: 40, height: 40, borderRadius: 10, background: 'var(--brand-tint)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Icon name="user" size={20} style={{ color: 'var(--brand)' }} />
+          </div>
+          <div>
+            <div style={{ fontSize: 13.5, fontWeight: 600 }}>{user?.email || '—'}</div>
+            <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
+              Último acesso:{' '}
+              {user?.last_sign_in_at
+                ? new Date(user.last_sign_in_at).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
+                : '—'}
+            </div>
+          </div>
+          <div style={{ marginLeft: 'auto' }}>
+            <span className="pill ok">Ativa</span>
+          </div>
+        </div>
+        <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--line)' }}>
+          <button className="btn ghost sm" style={{ color: 'var(--bad)' }} onClick={handleTerminateSessions}>
+            <Icon name="logout" size={14} /> Encerrar outras sessões
+          </button>
+        </div>
+      </div>
+
+      {/* Alterar senha */}
+      <div className="card" style={{ padding: 20 }}>
+        <SectionTitle>Alterar senha</SectionTitle>
+        <form onSubmit={handleChangePassword} style={{ display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 380 }}>
+          <div>
+            <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Nova senha</label>
+            <input
+              className="input"
+              type="password"
+              placeholder="Mínimo 6 caracteres"
+              value={newPwd}
+              onChange={e => setNewPwd(e.target.value)}
+              style={{ width: '100%' }}
+            />
+          </div>
+          <div>
+            <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Confirmar nova senha</label>
+            <input
+              className="input"
+              type="password"
+              placeholder="Repita a nova senha"
+              value={confirmPwd}
+              onChange={e => setConfirmPwd(e.target.value)}
+              style={{ width: '100%' }}
+            />
+          </div>
+          <div>
+            <button className="btn primary sm" type="submit" disabled={pwdLoading || !newPwd}>
+              {pwdLoading ? 'Salvando…' : 'Salvar nova senha'}
+            </button>
+          </div>
+        </form>
+      </div>
+
+      {/* Bloqueio por inatividade */}
+      {tweaks && setTweak && (
+        <div className="card" style={{ padding: 20 }}>
+          <SectionTitle>Bloqueio por inatividade</SectionTitle>
+          <div className="row gap-3" style={{ alignItems: 'center' }}>
+            <div className="grow">
+              <div style={{ fontSize: 13.5, fontWeight: 500 }}>Bloquear tela automaticamente</div>
+              <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
+                Exige nova autenticação após período sem atividade
+              </div>
+            </div>
+            <Toggle on={lockValue !== 'off'} onChange={v => setTweak('inactivityLock', v ? '15' : 'off')} />
+          </div>
+          {lockValue !== 'off' && (
+            <div className="row gap-2" style={{ marginTop: 14, flexWrap: 'wrap' }}>
+              {[['5', '5 min'], ['10', '10 min'], ['15', '15 min'], ['30', '30 min'], ['60', '1 hora']].map(([val, lbl]) => (
+                <button
+                  key={val}
+                  className={`btn sm ${lockValue === val ? 'primary' : 'ghost'}`}
+                  onClick={() => setTweak('inactivityLock', val)}
+                >
+                  {lbl}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Histórico de acesso */}
+      <div className="card" style={{ padding: 20 }}>
+        <SectionTitle>Histórico de acesso</SectionTitle>
+        {loadingAudit ? (
+          <div style={{ fontSize: 13, color: 'var(--muted)', padding: '12px 0' }}>Carregando…</div>
+        ) : auditRows.length === 0 ? (
+          <div style={{ fontSize: 13, color: 'var(--muted)', padding: '12px 0' }}>Nenhum registro encontrado.</div>
+        ) : (
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+            <thead>
+              <tr>
+                {['Ação', 'Alvo', 'IP', 'Dispositivo', 'Data'].map(h => (
+                  <th key={h} style={{ textAlign: 'left', padding: '6px 8px', color: 'var(--muted)', fontWeight: 600, borderBottom: '1px solid var(--line)' }}>
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {auditRows.map(r => (
+                <tr key={r.id} style={{ borderBottom: '1px solid var(--line-soft)' }}>
+                  <td style={{ padding: '8px 8px' }}>
+                    <span className={`pill ${r.action === 'LOGIN' ? 'ok' : 'warn'}`} style={{ fontSize: 10.5 }}>{r.action}</span>
+                  </td>
+                  <td style={{ padding: '8px 8px', color: 'var(--muted)' }}>{r.target || '—'}</td>
+                  <td style={{ padding: '8px 8px', color: 'var(--muted)', fontFamily: 'monospace' }}>{r.ip || '—'}</td>
+                  <td style={{ padding: '8px 8px', color: 'var(--muted)', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {r.device || '—'}
+                  </td>
+                  <td style={{ padding: '8px 8px', color: 'var(--muted)', whiteSpace: 'nowrap' }}>
+                    {new Date(r.created_at).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+    </div>
+  );
+}
+
+// ============================================================
 // SETTINGS (with Permissions as a tab)
 // ============================================================
 export function SettingsScreen({ initialTab, addToast, setRoute, activeCompany, tweaks, setTweak }) {
@@ -2281,56 +2493,7 @@ export function SettingsScreen({ initialTab, addToast, setRoute, activeCompany, 
 
       {tab === 'aparencia' && tweaks && <AparenciaTab tweaks={tweaks} setTweak={setTweak} />}
 
-      {tab === 'seguranca' && (
-        <div className="card" style={{ padding: 24 }}>
-          <h3 style={{ margin: '0 0 16px', fontSize: 14, fontWeight: 700 }}>Segurança</h3>
-          {[
-            { l: 'Autenticação em dois fatores (2FA)', s: 'Aplicativo autenticador · ativo', on: true },
-            { l: 'Sessões simultâneas', s: 'Limite de 3 dispositivos por usuário', on: true },
-            { l: 'Bloqueio por inatividade', s: 'Após 15 minutos sem atividade', on: true },
-            { l: 'Notificar acessos suspeitos', s: 'Por e-mail e Slack', on: false },
-          ].map((s, i) => (
-            <div
-              key={i}
-              className="row gap-3"
-              style={{
-                padding: '14px 0',
-                borderBottom: i < 3 ? '1px solid var(--line-soft)' : 'none',
-              }}
-            >
-              <div className="grow">
-                <div style={{ fontSize: 13.5, fontWeight: 500 }}>{s.l}</div>
-                <div style={{ fontSize: 11.5, color: 'var(--muted)' }}>{s.s}</div>
-              </div>
-              <div
-                style={{
-                  width: 36,
-                  height: 20,
-                  borderRadius: 10,
-                  background: s.on ? 'var(--brand)' : 'var(--line)',
-                  position: 'relative',
-                  cursor: 'pointer',
-                  transition: 'background .15s',
-                }}
-              >
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: 2,
-                    left: s.on ? 18 : 2,
-                    width: 16,
-                    height: 16,
-                    borderRadius: '50%',
-                    background: 'white',
-                    boxShadow: '0 1px 3px rgba(0,0,0,.2)',
-                    transition: 'left .15s',
-                  }}
-                />
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+      {tab === 'seguranca' && <SegurancaTab addToast={addToast} tweaks={tweaks} setTweak={setTweak} />}
 
       {tab === 'permissoes' && <PermissionsScreen addToast={addToast} embedded={true} activeCompany={activeCompany} />}
 
