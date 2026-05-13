@@ -449,6 +449,25 @@ select {
   .rh-pay-col-size  { display: none; }
 }
 
+/* === Dashboard responsive === */
+@media (max-width: 1100px) {
+  .dash-grid-main { grid-template-columns: 1fr !important; }
+}
+@media (max-width: 960px) {
+  .dash-grid-lower { grid-template-columns: 1fr 1fr !important; }
+}
+@media (max-width: 680px) {
+  .dash-page { padding: 12px !important; gap: 14px !important; }
+  .dash-grid-lower { grid-template-columns: 1fr !important; }
+  .dash-kpi-grid { grid-template-columns: 1fr 1fr !important; }
+  .dash-chart-legend { display: none !important; }
+  .dash-donut-inner { flex-direction: column !important; align-items: flex-start !important; }
+  .dash-actions-label { display: none !important; }
+}
+@media (max-width: 420px) {
+  .dash-kpi-grid { grid-template-columns: 1fr !important; }
+}
+
 /* === Print: A4 export for Justiça === */
 @media print {
   @page {

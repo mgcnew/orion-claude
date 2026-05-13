@@ -306,7 +306,7 @@ export default function Dashboard({ setRoute, navigate, addToast, activeCompany,
   const desPercent = data.totalEmployees > 0 ? ((data.counts.desligado / data.totalEmployees) * 100).toFixed(1) : '0';
 
   return (
-    <div className="fade-up" style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 20 }}>
+    <div className="fade-up dash-page" style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 20 }}>
       {/* Page header */}
       <div className="row" style={{ alignItems: 'flex-start', flexWrap: 'wrap', gap: 16 }}>
         <div className="grow" style={{ minWidth: 240 }}>
@@ -324,7 +324,7 @@ export default function Dashboard({ setRoute, navigate, addToast, activeCompany,
       </div>
 
       {/* KPI row */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>
+      <div className="dash-kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>
         <StatCard
           icon="users"
           label="Funcionários ativos"
@@ -363,7 +363,7 @@ export default function Dashboard({ setRoute, navigate, addToast, activeCompany,
       </div>
 
       {/* Main grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: 16 }}>
+      <div className="dash-grid-main" style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: 16 }}>
         {/* Admissions chart */}
         <div className="card" style={{ padding: 20 }}>
           <div className="row" style={{ marginBottom: 16 }}>
@@ -379,7 +379,7 @@ export default function Dashboard({ setRoute, navigate, addToast, activeCompany,
               </div>
             </div>
             <span className="grow" />
-            <div className="row gap-3" style={{ fontSize: 11.5, color: 'var(--muted)' }}>
+            <div className="dash-chart-legend row gap-3" style={{ fontSize: 11.5, color: 'var(--muted)' }}>
               <span className="row gap-2">
                 <span style={{ width: 10, height: 10, background: 'var(--brand)', borderRadius: 2 }} />{' '}
                 Admissões
@@ -457,7 +457,7 @@ export default function Dashboard({ setRoute, navigate, addToast, activeCompany,
           <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 16 }}>
             Distribuição por situação
           </div>
-          <div className="row gap-4" style={{ alignItems: 'center' }}>
+          <div className="dash-donut-inner row gap-4" style={{ alignItems: 'center' }}>
             <DonutChart
               segments={[
                 { v: data.counts.ativo, color: 'var(--brand)', label: 'Ativos' },
@@ -494,7 +494,7 @@ export default function Dashboard({ setRoute, navigate, addToast, activeCompany,
       </div>
 
       {/* Lower grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
+      <div className="dash-grid-lower" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
         {/* Activity timeline */}
         <div className="card" style={{ padding: 20 }}>
           <div className="row" style={{ marginBottom: 16 }}>
@@ -635,7 +635,7 @@ export default function Dashboard({ setRoute, navigate, addToast, activeCompany,
         <div className="row" style={{ marginBottom: 12 }}>
           <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700 }}>Ações rápidas</h3>
           <span className="grow" />
-          <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>
+          <span className="dash-actions-label" style={{ fontSize: 11.5, color: 'var(--muted)' }}>
             Atalhos para fluxos do dia a dia
           </span>
         </div>
