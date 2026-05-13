@@ -230,16 +230,16 @@ export function useDashboardData(companyId) {
       // Alerts
       const alerts = [];
       if (pendingDocsCount > 0) {
-        alerts.push({ kind: 'warn', icon: 'doc', title: `${pendingDocsCount} documentos sem assinatura/pendentes`, sub: 'Aguardando ação' });
+        alerts.push({ kind: 'warn', icon: 'doc', title: `${pendingDocsCount} documentos sem assinatura/pendentes`, sub: 'Aguardando ação', route: 'documents' });
       }
       if (warningsCount > 0) {
-        alerts.push({ kind: 'bad', icon: 'alert', title: `${warningsCount} advertências recentes`, sub: 'Atenção necessária' });
+        alerts.push({ kind: 'bad', icon: 'alert', title: `${warningsCount} advertências este mês`, sub: 'Atenção necessária', route: 'rh-warn' });
       }
       const vacationsPending = (vacations ?? []).filter(v =>
         v.status === 'pendente' && (!companyId || employeeIds.has(v.employee_id))
       );
       if (vacationsPending.length > 0) {
-        alerts.push({ kind: 'info', icon: 'umbrella', title: `${vacationsPending.length} solicitações de férias`, sub: 'Aprovação pendente' });
+        alerts.push({ kind: 'info', icon: 'umbrella', title: `${vacationsPending.length} solicitações de férias`, sub: 'Aprovação pendente', route: 'rh-vacation' });
       }
 
       setData({
@@ -499,7 +499,7 @@ export default function Dashboard({ setRoute, addToast, activeCompany, userName 
           <div className="row" style={{ marginBottom: 16 }}>
             <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>Atividade recente</h3>
             <span className="grow" />
-            <button className="btn ghost sm">Ver tudo</button>
+            <button className="btn ghost sm" onClick={() => setRoute('audit')}>Ver tudo</button>
           </div>
           <div className="col gap-3">
             {data.activities.length === 0 && <div style={{ fontSize: 12.5, color: 'var(--muted)' }}>Nenhuma atividade recente.</div>}
@@ -577,7 +577,7 @@ export default function Dashboard({ setRoute, addToast, activeCompany, userName 
               </div>
             ))}
           </div>
-          <button className="btn" style={{ width: '100%', justifyContent: 'center' }}>
+          <button className="btn" style={{ width: '100%', justifyContent: 'center' }} onClick={() => setRoute('rh-vacation')}>
             Ver calendário completo
           </button>
         </div>
@@ -599,8 +599,9 @@ export default function Dashboard({ setRoute, addToast, activeCompany, userName 
                   padding: '10px 12px',
                   borderRadius: 8,
                   border: '1px solid var(--line)',
-                  cursor: 'pointer',
+                  cursor: a.route ? 'pointer' : 'default',
                 }}
+                onClick={() => a.route && setRoute(a.route)}
                 onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--hover)')}
                 onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
               >
@@ -645,8 +646,8 @@ export default function Dashboard({ setRoute, addToast, activeCompany, userName 
           }}
         >
           {[
-            { i: 'plus', l: 'Novo funcionário', r: 'employees-new' },
-            { i: 'upload', l: 'Upload documento', r: 'documents-upload' },
+            { i: 'plus', l: 'Novo funcionário', r: 'employees' },
+            { i: 'upload', l: 'Upload documento', r: 'documents' },
             { i: 'alert', l: 'Nova advertência', r: 'rh-warn' },
             {
               i: 'clock',
