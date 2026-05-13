@@ -238,7 +238,7 @@ function AddDocModal({ onClose, onSaved, employees = [], companyId = null }) {
                   <div style={{ width: 38, height: 38, borderRadius: 9, background: c.color + '1f', color: c.color, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <Icon name={c.icon} size={17} />
                   </div>
-                  <span style={{ fontSize: 12, fontWeight: 600, lineHeight: 1.3 }}>{c.name}</span>
+                  <span style={{ fontSize: 12, fontWeight: 600, lineHeight: 1.3, color: 'var(--ink)' }}>{c.name}</span>
                 </button>
               ))}
             </div>
@@ -408,6 +408,88 @@ function DocFilterPanel({ filters, onChange, onClear, anchorRect, onClose, docCo
   );
 }
 
+// ============================================================
+// MODAL — Visualizar Documento
+// ============================================================
+function DocPreviewModal({ doc, onClose }) {
+  const cm = CATEGORIES.find(c => c.id === doc.cat);
+
+  useEffect(() => {
+    const esc = (e) => e.key === 'Escape' && onClose();
+    window.addEventListener('keydown', esc);
+    return () => window.removeEventListener('keydown', esc);
+  }, [onClose]);
+
+  const handleDownload = () => {
+    const a = document.createElement('a');
+    a.href = doc.file_url;
+    a.target = '_blank';
+    a.rel = 'noreferrer';
+    a.click();
+  };
+
+  return (
+    <div
+      style={{
+        position: 'fixed', inset: 0, zIndex: 500,
+        background: 'rgba(0,0,0,.72)', backdropFilter: 'blur(6px)',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        padding: 'clamp(8px,2vw,24px)',
+      }}
+      onClick={onClose}
+    >
+      <div
+        style={{
+          width: '100%', maxWidth: 920, maxHeight: '90vh',
+          background: 'var(--surface)', borderRadius: 16,
+          boxShadow: '0 32px 80px rgba(0,0,0,.5)',
+          display: 'flex', flexDirection: 'column', overflow: 'hidden',
+        }}
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--line)', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
+          <FileIcon type={doc.type} color={cm?.color} size={34} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc.name}</div>
+            <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 2 }}>
+              {cm && <span style={{ color: cm.color, fontWeight: 600 }}>{cm.name}</span>}
+              {cm && ' · '}{doc.who} · {doc.date}
+            </div>
+          </div>
+          {doc.file_url && (
+            <button className="btn sm" onClick={handleDownload}>
+              <Icon name="download" size={13} /> Baixar
+            </button>
+          )}
+          <button className="btn ghost icon sm" onClick={onClose}><Icon name="x" size={15} /></button>
+        </div>
+
+        {/* Content */}
+        <div style={{ flex: 1, overflow: 'hidden', background: 'var(--bg)', minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          {!doc.file_url ? (
+            <div style={{ padding: 64, textAlign: 'center', color: 'var(--muted)' }}>
+              <Icon name="folder" size={48} style={{ opacity: 0.3, marginBottom: 12 }} />
+              <div style={{ fontSize: 14, fontWeight: 600 }}>Arquivo não disponível</div>
+              <div style={{ fontSize: 12, marginTop: 4 }}>Este documento não tem arquivo anexado.</div>
+            </div>
+          ) : doc.type === 'image' ? (
+            <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+              <img src={doc.file_url} alt={doc.name} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: 8 }} />
+            </div>
+          ) : (
+            <iframe
+              src={doc.file_url}
+              title={doc.name}
+              style={{ width: '100%', height: '100%', border: 'none', minHeight: 520 }}
+            />
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function DocumentsScreen({ addToast, activeCompany }) {
   const { can } = usePermissions();
   const [filters, setFilters] = useState({ cat: null, dateFrom: '', dateTo: '' });
@@ -419,6 +501,7 @@ export default function DocumentsScreen({ addToast, activeCompany }) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [filterOpen, setFilterOpen]     = useState(false);
   const [filterRect, setFilterRect]     = useState(null);
+  const [previewDoc, setPreviewDoc]     = useState(null);
   const filterBtnRef = useRef();
 
   const { documents: raw, loading, error, refetch } = useAllDocuments(activeCompany?.id);
@@ -481,6 +564,13 @@ export default function DocumentsScreen({ addToast, activeCompany }) {
     const s = new Set(selected);
     s.has(id) ? s.delete(id) : s.add(id);
     setSelected(s);
+  };
+
+  const allSelected  = filtered.length > 0 && filtered.every(d => selected.has(d.id));
+  const someSelected = filtered.some(d => selected.has(d.id)) && !allSelected;
+  const toggleSelectAll = () => {
+    if (allSelected) setSelected(new Set());
+    else setSelected(new Set(filtered.map(d => d.id)));
   };
 
   return (
@@ -605,7 +695,16 @@ export default function DocumentsScreen({ addToast, activeCompany }) {
               <div style={{ fontSize: 12 }}>{search || activeFilterCount > 0 ? 'Tente ajustar os filtros' : 'Clique em "Novo documento" para começar'}</div>
             </div>
           ) : view === 'list' ? (
-            <ListView docs={filtered} categories={CATEGORIES} selected={selected} onToggle={toggleSelect} />
+            <ListView
+              docs={filtered}
+              categories={CATEGORIES}
+              selected={selected}
+              onToggle={toggleSelect}
+              onSelectAll={toggleSelectAll}
+              allSelected={allSelected}
+              someSelected={someSelected}
+              onPreview={setPreviewDoc}
+            />
           ) : (
             <GridView docs={filtered} categories={CATEGORIES} />
           )}
@@ -631,54 +730,69 @@ export default function DocumentsScreen({ addToast, activeCompany }) {
           onSaved={() => { refetch(); addToast({ kind: 'ok', msg: 'Documento adicionado' }); }}
         />
       )}
+
+      {previewDoc && (
+        <DocPreviewModal doc={previewDoc} onClose={() => setPreviewDoc(null)} />
+      )}
     </div>
   );
 }
 
-function ListView({ docs, categories, selected, onToggle }) {
+function ListView({ docs, categories, selected, onToggle, onSelectAll, allSelected, someSelected, onPreview }) {
+  const [hoveredRow, setHoveredRow] = useState(null);
+  const allCheckRef = useRef();
+
+  useEffect(() => {
+    if (allCheckRef.current) allCheckRef.current.indeterminate = someSelected;
+  }, [someSelected]);
+
   return (
     <div style={{ overflowX: 'auto' }}>
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 480 }}>
         <thead>
           <tr style={{ background: 'var(--surface-2)', color: 'var(--muted)', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 }}>
             <th style={{ padding: '9px 16px', width: 36 }}>
-              <input type="checkbox" style={{ accentColor: 'var(--brand)' }} />
+              <input
+                ref={allCheckRef}
+                type="checkbox"
+                checked={allSelected}
+                onChange={onSelectAll}
+                style={{ accentColor: 'var(--brand)', cursor: 'pointer' }}
+              />
             </th>
             <th style={{ padding: '9px 16px', textAlign: 'left', fontWeight: 600 }}>Nome</th>
-            <th className="doc-col-cat"  style={{ padding: '9px 16px', textAlign: 'left', fontWeight: 600 }}>Categoria</th>
-            <th className="doc-col-who"  style={{ padding: '9px 16px', textAlign: 'left', fontWeight: 600 }}>Funcionário</th>
-            <th className="doc-col-date" style={{ padding: '9px 16px', textAlign: 'left', fontWeight: 600 }}>Data</th>
-            <th className="doc-col-size" style={{ padding: '9px 16px', textAlign: 'left', fontWeight: 600 }}>Tamanho</th>
+            <th className="doc-col-cat"    style={{ padding: '9px 16px', textAlign: 'left', fontWeight: 600 }}>Categoria</th>
+            <th className="doc-col-who"    style={{ padding: '9px 16px', textAlign: 'left', fontWeight: 600 }}>Funcionário</th>
+            <th className="doc-col-date"   style={{ padding: '9px 16px', textAlign: 'left', fontWeight: 600 }}>Data</th>
+            <th className="doc-col-size"   style={{ padding: '9px 16px', textAlign: 'left', fontWeight: 600 }}>Tamanho</th>
             <th className="doc-col-status" style={{ padding: '9px 16px', textAlign: 'left', fontWeight: 600 }}>Status</th>
-            <th style={{ width: 72 }} />
+            <th style={{ width: 80 }} />
           </tr>
         </thead>
         <tbody>
           {docs.map(f => {
-            const cm = categories.find(c => c.id === f.cat);
-            const st = STATUS_MAP[f.status] || STATUS_MAP.ok;
+            const cm      = categories.find(c => c.id === f.cat);
+            const st      = STATUS_MAP[f.status] || STATUS_MAP.ok;
+            const hovered = hoveredRow === f.id;
+            const checked = selected.has(f.id);
             return (
               <tr
                 key={f.id}
-                style={{ borderTop: '1px solid var(--line-soft)', cursor: 'pointer' }}
-                onMouseEnter={e => e.currentTarget.style.background = 'var(--hover)'}
-                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                style={{ borderTop: '1px solid var(--line-soft)', cursor: 'pointer', background: hovered || checked ? 'var(--hover)' : 'transparent', transition: 'background .1s' }}
+                onMouseEnter={() => setHoveredRow(f.id)}
+                onMouseLeave={() => setHoveredRow(null)}
               >
                 <td style={{ padding: '10px 16px' }} onClick={e => { e.stopPropagation(); onToggle(f.id); }}>
-                  <input type="checkbox" checked={selected.has(f.id)} onChange={() => onToggle(f.id)} style={{ accentColor: 'var(--brand)' }} />
+                  <input type="checkbox" checked={checked} onChange={() => onToggle(f.id)} style={{ accentColor: 'var(--brand)', cursor: 'pointer' }} />
                 </td>
 
-                {/* Nome — absorbe info das colunas ocultas */}
                 <td style={{ padding: '10px 16px', minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
                     <FileIcon type={f.type} color={cm?.color} size={30} />
                     <div style={{ minWidth: 0, flex: 1 }}>
                       <div style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</div>
-                      {/* Subtítulo aparece quando colunas sumem */}
                       <div className="doc-name-sub" style={{ display: 'none', alignItems: 'center', gap: 6, marginTop: 2, flexWrap: 'wrap' }}>
-                        {cm && (
-                          <span className="doc-name-sub-cat" style={{ display: 'none', fontSize: 11, color: cm.color, fontWeight: 600 }}>{cm.name}</span>
-                        )}
+                        {cm && <span className="doc-name-sub-cat" style={{ display: 'none', fontSize: 11, color: cm.color, fontWeight: 600 }}>{cm.name}</span>}
                         <span style={{ fontSize: 11, color: 'var(--muted)' }}>{f.who}</span>
                         <span style={{ fontSize: 11, color: 'var(--muted-2)' }}>·</span>
                         <span style={{ fontSize: 11, color: 'var(--muted)' }}>{f.date}</span>
@@ -695,23 +809,36 @@ function ListView({ docs, categories, selected, onToggle }) {
                     </span>
                   )}
                 </td>
-                <td className="doc-col-who"   style={{ padding: '10px 16px', color: 'var(--muted)', fontSize: 12.5, whiteSpace: 'nowrap' }}>{f.who}</td>
-                <td className="doc-col-date"  style={{ padding: '10px 16px', color: 'var(--muted)', fontSize: 12.5, whiteSpace: 'nowrap' }}>{f.date}</td>
-                <td className="doc-col-size"  style={{ padding: '10px 16px', color: 'var(--muted)', fontSize: 12.5, whiteSpace: 'nowrap' }}>{f.size ?? '—'}</td>
+                <td className="doc-col-who"    style={{ padding: '10px 16px', color: 'var(--muted)', fontSize: 12.5, whiteSpace: 'nowrap' }}>{f.who}</td>
+                <td className="doc-col-date"   style={{ padding: '10px 16px', color: 'var(--muted)', fontSize: 12.5, whiteSpace: 'nowrap' }}>{f.date}</td>
+                <td className="doc-col-size"   style={{ padding: '10px 16px', color: 'var(--muted)', fontSize: 12.5, whiteSpace: 'nowrap' }}>{f.size ?? '—'}</td>
                 <td className="doc-col-status" style={{ padding: '10px 16px' }}>
                   <span className={`pill ${st.cls}`} style={{ fontSize: 11 }}>{st.label}</span>
                 </td>
                 <td style={{ padding: '10px 12px' }}>
-                  <div style={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
+                  <div style={{
+                    display: 'flex', gap: 2, justifyContent: 'flex-end',
+                    opacity: hovered || checked ? 1 : 0,
+                    pointerEvents: hovered || checked ? 'auto' : 'none',
+                    transition: 'opacity .12s',
+                  }}>
                     {f.file_url && (
-                      <a href={f.file_url} target="_blank" rel="noreferrer">
-                        <button className="btn ghost icon sm"><Icon name="eye" size={13} /></button>
-                      </a>
+                      <button
+                        className="btn ghost icon sm"
+                        title="Visualizar"
+                        onClick={e => { e.stopPropagation(); onPreview(f); }}
+                      >
+                        <Icon name="eye" size={13} />
+                      </button>
                     )}
                     {f.file_url && (
-                      <a href={f.file_url} download>
-                        <button className="btn ghost icon sm"><Icon name="download" size={13} /></button>
-                      </a>
+                      <button
+                        className="btn ghost icon sm"
+                        title="Baixar"
+                        onClick={e => { e.stopPropagation(); window.open(f.file_url, '_blank'); }}
+                      >
+                        <Icon name="download" size={13} />
+                      </button>
                     )}
                   </div>
                 </td>

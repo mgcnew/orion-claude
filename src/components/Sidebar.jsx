@@ -17,18 +17,7 @@ const NAV = [
     label: 'Controle de ponto',
     icon: 'clock',
   },
-  {
-    id: 'rh',
-    label: 'RH',
-    icon: 'briefcase',
-    sub: [
-      { id: 'rh-warn', label: 'Advertências' },
-      { id: 'rh-vacation', label: 'Férias' },
-      { id: 'rh-benefits', label: 'Benefícios' },
-      { id: 'rh-eval', label: 'Avaliações' },
-      { id: 'rh-payslip', label: 'Holerites' },
-    ],
-  },
+  { id: 'rh', label: 'RH', icon: 'briefcase' },
   { id: 'reports', label: 'Relatórios', icon: 'chart' },
   { id: 'justice', label: 'Justiça', icon: 'gavel' },
   { id: 'section', label: 'ADMINISTRAÇÃO' },
@@ -75,7 +64,6 @@ export default function Sidebar({ route, setRoute, collapsed, setCollapsed, user
     employees: route.startsWith('employees'),
     documents: route.startsWith('documents'),
     time: route.startsWith('time'),
-    rh: route.startsWith('rh'),
   });
   const [tip, setTip] = useState(null); // { label, y }
 

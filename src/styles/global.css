@@ -44,7 +44,7 @@ html.dark {
   --ink: #e6e8ec;
   --ink-soft: #bfc3cb;
   --muted: #8a8f99;
-  --muted-2: #5e6470;
+  --muted-2: #6e7480;
   --line: #1f242c;
   --line-soft: #181c22;
   --hover: #1a1e25;
@@ -88,6 +88,7 @@ body {
 
 button {
   font-family: inherit;
+  color: inherit;
 }
 input,
 textarea,
@@ -419,6 +420,33 @@ select {
   .doc-col-date { display: none; }
   .doc-col-cat  { display: none; }
   .doc-name-sub-cat { display: inline !important; }
+}
+
+/* === RH Screen responsive === */
+@media (max-width: 640px) {
+  .rh-screen { padding: 12px !important; }
+  .rh-tab-label { display: none; }
+}
+/* Advertências */
+@media (max-width: 860px) {
+  .rh-warn-col-by   { display: none; }
+}
+@media (max-width: 680px) {
+  .rh-warn-col-date { display: none; }
+  .rh-warn-col-desc { display: none; }
+}
+/* Férias */
+@media (max-width: 900px) {
+  .rh-vac-col-by    { display: none; }
+  .rh-vac-col-req   { display: none; }
+}
+@media (max-width: 680px) {
+  .rh-vac-col-days  { display: none; }
+}
+/* Holerites */
+@media (max-width: 700px) {
+  .rh-pay-col-date  { display: none; }
+  .rh-pay-col-size  { display: none; }
 }
 
 /* === Print: A4 export for Justiça === */

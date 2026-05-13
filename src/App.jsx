@@ -23,10 +23,9 @@ import {
   AuditScreen,
   ReportsScreen,
   SettingsScreen,
-  WarningsScreen,
-  VacationScreen,
   Placeholder,
 } from './screens/Other.jsx';
+import RHScreen from './screens/RH.jsx';
 
 import { useTweaks } from './hooks/useTweaks.js';
 import { darken, hexToRgba, isLight } from './lib/color.js';
@@ -200,15 +199,8 @@ export default function App() {
     if (route === 'reports') return <ReportsScreen addToast={addToast} activeCompany={activeCompany} />;
     if (route === 'settings')
       return <SettingsScreen addToast={addToast} setRoute={setRoute} activeCompany={activeCompany} />;
-    if (route === 'rh-warn') return <WarningsScreen addToast={addToast} activeCompany={activeCompany} />;
-    if (route === 'rh-vacation') return <VacationScreen addToast={addToast} activeCompany={activeCompany} />;
-    if (route.startsWith('rh'))
-      return (
-        <Placeholder
-          title="Recursos Humanos"
-          desc="Advertências, férias, benefícios, avaliações e holerites."
-        />
-      );
+    if (route === 'rh' || route.startsWith('rh-'))
+      return <RHScreen addToast={addToast} activeCompany={activeCompany} route={route} />;
     return <Dashboard setRoute={setRoute} addToast={addToast} />;
   };
 

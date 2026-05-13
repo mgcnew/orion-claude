@@ -38,7 +38,16 @@ function buildCrumbs(route, routeLabel) {
     return [{ label: 'Configurações', id: 'settings' }, { label: 'Permissões' }];
   if (route === 'reports') return [{ label: 'Relatórios' }];
   if (route === 'justice') return [{ label: 'Justiça' }];
-  if (route.startsWith('rh')) return [{ label: 'RH' }, { label: 'Visão geral' }];
+  if (route.startsWith('rh')) {
+    const sub = route === 'rh' ? 'Resumo'
+      : route === 'rh-warn'     ? 'Advertências'
+      : route === 'rh-vacation' ? 'Férias'
+      : route === 'rh-benefits' ? 'Benefícios'
+      : route === 'rh-eval'     ? 'Avaliações'
+      : route === 'rh-payslip'  ? 'Holerites'
+      : 'Resumo';
+    return [{ label: 'RH', id: 'rh' }, { label: sub }];
+  }
   return [{ label: 'Início' }];
 }
 
