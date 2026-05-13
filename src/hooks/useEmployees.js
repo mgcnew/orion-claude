@@ -344,6 +344,51 @@ export function useAllVacations(companyId) {
   return { vacations, loading, error, refetch: fetch };
 }
 
+// ============================================================
+// BENEFÍCIOS
+// ============================================================
+export function useAllBenefits(companyId) {
+  const [benefits, setBenefits] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetch = useCallback(async () => {
+    setLoading(true);
+    let query = supabase
+      .from('employee_benefits')
+      .select('*, employees!inner(id, name, dept, hue, company_id)')
+      .order('created_at', { ascending: false });
+    if (companyId) query = query.eq('company_id', companyId);
+    const { data } = await query;
+    setBenefits(data ?? []);
+    setLoading(false);
+  }, [companyId]);
+
+  useEffect(() => { fetch(); }, [fetch]);
+  return { benefits, loading, refetch: fetch };
+}
+
+export async function createBenefit(data) {
+  const { data: created, error } = await supabase
+    .from('employee_benefits')
+    .insert(data)
+    .select('*, employees(id, name, dept, hue)')
+    .single();
+  return { created, error };
+}
+
+export async function updateBenefitStatus(id, status) {
+  const { error } = await supabase
+    .from('employee_benefits')
+    .update({ status })
+    .eq('id', id);
+  return { error };
+}
+
+export async function deleteBenefit(id) {
+  const { error } = await supabase.from('employee_benefits').delete().eq('id', id);
+  return { error };
+}
+
 // Atualizar status de férias
 export async function updateVacationStatus(id, status) {
   const { error } = await supabase
