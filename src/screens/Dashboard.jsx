@@ -268,7 +268,8 @@ function greeting(name) {
   return first ? `${period}, ${first} 👋` : `${period} 👋`;
 }
 
-export default function Dashboard({ setRoute, addToast, activeCompany, userName }) {
+export default function Dashboard({ setRoute, navigate, addToast, activeCompany, userName }) {
+  const nav = navigate ?? setRoute;
   const { data, loading } = useDashboardData(activeCompany?.id);
   const today = new Date();
   
@@ -646,17 +647,10 @@ export default function Dashboard({ setRoute, addToast, activeCompany, userName 
           }}
         >
           {[
-            { i: 'plus', l: 'Novo funcionário', r: 'employees' },
-            { i: 'upload', l: 'Upload documento', r: 'documents' },
-            { i: 'alert', l: 'Nova advertência', r: 'rh-warn' },
-            {
-              i: 'clock',
-              l: 'Registrar ponto',
-              r: 'time',
-              action: () => {
-                setRoute('time');
-              },
-            },
+            { i: 'plus', l: 'Novo funcionário', r: 'employees', intent: 'new' },
+            { i: 'upload', l: 'Upload documento', r: 'documents', intent: 'upload' },
+            { i: 'alert', l: 'Nova advertência', r: 'rh-warn', intent: 'new-warn' },
+            { i: 'clock', l: 'Registrar ponto', r: 'time' },
             { i: 'umbrella', l: 'Aprovar férias', r: 'rh-vacation' },
             { i: 'chart', l: 'Gerar relatório', r: 'reports' },
           ].map((a, i) => (
@@ -664,7 +658,7 @@ export default function Dashboard({ setRoute, addToast, activeCompany, userName 
               key={i}
               className="btn"
               style={{ height: 64, flexDirection: 'column', gap: 6, justifyContent: 'center' }}
-              onClick={() => (a.action ? a.action() : setRoute(a.r))}
+              onClick={() => nav(a.r, a.intent ?? null)}
             >
               <Icon name={a.i} size={17} style={{ color: 'var(--brand)' }} />
               <span style={{ fontSize: 12 }}>{a.l}</span>

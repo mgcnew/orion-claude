@@ -490,7 +490,7 @@ function DocPreviewModal({ doc, onClose }) {
   );
 }
 
-export default function DocumentsScreen({ addToast, activeCompany }) {
+export default function DocumentsScreen({ addToast, activeCompany, openModal }) {
   const { can } = usePermissions();
   const [filters, setFilters] = useState({ cat: null, dateFrom: '', dateTo: '' });
   const [view, setView]       = useState('list');
@@ -498,7 +498,7 @@ export default function DocumentsScreen({ addToast, activeCompany }) {
   const [dragOver, setDragOver] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [selected, setSelected] = useState(new Set());
-  const [showAddModal, setShowAddModal] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(!!openModal);
   const [filterOpen, setFilterOpen]     = useState(false);
   const [filterRect, setFilterRect]     = useState(null);
   const [previewDoc, setPreviewDoc]     = useState(null);

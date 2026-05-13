@@ -962,13 +962,13 @@ function FilterPanel({ filters, onChange, onClear, anchorRect, onClose }) {
   );
 }
 
-export function EmployeesList({ setRoute, setRouteParam, setRouteLabel, companyId }) {
+export function EmployeesList({ setRoute, setRouteParam, setRouteLabel, companyId, openModal }) {
   const { can } = usePermissions();
   const [view, setView]     = useState('table');
   const [filters, setFilters] = useState({ status: 'todos', admissionFrom: '', admissionTo: '' });
   const [q, setQ]           = useState('');
   const [selected, setSelected] = useState(new Set());
-  const [showNewModal, setShowNewModal] = useState(false);
+  const [showNewModal, setShowNewModal] = useState(!!openModal);
   const [actionModal, setActionModal]   = useState(null); // { type: 'afastar'|'desligar'|'reativar', emp }
   const [filterOpen, setFilterOpen] = useState(false);
   const [filterRect, setFilterRect] = useState(null);

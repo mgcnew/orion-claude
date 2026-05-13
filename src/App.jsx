@@ -49,6 +49,7 @@ export default function App() {
   const [route, setRoute] = useState('dashboard');
   const [routeParam, setRouteParam] = useState(null);   // ex: employee UUID
   const [routeLabel, setRouteLabel] = useState(null);   // ex: employee name (para breadcrumb)
+  const [routeIntent, setRouteIntent] = useState(null); // ex: 'new', 'upload', 'new-warn'
   const [collapsed, setCollapsed] = useState(false);
   const [cmdOpen, setCmdOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
@@ -58,6 +59,9 @@ export default function App() {
   const [profileOpen, setProfileOpen] = useState(false);
   const [userProfile, setUserProfile] = useState(null);
   const { companies } = useCompanies();
+
+  const navigate = (r, intent = null) => { setRoute(r); setRouteIntent(intent); };
+  useEffect(() => { const t = setTimeout(() => setRouteIntent(null), 80); return () => clearTimeout(t); }, [route]);
 
   // Supabase auth state
   useEffect(() => {
@@ -184,11 +188,11 @@ export default function App() {
 
   // ===== ROUTING =====
   const renderScreen = () => {
-    if (route === 'dashboard') return <Dashboard setRoute={setRoute} addToast={addToast} activeCompany={activeCompany} userName={userName} />;
-    if (route === 'employees') return <EmployeesList setRoute={setRoute} setRouteParam={setRouteParam} setRouteLabel={setRouteLabel} companyId={activeCompany?.id} />;
+    if (route === 'dashboard') return <Dashboard setRoute={setRoute} navigate={navigate} addToast={addToast} activeCompany={activeCompany} userName={userName} />;
+    if (route === 'employees') return <EmployeesList setRoute={setRoute} setRouteParam={setRouteParam} setRouteLabel={setRouteLabel} companyId={activeCompany?.id} openModal={routeIntent === 'new'} />;
     if (route === 'employees-profile') return <EmployeeProfile setRoute={setRoute} employeeId={routeParam} />;
     if (route.startsWith('documents'))
-      return <DocumentsScreen addToast={addToast} activeCompany={activeCompany} />;
+      return <DocumentsScreen addToast={addToast} activeCompany={activeCompany} openModal={routeIntent === 'upload'} />;
     if (route.startsWith('time')) return <TimeScreen addToast={addToast} activeCompany={activeCompany} />;
     if (route === 'permissions' || route === 'settings-permissions')
       return (
@@ -200,7 +204,7 @@ export default function App() {
     if (route === 'settings')
       return <SettingsScreen addToast={addToast} setRoute={setRoute} activeCompany={activeCompany} />;
     if (route === 'rh' || route.startsWith('rh-'))
-      return <RHScreen addToast={addToast} activeCompany={activeCompany} route={route} />;
+      return <RHScreen addToast={addToast} activeCompany={activeCompany} route={route} openModal={routeIntent === 'new-warn'} />;
     return <Dashboard setRoute={setRoute} addToast={addToast} />;
   };
 

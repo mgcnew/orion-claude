@@ -30,7 +30,7 @@ const ROUTE_TO_TAB = {
 // ============================================================
 // MAIN SCREEN
 // ============================================================
-export default function RHScreen({ addToast, activeCompany, route }) {
+export default function RHScreen({ addToast, activeCompany, route, openModal }) {
   const [tab, setTab] = useState(() => ROUTE_TO_TAB[route] ?? 'resumo');
   const { can } = usePermissions();
 
@@ -87,7 +87,7 @@ export default function RHScreen({ addToast, activeCompany, route }) {
           <ResumoTab warnings={warnings} vacations={vacations} payslips={payslips} setTab={setTab} />
         )}
         {tab === 'advertencias' && (
-          <AdvertenciasTab {...shared} warnings={warnings} loading={warnLoading} refetch={refetchWarnings} />
+          <AdvertenciasTab {...shared} warnings={warnings} loading={warnLoading} refetch={refetchWarnings} openModal={openModal} />
         )}
         {tab === 'ferias' && (
           <FeriasTab {...shared} vacations={vacations} loading={vacLoading} refetch={refetchVacations} />
@@ -242,10 +242,10 @@ function ResumoTab({ warnings, vacations, payslips, setTab }) {
 // ============================================================
 // ABA — ADVERTÊNCIAS
 // ============================================================
-function AdvertenciasTab({ addToast, companyId, activeEmployees, can, warnings, loading, refetch }) {
+function AdvertenciasTab({ addToast, companyId, activeEmployees, can, warnings, loading, refetch, openModal }) {
   const [filter, setFilter] = useState('todas');
   const [q, setQ] = useState('');
-  const [showModal, setShowModal] = useState(false);
+  const [showModal, setShowModal] = useState(!!openModal);
   const [newWarn, setNewWarn] = useState({ employee_id: '', severity: 'verbal', description: '' });
   const [saving, setSaving] = useState(false);
 
