@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import Icon from '../components/Icon.jsx';
 import { useAllDocuments, useEmployees, logAudit } from '../hooks/useEmployees.js';
 import { supabase } from '../lib/supabase.js';
+import { usePermissions } from '../lib/permissions.jsx';
 
 const CATEGORIES = [
   { id: 'contratos',     name: 'Contratos',       icon: 'doc',         color: '#2A5BFF' },
@@ -408,6 +409,7 @@ function DocFilterPanel({ filters, onChange, onClear, anchorRect, onClose, docCo
 }
 
 export default function DocumentsScreen({ addToast, activeCompany }) {
+  const { can } = usePermissions();
   const [filters, setFilters] = useState({ cat: null, dateFrom: '', dateTo: '' });
   const [view, setView]       = useState('list');
   const [search, setSearch]   = useState('');
@@ -504,9 +506,11 @@ export default function DocumentsScreen({ addToast, activeCompany }) {
           <h1 style={{ margin: '0 0 4px', fontSize: 22, fontWeight: 700, letterSpacing: -0.4 }}>Documentos</h1>
           <p style={{ margin: 0, fontSize: 13, color: 'var(--muted)' }}>Contratos, holerites, atestados e toda a documentação da equipe.</p>
         </div>
-        <button className="btn primary" onClick={() => setShowAddModal(true)}>
-          <Icon name="plus" size={15} /> Novo documento
-        </button>
+        {can('Documentos', 'upload') && (
+          <button className="btn primary" onClick={() => setShowAddModal(true)}>
+            <Icon name="plus" size={15} /> Novo documento
+          </button>
+        )}
       </div>
 
       {/* Card with toolbar + table */}

@@ -777,3 +777,42 @@ export async function sendInvite({ email, role, companyIds }) {
     .single();
   return { data, error };
 }
+
+// ============================================================
+// PERMISSÕES
+// ============================================================
+
+export function useCompanyUsers(companyId) {
+  const [members, setMembers] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetch = useCallback(async () => {
+    if (!companyId) { setMembers([]); setLoading(false); return; }
+    setLoading(true);
+    const { data: ucs } = await supabase
+      .from('user_companies')
+      .select('user_id, role, grants')
+      .eq('company_id', companyId);
+    if (!ucs || ucs.length === 0) { setMembers([]); setLoading(false); return; }
+    const ids = ucs.map(u => u.user_id);
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, name, email, avatar_hue, active')
+      .in('id', ids);
+    const profileMap = Object.fromEntries((profiles ?? []).map(p => [p.id, p]));
+    setMembers(ucs.map(uc => ({ ...uc, profile: profileMap[uc.user_id] ?? null })));
+    setLoading(false);
+  }, [companyId]);
+
+  useEffect(() => { fetch(); }, [fetch]);
+  return { members, loading, refetch: fetch };
+}
+
+export async function updateUserCompany(userId, companyId, { role, grants }) {
+  const { error } = await supabase
+    .from('user_companies')
+    .update({ role, grants })
+    .eq('user_id', userId)
+    .eq('company_id', companyId);
+  return { error };
+}

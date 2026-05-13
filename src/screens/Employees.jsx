@@ -4,6 +4,7 @@ import Icon from '../components/Icon.jsx';
 import Avatar from '../components/Avatar.jsx';
 import { useEmployees, useEmployee, useEmployeeCounts, useEmployeeWarnings, useEmployeeVacations, useEmployeeDocuments, useEmployeeHistory, useEmployeeTimeEntries, clockIn, clockOut, createEmployee, updateEmployee, updateEmployeeStatus, createDocuments, useCompanies, useOnboardingDocs, createOnboardingDocs, markOnboardingDocUploaded, useAllPendingOnboarding, logAudit } from '../hooks/useEmployees.js';
 import { supabase } from '../lib/supabase.js';
+import { usePermissions } from '../lib/permissions.jsx';
 
 // ── Checklist de admissão ─────────────────────────────────────
 const ONBOARDING_BASE = [
@@ -962,6 +963,7 @@ function FilterPanel({ filters, onChange, onClear, anchorRect, onClose }) {
 }
 
 export function EmployeesList({ setRoute, setRouteParam, setRouteLabel, companyId }) {
+  const { can } = usePermissions();
   const [view, setView]     = useState('table');
   const [filters, setFilters] = useState({ status: 'todos', admissionFrom: '', admissionTo: '' });
   const [q, setQ]           = useState('');
@@ -1029,9 +1031,11 @@ export function EmployeesList({ setRoute, setRouteParam, setRouteLabel, companyI
           <button className="btn">
             <Icon name="download" size={15} /> Exportar CSV
           </button>
-          <button className="btn primary" onClick={() => setShowNewModal(true)}>
-            <Icon name="plus" size={15} /> Novo funcionário
-          </button>
+          {can('Funcionários', 'criar') && (
+            <button className="btn primary" onClick={() => setShowNewModal(true)}>
+              <Icon name="plus" size={15} /> Novo funcionário
+            </button>
+          )}
         </div>
       </div>
 

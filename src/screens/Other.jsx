@@ -19,222 +19,206 @@ import {
   updateCompany,
   useAuditLog,
   logAudit,
+  useCompanyUsers,
+  updateUserCompany,
 } from '../hooks/useEmployees.js';
+import { MODULES, ROLES, ROLE_TEMPLATES, usePermissions } from '../lib/permissions.jsx';
 
 // ============================================================
 // TIME TRACKING
 // ============================================================
 // PERMISSIONS
 // ============================================================
-export function PermissionsScreen({ addToast, embedded }) {
-  const [active, setActive] = useState(0);
-  const [grants, setGrants] = useState({});
-  const user = D.userRoles[active];
-  const key = (m, p) => `${active}|${m}|${p}`;
-  const isOn = (m, p) => {
-    if (grants[key(m, p)] != null) return grants[key(m, p)];
-    if (user.role === 'Administrador') return true;
-    if (user.role === 'RH') return p !== 'excluir' && m !== 'Administração';
-    if (user.role === 'Supervisor')
-      return ['ver', 'registrar', 'aprovar h.ext', 'exportar', 'ponto', 'funcionários'].includes(p);
-    return ['ver'].includes(p);
+export function PermissionsScreen({ addToast, embedded, activeCompany }) {
+  const { members, loading, refetch } = useCompanyUsers(activeCompany?.id);
+  const [activeId, setActiveId] = useState(null);
+  const [localGrants, setLocalGrants] = useState({});
+  const [localRole, setLocalRole] = useState('Operacional');
+  const [saving, setSaving] = useState(false);
+  const [search, setSearch] = useState('');
+
+  const selected = members.find(m => m.user_id === activeId);
+
+  useEffect(() => {
+    if (selected) {
+      setLocalGrants(selected.grants ?? {});
+      setLocalRole(selected.role ?? 'Operacional');
+    }
+  }, [activeId, selected]);
+
+  const isOn = (module, perm) => {
+    if (localRole === 'Administrador') return true;
+    const key = `${module}.${perm}`;
+    if (localGrants[key] !== undefined) return Boolean(localGrants[key]);
+    const tpl = ROLE_TEMPLATES[localRole] ?? ROLE_TEMPLATES.Operacional;
+    return tpl[key] ?? false;
   };
-  const toggle = (m, p) => setGrants((g) => ({ ...g, [key(m, p)]: !isOn(m, p) }));
+
+  const toggle = (module, perm) => {
+    const key = `${module}.${perm}`;
+    setLocalGrants(g => ({ ...g, [key]: !isOn(module, perm) }));
+  };
+
+  const applyTemplate = (role) => {
+    setLocalRole(role);
+    setLocalGrants({});
+  };
+
+  const handleSave = async () => {
+    if (!activeId || !activeCompany?.id) return;
+    setSaving(true);
+    const { error } = await updateUserCompany(activeId, activeCompany.id, { role: localRole, grants: localGrants });
+    setSaving(false);
+    if (error) {
+      addToast({ kind: 'warn', msg: 'Erro ao salvar: ' + error.message });
+    } else {
+      logAudit(activeCompany.id, 'EDITOU', `Permissões: ${selected?.profile?.name ?? activeId}`);
+      addToast({ kind: 'ok', msg: 'Permissões salvas!' });
+      refetch();
+    }
+  };
+
+  const filtered = members.filter(m =>
+    !search ||
+    (m.profile?.name ?? '').toLowerCase().includes(search.toLowerCase()) ||
+    (m.profile?.email ?? '').toLowerCase().includes(search.toLowerCase())
+  );
+
+  if (!activeCompany) {
+    return (
+      <div className="card" style={{ padding: 48, textAlign: 'center', color: 'var(--muted)' }}>
+        <Icon name="building" size={32} style={{ marginBottom: 12, opacity: 0.4 }} />
+        <div style={{ fontSize: 14, fontWeight: 600 }}>Selecione uma empresa</div>
+        <div style={{ fontSize: 12.5, marginTop: 6 }}>As permissões são configuradas por empresa. Escolha uma empresa no menu lateral.</div>
+      </div>
+    );
+  }
 
   return (
-    <div
-      className={embedded ? '' : 'fade-up'}
-      style={{
-        padding: embedded ? 0 : 24,
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 16,
-      }}
-    >
+    <div className={embedded ? '' : 'fade-up'} style={{ padding: embedded ? 0 : 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
       {!embedded && (
         <div className="row" style={{ gap: 12, flexWrap: 'wrap' }}>
           <div className="grow">
-            <h1 style={{ margin: '0 0 4px', fontSize: 22, fontWeight: 700, letterSpacing: -0.4 }}>
-              Permissões granulares
-            </h1>
-            <p style={{ margin: 0, fontSize: 13, color: 'var(--muted)' }}>
-              Configure exatamente o que cada usuário pode acessar dentro do sistema.
-            </p>
+            <h1 style={{ margin: '0 0 4px', fontSize: 22, fontWeight: 700, letterSpacing: -0.4 }}>Permissões granulares</h1>
+            <p style={{ margin: 0, fontSize: 13, color: 'var(--muted)' }}>Configure exatamente o que cada usuário pode acessar — por empresa.</p>
           </div>
-          <div className="row gap-2">
-            <button className="btn">
-              <Icon name="download" size={14} /> Exportar matriz
+          {activeId && (
+            <button className="btn primary" disabled={saving} onClick={handleSave}>
+              <Icon name="check" size={14} /> {saving ? 'Salvando…' : 'Salvar alterações'}
             </button>
-            <button
-              className="btn primary"
-              onClick={() => addToast({ kind: 'ok', msg: 'Permissões salvas' })}
-            >
-              <Icon name="check" size={14} /> Salvar alterações
-            </button>
-          </div>
+          )}
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: 16 }}>
-        {/* Users list */}
+      <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: 16 }}>
+        {/* Lista de usuários */}
         <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-          <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--line)' }}>
-            <input
-              className="field"
-              placeholder="Buscar usuário…"
-              style={{ height: 34, fontSize: 13 }}
-            />
+          <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--line)' }}>
+            <input className="field" placeholder="Buscar usuário…" value={search} onChange={e => setSearch(e.target.value)} style={{ height: 34, fontSize: 13 }} />
           </div>
-          <div style={{ maxHeight: 600, overflowY: 'auto' }}>
-            {D.userRoles.map((u, i) => (
+          <div style={{ overflowY: 'auto', maxHeight: 520 }}>
+            {loading ? (
+              <div style={{ padding: 32, textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}><div className="pulse">Carregando…</div></div>
+            ) : filtered.length === 0 ? (
+              <div style={{ padding: 32, textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>
+                Nenhum usuário convidado nesta empresa ainda.
+              </div>
+            ) : filtered.map((m) => (
               <button
-                key={i}
-                onClick={() => setActive(i)}
+                key={m.user_id}
+                onClick={() => setActiveId(m.user_id)}
                 style={{
-                  width: '100%',
-                  textAlign: 'left',
-                  display: 'flex',
-                  gap: 10,
-                  alignItems: 'center',
-                  padding: '12px 14px',
-                  border: 'none',
-                  background: i === active ? 'var(--brand-tint)' : 'transparent',
-                  cursor: 'pointer',
-                  borderBottom: '1px solid var(--line-soft)',
+                  width: '100%', textAlign: 'left', display: 'flex', gap: 10, alignItems: 'center',
+                  padding: '11px 13px', border: 'none',
+                  background: m.user_id === activeId ? 'var(--brand-tint)' : 'transparent',
+                  cursor: 'pointer', borderBottom: '1px solid var(--line-soft)',
                 }}
               >
-                <Avatar name={u.name} size={32} hue={i * 70 + 40} />
+                <Avatar name={m.profile?.name ?? '?'} size={32} hue={m.profile?.avatar_hue ?? 215} />
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div
-                    style={{
-                      fontSize: 13,
-                      fontWeight: 600,
-                      color: i === active ? 'var(--brand)' : 'var(--ink)',
-                    }}
-                  >
-                    {u.name}
+                  <div style={{ fontSize: 13, fontWeight: 600, color: m.user_id === activeId ? 'var(--brand)' : 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {m.profile?.name ?? 'Usuário'}
                   </div>
-                  <div style={{ fontSize: 11.5, color: 'var(--muted)' }}>
-                    {u.role} · {u.email}
+                  <div style={{ fontSize: 11.5, color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {m.role} · {m.profile?.email ?? '—'}
                   </div>
                 </div>
-                {!u.active && (
-                  <span className="pill warn" style={{ fontSize: 10 }}>
-                    off
-                  </span>
-                )}
+                {m.profile?.active === false && <span className="pill warn" style={{ fontSize: 10 }}>inativo</span>}
               </button>
             ))}
           </div>
-          <div style={{ padding: 12, borderTop: '1px solid var(--line)' }}>
-            <button className="btn" style={{ width: '100%', justifyContent: 'center' }}>
-              <Icon name="plus" size={14} /> Convidar novo usuário
-            </button>
-          </div>
         </div>
 
-        {/* Permissions grid */}
-        <div className="card" style={{ padding: 22 }}>
-          <div className="row">
-            <div>
-              <div className="row gap-2">
-                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>{user.name}</h3>
-                <span className="pill brand">{user.role}</span>
-              </div>
-              <div style={{ fontSize: 12.5, color: 'var(--muted)', marginTop: 4 }}>
-                Aplicar template:
-                <button className="btn ghost sm" style={{ marginLeft: 6 }}>
-                  Administrador
-                </button>
-                <button className="btn ghost sm">RH padrão</button>
-                <button className="btn ghost sm">Supervisor</button>
-                <button className="btn ghost sm">Somente leitura</button>
-              </div>
-            </div>
+        {/* Painel de permissões */}
+        {!activeId ? (
+          <div className="card" style={{ padding: 48, textAlign: 'center', color: 'var(--muted)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+            <Icon name="key" size={32} style={{ marginBottom: 12, opacity: 0.4 }} />
+            <div style={{ fontSize: 14, fontWeight: 600 }}>Selecione um usuário</div>
+            <div style={{ fontSize: 12.5, marginTop: 6, maxWidth: 300 }}>Escolha um usuário à esquerda para configurar suas permissões nesta empresa.</div>
           </div>
-          <div className="h-line" style={{ margin: '18px 0' }} />
-
-          <div className="col gap-4">
-            {D.permissionsModules.map((mod, mi) => (
-              <div key={mi}>
-                <div className="row" style={{ marginBottom: 10 }}>
-                  <h4
-                    style={{
-                      margin: 0,
-                      fontSize: 13,
-                      fontWeight: 700,
-                      textTransform: 'uppercase',
-                      letterSpacing: 0.6,
-                      color: 'var(--muted)',
-                    }}
-                  >
-                    {mod.module}
-                  </h4>
-                  <span className="grow" />
-                  <span style={{ fontSize: 11.5, color: 'var(--muted-2)' }}>
-                    {mod.perms.filter((p) => isOn(mod.module, p)).length} / {mod.perms.length}{' '}
-                    ativas
-                  </span>
+        ) : (
+          <div className="card" style={{ padding: 22 }}>
+            <div className="row" style={{ flexWrap: 'wrap', gap: 10 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div className="row gap-2" style={{ flexWrap: 'wrap' }}>
+                  <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>{selected?.profile?.name ?? 'Usuário'}</h3>
+                  <span className="pill brand">{localRole}</span>
                 </div>
-                <div
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                    gap: 8,
-                  }}
-                >
-                  {mod.perms.map((p, pi) => {
-                    const on = isOn(mod.module, p);
-                    return (
-                      <button
-                        key={pi}
-                        onClick={() => toggle(mod.module, p)}
-                        className="row gap-2"
-                        style={{
-                          padding: '10px 12px',
-                          borderRadius: 8,
-                          border: `1px solid ${on ? 'var(--brand)' : 'var(--line)'}`,
-                          background: on ? 'var(--brand-tint)' : 'var(--surface)',
-                          color: on ? 'var(--brand)' : 'var(--ink-soft)',
-                          cursor: 'pointer',
-                          fontSize: 13,
-                          fontWeight: 500,
-                        }}
-                      >
-                        <div
+                <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 4 }}>
+                  <span>Template:</span>
+                  {ROLES.map(r => (
+                    <button key={r} onClick={() => applyTemplate(r)} className="btn ghost sm" style={{ borderColor: localRole === r ? 'var(--brand)' : undefined, color: localRole === r ? 'var(--brand)' : undefined }}>
+                      {r}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {embedded && (
+                <button className="btn primary sm" disabled={saving} onClick={handleSave}>
+                  <Icon name="check" size={13} /> {saving ? 'Salvando…' : 'Salvar'}
+                </button>
+              )}
+            </div>
+            <div className="h-line" style={{ margin: '16px 0' }} />
+            <div className="col gap-4" style={{ overflowY: 'auto', maxHeight: 460 }}>
+              {MODULES.map((mod) => (
+                <div key={mod.module}>
+                  <div className="row" style={{ marginBottom: 8 }}>
+                    <h4 style={{ margin: 0, fontSize: 11.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.7, color: 'var(--muted)' }}>{mod.module}</h4>
+                    <span className="grow" />
+                    <span style={{ fontSize: 11, color: 'var(--muted-2)' }}>
+                      {mod.perms.filter(p => isOn(mod.module, p)).length}/{mod.perms.length} ativas
+                    </span>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 7 }}>
+                    {mod.perms.map((p) => {
+                      const on = isOn(mod.module, p);
+                      return (
+                        <button
+                          key={p}
+                          onClick={() => toggle(mod.module, p)}
+                          className="row gap-2"
                           style={{
-                            width: 30,
-                            height: 16,
-                            borderRadius: 8,
-                            background: on ? 'var(--brand)' : 'var(--line)',
-                            position: 'relative',
-                            flexShrink: 0,
-                            transition: 'background .15s',
+                            padding: '9px 11px', borderRadius: 8,
+                            border: `1px solid ${on ? 'var(--brand)' : 'var(--line)'}`,
+                            background: on ? 'var(--brand-tint)' : 'var(--surface)',
+                            color: on ? 'var(--brand)' : 'var(--ink-soft)',
+                            cursor: 'pointer', fontSize: 12.5, fontWeight: 500,
                           }}
                         >
-                          <div
-                            style={{
-                              position: 'absolute',
-                              top: 1,
-                              left: on ? 15 : 1,
-                              width: 14,
-                              height: 14,
-                              borderRadius: '50%',
-                              background: 'white',
-                              transition: 'left .15s',
-                              boxShadow: '0 1px 3px rgba(0,0,0,.2)',
-                            }}
-                          />
-                        </div>
-                        <span style={{ textTransform: 'capitalize' }}>{p}</span>
-                      </button>
-                    );
-                  })}
+                          <div style={{ width: 28, height: 15, borderRadius: 8, background: on ? 'var(--brand)' : 'var(--line)', position: 'relative', flexShrink: 0, transition: 'background .15s' }}>
+                            <div style={{ position: 'absolute', top: 1.5, left: on ? 14 : 1.5, width: 12, height: 12, borderRadius: '50%', background: 'white', transition: 'left .15s', boxShadow: '0 1px 2px rgba(0,0,0,.2)' }} />
+                          </div>
+                          <span style={{ textTransform: 'capitalize' }}>{p}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
@@ -1769,7 +1753,7 @@ function EmpresasTab({ addToast }) {
 // ============================================================
 // SETTINGS (with Permissions as a tab)
 // ============================================================
-export function SettingsScreen({ initialTab, addToast, setRoute }) {
+export function SettingsScreen({ initialTab, addToast, setRoute, activeCompany }) {
   const [tab, setTab] = useState(initialTab || 'empresas');
   useEffect(() => {
     if (initialTab) setTab(initialTab);
@@ -1910,7 +1894,7 @@ export function SettingsScreen({ initialTab, addToast, setRoute }) {
         </div>
       )}
 
-      {tab === 'permissoes' && <PermissionsScreen addToast={addToast} embedded={true} />}
+      {tab === 'permissoes' && <PermissionsScreen addToast={addToast} embedded={true} activeCompany={activeCompany} />}
 
       {tab === 'integracao' && (
         <div className="card" style={{ padding: 24 }}>
@@ -1971,6 +1955,7 @@ export function SettingsScreen({ initialTab, addToast, setRoute }) {
 // RH - WARNINGS (ADVERTÊNCIAS)
 // ============================================================
 export function WarningsScreen({ addToast, activeCompany }) {
+  const { can } = usePermissions();
   const [filter, setFilter] = useState('todas');
   const [q, setQ] = useState('');
   const [showModal, setShowModal] = useState(false);
@@ -2009,9 +1994,11 @@ export function WarningsScreen({ addToast, activeCompany }) {
           <button className="btn">
             <Icon name="download" size={15} /> Exportar
           </button>
-          <button className="btn primary" onClick={() => setShowModal(true)}>
-            <Icon name="plus" size={15} /> Nova advertência
-          </button>
+          {can('RH', 'advertir') && (
+            <button className="btn primary" onClick={() => setShowModal(true)}>
+              <Icon name="plus" size={15} /> Nova advertência
+            </button>
+          )}
         </div>
       </div>
 
@@ -2214,6 +2201,7 @@ export function WarningsScreen({ addToast, activeCompany }) {
 // RH - VACATIONS (FÉRIAS)
 // ============================================================
 export function VacationScreen({ addToast, activeCompany }) {
+  const { can } = usePermissions();
   const [filter, setFilter] = useState('todas');
   const { vacations: allVacations, loading, refetch } = useAllVacations(activeCompany?.id);
   const { employees } = useEmployees({ companyId: activeCompany?.id });
@@ -2259,9 +2247,11 @@ export function VacationScreen({ addToast, activeCompany }) {
         </div>
         <div className="row gap-2">
           <button className="btn"><Icon name="download" size={15} /> Exportar</button>
-          <button className="btn primary" onClick={() => setShowModal(true)}>
-            <Icon name="plus" size={15} /> Nova solicitação
-          </button>
+          {can('RH', 'férias') && (
+            <button className="btn primary" onClick={() => setShowModal(true)}>
+              <Icon name="plus" size={15} /> Nova solicitação
+            </button>
+          )}
         </div>
       </div>
 
@@ -2354,7 +2344,7 @@ export function VacationScreen({ addToast, activeCompany }) {
                     </span>
                   </td>
                   <td style={{ padding: '11px 16px' }}>
-                    {v.status === 'pendente' ? (
+                    {v.status === 'pendente' && can('RH', 'férias') ? (
                       <div className="row gap-1">
                         <button className="btn sm" style={{ color: 'var(--ok)', borderColor: 'var(--ok)' }} onClick={() => approve(v.id)}>
                           <Icon name="check" size={12} /> Aprovar

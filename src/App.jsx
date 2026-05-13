@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from './lib/supabase.js';
 import { useCompanies, logAudit } from './hooks/useEmployees.js';
+import { PermissionsProvider } from './lib/permissions.jsx';
 
 import Sidebar from './components/Sidebar.jsx';
 import Header from './components/Header.jsx';
@@ -154,13 +155,13 @@ export default function App() {
     if (route.startsWith('time')) return <TimeScreen addToast={addToast} activeCompany={activeCompany} />;
     if (route === 'permissions' || route === 'settings-permissions')
       return (
-        <SettingsScreen initialTab="permissoes" addToast={addToast} setRoute={setRoute} />
+        <SettingsScreen initialTab="permissoes" addToast={addToast} setRoute={setRoute} activeCompany={activeCompany} />
       );
     if (route === 'audit') return <AuditScreen activeCompany={activeCompany} />;
     if (route === 'justice') return <JusticeScreen addToast={addToast} activeCompany={activeCompany} />;
     if (route === 'reports') return <ReportsScreen addToast={addToast} activeCompany={activeCompany} />;
     if (route === 'settings')
-      return <SettingsScreen addToast={addToast} setRoute={setRoute} />;
+      return <SettingsScreen addToast={addToast} setRoute={setRoute} activeCompany={activeCompany} />;
     if (route === 'rh-warn') return <WarningsScreen addToast={addToast} activeCompany={activeCompany} />;
     if (route === 'rh-vacation') return <VacationScreen addToast={addToast} activeCompany={activeCompany} />;
     if (route.startsWith('rh'))
@@ -176,8 +177,11 @@ export default function App() {
   const isAdmin = session?.user?.app_metadata?.role === 'admin';
   const userName = session?.user?.user_metadata?.name || session?.user?.email?.split('@')[0] || 'Usuário';
   const userEmail = session?.user?.email || '';
+  const userId = session?.user?.id;
+  const ownedCompanyIds = companies.filter(c => c.owner_id === userId).map(c => c.id);
 
   return (
+    <PermissionsProvider userId={userId} activeCompanyId={activeCompany?.id} ownedCompanyIds={ownedCompanyIds}>
     <div
       style={{
         display: 'flex',
@@ -250,5 +254,6 @@ export default function App() {
         onLogout={() => supabase.auth.signOut()}
       />
     </div>
+    </PermissionsProvider>
   );
 }

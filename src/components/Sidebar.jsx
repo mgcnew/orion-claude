@@ -2,6 +2,7 @@ import { useState } from 'react';
 import Icon from './Icon.jsx';
 import Avatar from './Avatar.jsx';
 import OrionGlyph from './OrionGlyph.jsx';
+import { usePermissions } from '../lib/permissions.jsx';
 
 const NAV = [
   { id: 'dashboard', label: 'Dashboard', icon: 'dashboard' },
@@ -31,8 +32,8 @@ const NAV = [
   { id: 'reports', label: 'Relatórios', icon: 'chart' },
   { id: 'justice', label: 'Justiça', icon: 'gavel' },
   { id: 'section', label: 'ADMINISTRAÇÃO' },
-  { id: 'audit', label: 'Auditoria', icon: 'history' },
-  { id: 'settings', label: 'Configurações', icon: 'settings' },
+  { id: 'audit',    label: 'Auditoria',       icon: 'history',  perm: ['Administração', 'logs'] },
+  { id: 'settings', label: 'Configurações',   icon: 'settings', perm: ['Administração', 'config'] },
 ];
 
 function Logo({ collapsed }) {
@@ -69,6 +70,7 @@ function Logo({ collapsed }) {
 }
 
 export default function Sidebar({ route, setRoute, collapsed, setCollapsed, userName, userEmail, isAdmin, onLogout, companies = [], activeCompany, setActiveCompany }) {
+  const { can } = usePermissions();
   const [open, setOpen] = useState({
     employees: route.startsWith('employees'),
     documents: route.startsWith('documents'),
@@ -162,6 +164,7 @@ export default function Sidebar({ route, setRoute, collapsed, setCollapsed, user
 
       <nav style={{ flex: 1, overflowY: 'auto', padding: '10px 8px' }}>
         {NAV.map((item, i) => {
+          if (item.perm && !can(item.perm[0], item.perm[1])) return null;
           if (item.id === 'section') {
             return collapsed ? (
               <div key={i} style={{ height: 12 }} />
