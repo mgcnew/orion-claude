@@ -23,6 +23,9 @@ import {
   updateUserCompany,
   usePendingInvitesByCompany,
   deleteInvite,
+  findProfileByEmail,
+  promoteUserToCompany,
+  linkEmployeeUser,
 } from '../hooks/useEmployees.js';
 import { MODULES, ROLES, ROLE_TEMPLATES, usePermissions } from '../lib/permissions.jsx';
 import { SendInviteModal } from './Auth.jsx';
@@ -51,6 +54,7 @@ export function PermissionsScreen({ addToast, embedded, activeCompany: propCompa
   const [search, setSearch] = useState('');
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
+  const [promoting, setPromoting] = useState(null);
 
   const { employees: companyEmployees } = useEmployees({ companyId });
 
@@ -117,9 +121,29 @@ export function PermissionsScreen({ addToast, embedded, activeCompany: propCompa
     ...invites.filter(i => !i.accepted_at).map(i => i.email),
   ]);
   const employeesWithoutAccess = (companyEmployees ?? []).filter(e =>
-    e.email && !memberEmails.has(e.email) &&
-    (!q || e.name.toLowerCase().includes(q) || e.email.toLowerCase().includes(q))
+    e.email_personal && !memberEmails.has(e.email_personal) &&
+    (!q || e.name.toLowerCase().includes(q) || e.email_personal.toLowerCase().includes(q))
   );
+
+  const handleGiveAccess = async (emp) => {
+    if (!companyId || promoting) return;
+    setPromoting(emp.id);
+    const profile = await findProfileByEmail(emp.email_personal);
+    setPromoting(null);
+    if (profile) {
+      // Já tem conta — promove direto, sem convite
+      const { error } = await promoteUserToCompany(profile.id, companyId);
+      if (error) { addToast({ kind: 'warn', msg: 'Erro ao promover: ' + error.message }); return; }
+      await linkEmployeeUser(emp.id, profile.id);
+      logAudit(companyId, 'CRIOU', `Acesso direto: ${emp.name}`);
+      addToast({ kind: 'ok', msg: `${emp.name} adicionado com sucesso!` });
+      refetch();
+    } else {
+      // Sem conta — abre convite pré-preenchido
+      setInviteEmail(emp.email_personal);
+      setShowInviteModal(true);
+    }
+  };
 
   const fmtDate = (d) => d ? new Date(d).toLocaleDateString('pt-BR') : '—';
 
@@ -276,17 +300,18 @@ export function PermissionsScreen({ addToast, embedded, activeCompany: propCompa
                         padding: '9px 13px', borderBottom: '1px solid var(--line-soft)',
                       }}
                     >
-                      <Avatar name={emp.name} size={30} hue={emp.avatar_hue ?? 215} />
+                      <Avatar name={emp.name} size={30} hue={emp.hue ?? 215} />
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: 12.5, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{emp.name}</div>
-                        <div style={{ fontSize: 11, color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{emp.email}</div>
+                        <div style={{ fontSize: 11, color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{emp.email_personal}</div>
                       </div>
                       <button
                         className="btn ghost sm"
                         style={{ flexShrink: 0, fontSize: 11, padding: '3px 8px' }}
-                        onClick={() => { setInviteEmail(emp.email); setShowInviteModal(true); }}
+                        disabled={promoting === emp.id}
+                        onClick={() => handleGiveAccess(emp)}
                       >
-                        Dar acesso
+                        {promoting === emp.id ? '…' : 'Dar acesso'}
                       </button>
                     </div>
                   ))}

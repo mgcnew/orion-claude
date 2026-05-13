@@ -841,3 +841,30 @@ export async function updateUserCompany(userId, companyId, { role, grants }) {
     .eq('company_id', companyId);
   return { error };
 }
+
+// Verifica se um e-mail já tem perfil no sistema
+export async function findProfileByEmail(email) {
+  const { data } = await supabase
+    .from('profiles')
+    .select('id, name, email, avatar_hue')
+    .eq('email', email.trim().toLowerCase())
+    .maybeSingle();
+  return data ?? null;
+}
+
+// Promove diretamente um usuário existente para uma empresa (sem convite)
+export async function promoteUserToCompany(userId, companyId, role = 'Operacional') {
+  const { error } = await supabase
+    .from('user_companies')
+    .upsert({ user_id: userId, company_id: companyId, role, grants: {} }, { onConflict: 'user_id,company_id' });
+  return { error };
+}
+
+// Vincula employee.user_id após promoção/convite aceito
+export async function linkEmployeeUser(employeeId, userId) {
+  const { error } = await supabase
+    .from('employees')
+    .update({ user_id: userId })
+    .eq('id', employeeId);
+  return { error };
+}
