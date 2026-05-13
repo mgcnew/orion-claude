@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from './lib/supabase.js';
 import { useCompanies, logAudit } from './hooks/useEmployees.js';
 import { PermissionsProvider } from './lib/permissions.jsx';
@@ -178,9 +178,13 @@ export default function App() {
   const userName = session?.user?.user_metadata?.name || session?.user?.email?.split('@')[0] || 'Usuário';
   const userEmail = session?.user?.email || '';
   const userId = session?.user?.id;
+  const ownedCompanyIds = useMemo(
+    () => companies.filter(c => c.owner_id === userId).map(c => c.id),
+    [companies, userId]
+  );
 
   return (
-    <PermissionsProvider userId={userId} activeCompanyId={activeCompany?.id}>
+    <PermissionsProvider userId={userId} activeCompanyId={activeCompany?.id} ownedCompanyIds={ownedCompanyIds}>
     <div
       style={{
         display: 'flex',

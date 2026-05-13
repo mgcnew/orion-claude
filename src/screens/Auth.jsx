@@ -380,11 +380,11 @@ export function LoginScreen({ onLogin }) {
 }
 
 // Modal de envio de convite (usado pelo admin dentro do sistema)
-export function SendInviteModal({ onClose, addToast }) {
+export function SendInviteModal({ onClose, addToast, initialEmail = '', initialCompanyId = null }) {
   const { companies } = useCompanies();
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(initialEmail);
   const [role, setRole] = useState('Operacional');
-  const [selectedCompanies, setSelectedCompanies] = useState([]);
+  const [selectedCompanies, setSelectedCompanies] = useState(initialCompanyId ? [initialCompanyId] : []);
   const [saving, setSaving] = useState(false);
   const [sent, setSent] = useState(null);
 

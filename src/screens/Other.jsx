@@ -50,6 +50,9 @@ export function PermissionsScreen({ addToast, embedded, activeCompany: propCompa
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState('');
   const [showInviteModal, setShowInviteModal] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState('');
+
+  const { employees: companyEmployees } = useEmployees({ companyId });
 
   const selected = activeId && activeId !== OWNER_ID ? members.find(m => m.user_id === activeId) : null;
   const selectedInvite = activeId && !selected && activeId !== OWNER_ID ? invites.find(i => i.id === activeId) : null;
@@ -108,6 +111,16 @@ export function PermissionsScreen({ addToast, embedded, activeCompany: propCompa
   );
   const filteredInvites = invites.filter(i => !i.accepted_at && (!q || i.email.toLowerCase().includes(q)));
 
+  // Employees without system access yet (not in members, not in pending invites)
+  const memberEmails = new Set([
+    ...members.map(m => m.profile?.email).filter(Boolean),
+    ...invites.filter(i => !i.accepted_at).map(i => i.email),
+  ]);
+  const employeesWithoutAccess = (companyEmployees ?? []).filter(e =>
+    e.email && !memberEmails.has(e.email) &&
+    (!q || e.name.toLowerCase().includes(q) || e.email.toLowerCase().includes(q))
+  );
+
   const fmtDate = (d) => d ? new Date(d).toLocaleDateString('pt-BR') : '—';
 
   // ── Render ────────────────────────────────────────────────────
@@ -147,7 +160,7 @@ export function PermissionsScreen({ addToast, embedded, activeCompany: propCompa
       )}
 
       {/* Aviso inline quando Settings e empresa não selecionada */}
-      {propCompany === null || (!propCompany && !localCompanyId) ? (
+      {!companyId ? (
         <div className="card" style={{ padding: 40, textAlign: 'center', color: 'var(--muted)' }}>
           <Icon name="building" size={28} style={{ marginBottom: 10, opacity: 0.35 }} />
           <div style={{ fontSize: 14, fontWeight: 600 }}>Selecione uma empresa acima</div>
@@ -248,11 +261,42 @@ export function PermissionsScreen({ addToast, embedded, activeCompany: propCompa
                   )}
                 </>
               )}
+
+              {/* Funcionários sem acesso ao sistema */}
+              {employeesWithoutAccess.length > 0 && (
+                <>
+                  <div style={{ padding: '10px 13px 4px', fontSize: 10.5, fontWeight: 700, color: 'var(--muted-2)', letterSpacing: 0.8, textTransform: 'uppercase' }}>
+                    Funcionários sem acesso
+                  </div>
+                  {employeesWithoutAccess.map((emp) => (
+                    <div
+                      key={emp.id}
+                      style={{
+                        display: 'flex', gap: 10, alignItems: 'center',
+                        padding: '9px 13px', borderBottom: '1px solid var(--line-soft)',
+                      }}
+                    >
+                      <Avatar name={emp.name} size={30} hue={emp.avatar_hue ?? 215} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 12.5, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{emp.name}</div>
+                        <div style={{ fontSize: 11, color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{emp.email}</div>
+                      </div>
+                      <button
+                        className="btn ghost sm"
+                        style={{ flexShrink: 0, fontSize: 11, padding: '3px 8px' }}
+                        onClick={() => { setInviteEmail(emp.email); setShowInviteModal(true); }}
+                      >
+                        Dar acesso
+                      </button>
+                    </div>
+                  ))}
+                </>
+              )}
             </div>
 
             {/* Rodapé — botão de convidar */}
             <div style={{ padding: 10, borderTop: '1px solid var(--line)' }}>
-              <button className="btn" style={{ width: '100%', justifyContent: 'center' }} onClick={() => setShowInviteModal(true)}>
+              <button className="btn" style={{ width: '100%', justifyContent: 'center' }} onClick={() => { setInviteEmail(''); setShowInviteModal(true); }}>
                 <Icon name="plus" size={14} /> Convidar usuário
               </button>
             </div>
@@ -376,8 +420,10 @@ export function PermissionsScreen({ addToast, embedded, activeCompany: propCompa
 
       {showInviteModal && (
         <SendInviteModal
-          onClose={() => { setShowInviteModal(false); refetchInvites(); }}
+          onClose={() => { setShowInviteModal(false); setInviteEmail(''); refetchInvites(); }}
           addToast={addToast}
+          initialEmail={inviteEmail}
+          initialCompanyId={companyId}
         />
       )}
     </div>

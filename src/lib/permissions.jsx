@@ -67,24 +67,30 @@ export function usePermissions() {
 }
 
 // ── Provider ──────────────────────────────────────────────────
-// Queries the DB directly — no timing dependency on parent props
-export function PermissionsProvider({ children, userId, activeCompanyId }) {
-  const [state, setState] = useState({ isOwner: false, role: 'Operacional', grants: {}, loading: true });
+// Starts optimistic (isOwner: true) to avoid flash of missing admin items.
+// DB query confirms or revokes after load.
+export function PermissionsProvider({ children, userId, activeCompanyId, ownedCompanyIds = [] }) {
+  // Optimistic: assume owner until DB says otherwise → no flash of restricted sidebar
+  const [state, setState] = useState({ isOwner: true, role: 'Administrador', grants: {}, loading: true });
 
   useEffect(() => {
     if (!userId) {
       setState({ isOwner: false, role: 'Operacional', grants: {}, loading: false });
       return;
     }
+    // No company selected → full access (owner view)
     if (!activeCompanyId) {
-      // "All companies" view → treat as full access so admin menu stays visible
+      setState({ isOwner: true, role: 'Administrador', grants: {}, loading: false });
+      return;
+    }
+    // Fast-path: if parent already knows this company is owned, skip DB round-trip
+    if (ownedCompanyIds.length > 0 && ownedCompanyIds.includes(activeCompanyId)) {
       setState({ isOwner: true, role: 'Administrador', grants: {}, loading: false });
       return;
     }
     let cancelled = false;
     (async () => {
-      setState(s => ({ ...s, loading: true }));
-      // Check ownership directly from DB — reliable regardless of prop timing
+      // Verify ownership in DB (handles cases where ownedCompanyIds is still loading)
       const { data: owned } = await supabase
         .from('companies')
         .select('id')
@@ -95,7 +101,7 @@ export function PermissionsProvider({ children, userId, activeCompanyId }) {
         if (!cancelled) setState({ isOwner: true, role: 'Administrador', grants: {}, loading: false });
         return;
       }
-      // Not owner — check membership
+      // Not owner — check user_companies membership
       const { data } = await supabase
         .from('user_companies')
         .select('role, grants')
@@ -107,7 +113,7 @@ export function PermissionsProvider({ children, userId, activeCompanyId }) {
       }
     })();
     return () => { cancelled = true; };
-  }, [userId, activeCompanyId]);
+  }, [userId, activeCompanyId, ownedCompanyIds]);
 
   const can = useCallback((module, perm) => {
     if (state.isOwner) return true;
