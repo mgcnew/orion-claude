@@ -769,13 +769,23 @@ export function usePendingInvites() {
 }
 
 export async function sendInvite({ email, role, companyIds }) {
-  const { data: { user } } = await supabase.auth.getUser();
-  const { data, error } = await supabase
-    .from('pending_invites')
-    .insert({ email, role, company_ids: companyIds, invited_by: user?.id })
-    .select()
-    .single();
-  return { data, error };
+  const { data: { session } } = await supabase.auth.getSession();
+  const res = await fetch(
+    `${supabase.supabaseUrl}/functions/v1/send-invite`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session?.access_token}`,
+        'apikey': supabase.supabaseKey,
+        'origin': window.location.origin,
+      },
+      body: JSON.stringify({ email, role, companyIds }),
+    }
+  );
+  const data = await res.json();
+  if (!res.ok) return { data: null, error: { message: data.error ?? 'Erro ao enviar convite' } };
+  return { data, error: null };
 }
 
 export async function deleteInvite(id) {

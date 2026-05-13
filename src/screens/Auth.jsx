@@ -533,6 +533,110 @@ export function SendInviteModal({ onClose, addToast, initialEmail = '', initialC
   );
 }
 
+export function CompleteRegistrationScreen({ session, onComplete }) {
+  const [name, setName] = useState(session?.user?.user_metadata?.name ?? '');
+  const [pw, setPw] = useState('');
+  const [pwConfirm, setPwConfirm] = useState('');
+  const [showPw, setShowPw] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const email = session?.user?.email ?? '';
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setError('');
+    if (pw.length < 6) { setError('A senha precisa ter pelo menos 6 caracteres.'); return; }
+    if (pw !== pwConfirm) { setError('As senhas não coincidem.'); return; }
+    if (!name.trim()) { setError('Digite seu nome completo.'); return; }
+    setLoading(true);
+    const { error: err } = await supabase.auth.updateUser({
+      password: pw,
+      data: { name: name.trim() },
+    });
+    setLoading(false);
+    if (err) { setError(err.message); return; }
+    onComplete();
+  };
+
+  return (
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)', padding: 24 }}>
+      <div className="card fade-up" style={{ width: 440, maxWidth: '100%', padding: 40 }}>
+        <div className="row gap-2" style={{ marginBottom: 28 }}>
+          <div style={{ width: 32, height: 32, borderRadius: 8, background: 'linear-gradient(135deg, var(--brand), var(--brand-700))', position: 'relative' }}>
+            <div style={{ position: 'absolute', inset: 6 }}><OrionGlyph size={20} /></div>
+          </div>
+          <div style={{ fontWeight: 700, letterSpacing: -0.2 }}>Orion Gestão</div>
+        </div>
+
+        <div className="pill brand" style={{ marginBottom: 16, display: 'inline-flex' }}>
+          <Icon name="mail" size={12} /> Convite recebido
+        </div>
+        <h1 style={{ fontSize: 22, fontWeight: 700, letterSpacing: -0.5, margin: '0 0 6px' }}>
+          Complete seu cadastro
+        </h1>
+        <p style={{ color: 'var(--muted)', fontSize: 13, lineHeight: 1.55, margin: '0 0 24px' }}>
+          Você foi convidado para acessar o sistema. Defina seu nome e senha para entrar.
+        </p>
+
+        <form className="col gap-3" onSubmit={submit}>
+          <div>
+            <label className="label">E-mail</label>
+            <input className="field" value={email} disabled style={{ opacity: 0.6 }} />
+          </div>
+          <div>
+            <label className="label">Nome completo</label>
+            <input
+              className="field"
+              placeholder="Seu nome completo"
+              value={name}
+              onChange={e => setName(e.target.value)}
+              autoFocus
+            />
+          </div>
+          <div>
+            <label className="label">Criar senha</label>
+            <div style={{ position: 'relative' }}>
+              <input
+                className="field"
+                type={showPw ? 'text' : 'password'}
+                placeholder="Mínimo 6 caracteres"
+                value={pw}
+                onChange={e => setPw(e.target.value)}
+                style={{ paddingRight: 40 }}
+              />
+              <button type="button" onClick={() => setShowPw(v => !v)}
+                style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', padding: 2 }}>
+                <Icon name={showPw ? 'eye-off' : 'eye'} size={16} />
+              </button>
+            </div>
+          </div>
+          <div>
+            <label className="label">Confirmar senha</label>
+            <input
+              className="field"
+              type={showPw ? 'text' : 'password'}
+              placeholder="Repita a senha"
+              value={pwConfirm}
+              onChange={e => setPwConfirm(e.target.value)}
+            />
+          </div>
+
+          {error && (
+            <div style={{ padding: '10px 14px', borderRadius: 8, background: 'var(--bad-tint, #FEE2E2)', color: 'var(--bad, #DC2626)', fontSize: 13 }}>
+              {error}
+            </div>
+          )}
+
+          <button className="btn primary" type="submit" disabled={loading} style={{ marginTop: 4 }}>
+            {loading ? <span className="pulse">Aguarde…</span> : <><Icon name="check" size={14} /> Acessar o sistema</>}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 export function InviteScreen({ onAccept, onBack }) {
   return (
     <div

@@ -11,7 +11,7 @@ import Toasts from './components/Toasts.jsx';
 import TweaksPanel from './components/TweaksPanel.jsx';
 import Icon from './components/Icon.jsx';
 
-import { LoginScreen, InviteScreen, SendInviteModal } from './screens/Auth.jsx';
+import { LoginScreen, InviteScreen, SendInviteModal, CompleteRegistrationScreen } from './screens/Auth.jsx';
 import Dashboard from './screens/Dashboard.jsx';
 import { EmployeesList, EmployeeProfile } from './screens/Employees.jsx';
 import DocumentsScreen from './screens/Documents.jsx';
@@ -42,6 +42,10 @@ export default function App() {
   const [session, setSession] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [authView, setAuthView] = useState('login');
+  const [isInviteFlow, setIsInviteFlow] = useState(() => {
+    const hash = new URLSearchParams(window.location.hash.slice(1));
+    return hash.get('type') === 'invite';
+  });
   const [route, setRoute] = useState('dashboard');
   const [routeParam, setRouteParam] = useState(null);   // ex: employee UUID
   const [routeLabel, setRouteLabel] = useState(null);   // ex: employee name (para breadcrumb)
@@ -64,6 +68,11 @@ export default function App() {
       setAuthLoading(false);
       if (event === 'SIGNED_IN' && s?.user) {
         logAudit(null, 'LOGIN', s.user.email);
+      }
+      if (event === 'USER_UPDATED') {
+        setIsInviteFlow(false);
+        // Limpa o hash da URL após senha definida
+        window.history.replaceState(null, '', window.location.pathname);
       }
     });
     return () => subscription.unsubscribe();
@@ -122,6 +131,19 @@ export default function App() {
           <div className="pulse" style={{ fontSize: 14, color: 'var(--muted)' }}>Carregando…</div>
         </div>
       </div>
+    );
+  }
+
+  // ===== INVITE COMPLETION (usuário acabou de clicar no link do convite) =====
+  if (session && isInviteFlow) {
+    return (
+      <>
+        <CompleteRegistrationScreen
+          session={session}
+          onComplete={() => setIsInviteFlow(false)}
+        />
+        <TweaksPanel tweaks={tweaks} setTweak={setTweak} />
+      </>
     );
   }
 
