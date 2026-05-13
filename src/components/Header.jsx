@@ -56,6 +56,8 @@ export default function Header({
   setRoute,
   collapsed,
   setCollapsed,
+  mobileOpen,
+  setMobileOpen,
   theme,
   setTheme,
   openCmd,
@@ -84,7 +86,14 @@ export default function Header({
         minWidth: 0,
       }}
     >
-      <button className="btn ghost icon sm" onClick={() => setCollapsed(!collapsed)}>
+      {/* Desktop: colapsa sidebar | Mobile: abre drawer */}
+      <button
+        className="btn ghost icon sm"
+        onClick={() => {
+          if (window.innerWidth < 768) setMobileOpen(o => !o);
+          else setCollapsed(c => !c);
+        }}
+      >
         <Icon name="menu" size={18} />
       </button>
 

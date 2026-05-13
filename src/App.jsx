@@ -51,6 +51,7 @@ export default function App() {
   const [routeLabel, setRouteLabel] = useState(null);   // ex: employee name (para breadcrumb)
   const [routeIntent, setRouteIntent] = useState(null); // ex: 'new', 'upload', 'new-warn'
   const [collapsed, setCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const [cmdOpen, setCmdOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [toasts, setToasts] = useState([]);
@@ -60,7 +61,7 @@ export default function App() {
   const [userProfile, setUserProfile] = useState(null);
   const { companies } = useCompanies();
 
-  const navigate = (r, intent = null) => { setRoute(r); setRouteIntent(intent); };
+  const navigate = (r, intent = null) => { setRoute(r); setRouteIntent(intent); setMobileOpen(false); };
   useEffect(() => { const t = setTimeout(() => setRouteIntent(null), 80); return () => clearTimeout(t); }, [route]);
 
   // Supabase auth state
@@ -222,11 +223,19 @@ export default function App() {
         background: 'var(--bg)',
       }}
     >
+      {mobileOpen && (
+        <div
+          className="mobile-backdrop"
+          onClick={() => setMobileOpen(false)}
+        />
+      )}
       <Sidebar
         route={route}
-        setRoute={setRoute}
+        setRoute={(r) => { setRoute(r); setMobileOpen(false); }}
         collapsed={collapsed}
         setCollapsed={setCollapsed}
+        mobileOpen={mobileOpen}
+        setMobileOpen={setMobileOpen}
         userName={userName}
         userEmail={userEmail}
         isAdmin={isAdmin}
@@ -235,7 +244,7 @@ export default function App() {
         activeCompany={activeCompany}
         setActiveCompany={setActiveCompany}
         profile={userProfile}
-        onOpenProfile={() => setProfileOpen(true)}
+        onOpenProfile={() => { setProfileOpen(true); setMobileOpen(false); }}
       />
       <main
         style={{
@@ -251,6 +260,8 @@ export default function App() {
           setRoute={setRoute}
           collapsed={collapsed}
           setCollapsed={setCollapsed}
+          mobileOpen={mobileOpen}
+          setMobileOpen={setMobileOpen}
           theme={tweaks.theme}
           setTheme={(t) => setTweak('theme', t)}
           openCmd={() => setCmdOpen(true)}

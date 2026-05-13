@@ -58,7 +58,7 @@ function Logo({ collapsed }) {
   );
 }
 
-export default function Sidebar({ route, setRoute, collapsed, setCollapsed, userName, userEmail, isAdmin, onLogout, companies = [], activeCompany, setActiveCompany, profile, onOpenProfile }) {
+export default function Sidebar({ route, setRoute, collapsed, setCollapsed, mobileOpen, setMobileOpen, userName, userEmail, isAdmin, onLogout, companies = [], activeCompany, setActiveCompany, profile, onOpenProfile }) {
   const { can } = usePermissions();
   const [open, setOpen] = useState({
     employees: route.startsWith('employees'),
@@ -73,14 +73,14 @@ export default function Sidebar({ route, setRoute, collapsed, setCollapsed, user
   return (
     <>
     <aside
-      className="orion-sidebar"
+      className={`orion-sidebar${mobileOpen ? ' mobile-open' : ''}`}
       style={{
         width: collapsed ? 68 : 248,
         background: 'var(--sidebar)',
         borderRight: '1px solid var(--line)',
         display: 'flex',
         flexDirection: 'column',
-        transition: 'width .18s ease',
+        transition: 'width .18s ease, transform .22s ease',
         flexShrink: 0,
         height: '100%',
       }}
