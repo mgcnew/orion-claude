@@ -1040,31 +1040,352 @@ function FechamentoTab({ selectedEmp, employees, empId, setEmpId, month, setMont
   function exportPDF() {
     if (!result || !selectedEmp) return;
     const brl = v => v.toLocaleString('pt-BR', { style:'currency', currency:'BRL' });
+    const bonus = result.extraValue + (result.total - salary - result.extraValue + result.totalDisc > 0 ? 0 : 0);
+    const bonusTotal = result.total - salary;
+    const mesAno = fmtMonth(month);
+    const empresa = selectedEmp.company || 'Empresa';
+    const emitidoEm = new Date().toLocaleDateString('pt-BR', { day:'2-digit', month:'long', year:'numeric' });
     const win = window.open('', '_blank');
-    win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8">
-      <title>Fechamento — ${selectedEmp.name}</title>
-      <style>
-        body { font-family: Arial, sans-serif; padding: 40px; color: #111; }
-        h2 { margin: 0 0 4px; font-size: 20px; }
-        .sub { color: #666; font-size: 13px; margin-bottom: 24px; }
-        table { width: 100%; border-collapse: collapse; font-size: 14px; }
-        td { padding: 10px 12px; border-bottom: 1px solid #e5e7eb; }
-        td:last-child { text-align: right; font-weight: 600; }
-        .total td { font-size: 16px; font-weight: 700; border-top: 2px solid #111; border-bottom: none; }
-        .disc td { color: #dc2626; }
-        .extra td:last-child { color: #7c3aed; }
-      </style></head><body>
-      <h2>Fechamento de ${fmtMonth(month)}</h2>
-      <div class="sub">${selectedEmp.name} · ${selectedEmp.role || ''} · ${selectedEmp.contract || 'CLT'}</div>
-      <table>
-        <tr><td>Salário base</td><td>${brl(salary)}</td></tr>
-        <tr class="extra"><td>Horas extras (${minutesToHM(extraMins)} × ${overtimePercent}% adicional)</td><td>+ ${brl(result.extraValue)}</td></tr>
-        ${discounts.map(d => `<tr class="disc"><td>${d.label}</td><td>− ${brl(Number(d.value))}</td></tr>`).join('')}
-        <tr class="total"><td>TOTAL</td><td>${brl(result.total)}</td></tr>
-      </table>
-      <p style="font-size:11px;color:#999;margin-top:32px">Gerado em ${new Date().toLocaleString('pt-BR')}</p>
-      <script>window.onload=()=>window.print()<\/script>
-      </body></html>`);
+    win.document.write(`<!DOCTYPE html><html lang="pt-BR"><head>
+<meta charset="utf-8">
+<title>Reconhecimento — ${selectedEmp.name}</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 210mm; min-height: 297mm; background: #fff; }
+  body {
+    font-family: 'Inter', Arial, sans-serif;
+    color: #1a1a2e;
+    padding: 0;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .page {
+    width: 210mm;
+    min-height: 297mm;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* Barra de topo */
+  .top-bar {
+    background: linear-gradient(135deg, #1e40af 0%, #3b82f6 60%, #06b6d4 100%);
+    height: 10px;
+    width: 100%;
+  }
+
+  /* Decoração geométrica fundo */
+  .bg-circle-1 {
+    position: absolute;
+    width: 420px; height: 420px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(59,130,246,0.06) 0%, transparent 70%);
+    top: -80px; right: -80px;
+    pointer-events: none;
+  }
+  .bg-circle-2 {
+    position: absolute;
+    width: 300px; height: 300px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(16,185,129,0.05) 0%, transparent 70%);
+    bottom: 60px; left: -60px;
+    pointer-events: none;
+  }
+
+  .content {
+    flex: 1;
+    padding: 48px 56px 40px;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* Cabeçalho */
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 40px;
+  }
+  .header-company {
+    font-size: 13px;
+    font-weight: 700;
+    color: #1e40af;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+  }
+  .header-ref {
+    font-size: 11px;
+    color: #94a3b8;
+    margin-top: 3px;
+  }
+  .badge {
+    background: linear-gradient(135deg, #1e40af, #3b82f6);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    padding: 5px 14px;
+    border-radius: 20px;
+  }
+
+  /* Estrela / ícone central */
+  .icon-wrap {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 28px;
+  }
+  .icon-star {
+    width: 64px; height: 64px;
+    background: linear-gradient(135deg, #fbbf24, #f59e0b);
+    border-radius: 20px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 32px;
+    box-shadow: 0 8px 24px rgba(251,191,36,.35);
+  }
+
+  /* Título */
+  .title-block { text-align: center; margin-bottom: 32px; }
+  .title-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: #64748b;
+    margin-bottom: 8px;
+  }
+  .title-main {
+    font-size: 32px;
+    font-weight: 800;
+    color: #1a1a2e;
+    line-height: 1.1;
+    letter-spacing: -0.5px;
+  }
+  .title-main span { color: #2563eb; }
+
+  /* Texto de congratulações */
+  .congrats {
+    background: linear-gradient(135deg, #f0f7ff 0%, #e8f4fd 100%);
+    border: 1px solid #bfdbfe;
+    border-radius: 14px;
+    padding: 24px 28px;
+    text-align: center;
+    margin-bottom: 32px;
+  }
+  .congrats p {
+    font-size: 14.5px;
+    line-height: 1.75;
+    color: #334155;
+  }
+  .congrats strong { color: #1e40af; font-weight: 700; }
+
+  /* Card de valor */
+  .value-card {
+    background: linear-gradient(135deg, #1e40af 0%, #2563eb 50%, #3b82f6 100%);
+    border-radius: 16px;
+    padding: 28px 36px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 36px;
+    box-shadow: 0 12px 32px rgba(37,99,235,.25);
+    color: #fff;
+  }
+  .value-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    opacity: .75;
+    margin-bottom: 6px;
+  }
+  .value-name {
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1.2;
+  }
+  .value-role {
+    font-size: 12px;
+    opacity: .7;
+    margin-top: 3px;
+  }
+  .value-amount {
+    text-align: right;
+  }
+  .value-amount .amount {
+    font-size: 34px;
+    font-weight: 800;
+    letter-spacing: -1px;
+    line-height: 1;
+  }
+  .value-amount .period {
+    font-size: 11px;
+    opacity: .65;
+    margin-top: 4px;
+  }
+
+  /* Linha divisória decorativa */
+  .divider {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 36px;
+    color: #cbd5e1;
+    font-size: 11px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  .divider::before, .divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, #e2e8f0, transparent);
+  }
+
+  /* Assinatura */
+  .signature-section {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 40px;
+    margin-top: auto;
+    padding-top: 8px;
+  }
+  .sig-box { }
+  .sig-line {
+    border-top: 1.5px solid #94a3b8;
+    margin-bottom: 8px;
+    padding-top: 8px;
+  }
+  .sig-label {
+    font-size: 11px;
+    color: #64748b;
+    font-weight: 500;
+  }
+  .sig-name {
+    font-size: 12px;
+    color: #1a1a2e;
+    font-weight: 600;
+    margin-top: 2px;
+  }
+  .sig-role {
+    font-size: 10.5px;
+    color: #94a3b8;
+    margin-top: 1px;
+  }
+
+  /* Rodapé */
+  .footer {
+    margin-top: 32px;
+    padding-top: 16px;
+    border-top: 1px solid #f1f5f9;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .footer-left { font-size: 10px; color: #94a3b8; }
+  .footer-right { font-size: 10px; color: #94a3b8; text-align: right; }
+
+  @media print {
+    html, body { width: 210mm; height: 297mm; }
+    .page { page-break-after: avoid; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="top-bar"></div>
+  <div class="bg-circle-1"></div>
+  <div class="bg-circle-2"></div>
+
+  <div class="content">
+    <!-- Cabeçalho -->
+    <div class="header">
+      <div>
+        <div class="header-company">${empresa}</div>
+        <div class="header-ref">Ref.: ${mesAno}</div>
+      </div>
+      <div class="badge">✦ Reconhecimento</div>
+    </div>
+
+    <!-- Ícone -->
+    <div class="icon-wrap">
+      <div class="icon-star">⭐</div>
+    </div>
+
+    <!-- Título -->
+    <div class="title-block">
+      <div class="title-label">Certificado de</div>
+      <div class="title-main">Bom <span>Desempenho</span></div>
+    </div>
+
+    <!-- Parabéns -->
+    <div class="congrats">
+      <p>
+        É com grande satisfação que reconhecemos e parabenizamos
+        <strong>${selectedEmp.name}</strong> pelo excelente desempenho
+        apresentado em <strong>${mesAno}</strong>.<br><br>
+        Sua dedicação, comprometimento e contribuição são fundamentais
+        para o crescimento da nossa equipe. Este reconhecimento é uma
+        forma de expressar nossa gratidão pelo seu esforço e entrega.
+      </p>
+    </div>
+
+    <!-- Card de valor -->
+    <div class="value-card">
+      <div>
+        <div class="value-label">Colaborador</div>
+        <div class="value-name">${selectedEmp.name}</div>
+        <div class="value-role">${[selectedEmp.role, selectedEmp.dept].filter(Boolean).join(' · ') || 'Equipe'}</div>
+      </div>
+      <div class="value-amount">
+        <div class="value-label">Bônus de desempenho</div>
+        <div class="amount">${brl(bonusTotal > 0 ? bonusTotal : result.total)}</div>
+        <div class="period">${mesAno}</div>
+      </div>
+    </div>
+
+    <div class="divider">Assinaturas</div>
+
+    <!-- Assinaturas -->
+    <div class="signature-section">
+      <div class="sig-box">
+        <div style="height:48px"></div>
+        <div class="sig-line"></div>
+        <div class="sig-label">Assinatura do colaborador</div>
+        <div class="sig-name">${selectedEmp.name}</div>
+        <div class="sig-role">${selectedEmp.role || ''}</div>
+      </div>
+      <div class="sig-box">
+        <div style="height:48px"></div>
+        <div class="sig-line"></div>
+        <div class="sig-label">Responsável / RH</div>
+        <div class="sig-name">${empresa}</div>
+        <div class="sig-role">Recursos Humanos</div>
+      </div>
+    </div>
+
+    <!-- Rodapé -->
+    <div class="footer">
+      <div class="footer-left">
+        Documento gerado em ${emitidoEm}<br>
+        Este documento tem validade mediante assinatura das partes.
+      </div>
+      <div class="footer-right">
+        ${empresa}<br>
+        Gestão de Pessoas
+      </div>
+    </div>
+  </div>
+</div>
+<script>window.onload = () => window.print()<\/script>
+</body></html>`);
     win.document.close();
   }
 
