@@ -107,8 +107,9 @@ export default function App() {
     root.setProperty('--brand-ink', isLight(tweaks.primary) ? '#0B0D11' : '#FFFFFF');
     root.setProperty('--radius', tweaks.radius + 'px');
     root.setProperty('--radius-lg', tweaks.radius + 4 + 'px');
-    const fz = tweaks.fontSize === 'sm' ? '13px' : tweaks.fontSize === 'lg' ? '15px' : '14px';
-    document.documentElement.style.setProperty('--font-size-base', fz);
+    // zoom escala todos os valores inline px sem precisar refatorar
+    const zoomMap = { sm: 0.88, md: 1, lg: 1.12 };
+    document.body.style.zoom = zoomMap[tweaks.fontSize] ?? 1;
   }, [tweaks.primary, tweaks.radius, tweaks.fontSize]);
 
   // Cmd/Ctrl+K palette · ESC closes overlays
