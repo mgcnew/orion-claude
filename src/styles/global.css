@@ -248,6 +248,32 @@ select {
   color: var(--brand);
 }
 
+/* Sidebar nav tooltip */
+.nav-tip {
+  position: relative;
+}
+.nav-tip::after {
+  content: attr(data-tip);
+  position: absolute;
+  left: calc(100% + 10px);
+  top: 50%;
+  transform: translateY(-50%);
+  white-space: nowrap;
+  background: var(--ink);
+  color: var(--bg);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 5px 10px;
+  border-radius: 6px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+  z-index: 200;
+}
+.nav-tip:hover::after {
+  opacity: 1;
+}
+
 /* Tooltip-ish kbd */
 .kbd {
   font-family: 'JetBrains Mono', monospace;

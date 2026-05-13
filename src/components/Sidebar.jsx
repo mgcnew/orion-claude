@@ -217,7 +217,8 @@ export default function Sidebar({ route, setRoute, collapsed, setCollapsed, user
                 onMouseLeave={(e) => {
                   if (!active) e.currentTarget.style.background = 'transparent';
                 }}
-                title={collapsed ? item.label : undefined}
+                className={collapsed ? 'nav-tip' : undefined}
+                data-tip={collapsed ? item.label : undefined}
               >
                 <Icon name={item.icon} size={18} />
                 {!collapsed && <span style={{ flex: 1 }}>{item.label}</span>}
