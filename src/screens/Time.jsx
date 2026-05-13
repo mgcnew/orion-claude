@@ -1041,7 +1041,7 @@ function FechamentoTab({ selectedEmp, employees, empId, setEmpId, month, setMont
     if (!result || !selectedEmp) return;
     const brl = v => v.toLocaleString('pt-BR', { style:'currency', currency:'BRL' });
     const bonus = result.extraValue + (result.total - salary - result.extraValue + result.totalDisc > 0 ? 0 : 0);
-    const bonusTotal = result.total - salary;
+    const bonusTotal = result.extraValue - result.totalDisc;
     const mesAno = fmtMonth(month);
     const empresa = selectedEmp.company || 'Empresa';
     const emitidoEm = new Date().toLocaleDateString('pt-BR', { day:'2-digit', month:'long', year:'numeric' });
@@ -1346,7 +1346,7 @@ function FechamentoTab({ selectedEmp, employees, empId, setEmpId, month, setMont
       </div>
       <div class="value-amount">
         <div class="value-label">Bônus de desempenho</div>
-        <div class="amount">${brl(bonusTotal > 0 ? bonusTotal : result.total)}</div>
+        <div class="amount">${brl(bonusTotal)}</div>
         <div class="period">${mesAno}</div>
       </div>
     </div>
@@ -1542,10 +1542,15 @@ function FechamentoTab({ selectedEmp, employees, empId, setEmpId, month, setMont
                     </button>
                   </div>
 
-                  {/* Total */}
+                  {/* Total bônus */}
                   <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'14px 20px', background:'var(--surface-2)' }}>
-                    <span style={{ fontWeight:700, fontSize:15, textTransform:'uppercase', letterSpacing:0.3 }}>Total estimado</span>
-                    <span style={{ fontWeight:800, fontSize:22, letterSpacing:-0.5, color:'var(--brand)' }}>{brl(result.total)}</span>
+                    <div>
+                      <div style={{ fontWeight:700, fontSize:15, textTransform:'uppercase', letterSpacing:0.3 }}>Bônus de desempenho</div>
+                      <div style={{ fontSize:11.5, color:'var(--muted)', marginTop:2 }}>Valor a ser pago ao colaborador</div>
+                    </div>
+                    <span style={{ fontWeight:800, fontSize:22, letterSpacing:-0.5, color: result.extraValue - result.totalDisc > 0 ? '#7c3aed' : 'var(--muted)' }}>
+                      {result.extraValue - result.totalDisc > 0 ? brl(result.extraValue - result.totalDisc) : '—'}
+                    </span>
                   </div>
                 </div>
               </div>
