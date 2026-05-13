@@ -254,7 +254,7 @@ export default function App() {
           routeLabel={routeLabel}
           onInvite={() => setInviteOpen(true)}
         />
-        <div style={{ flex: 1, overflowY: 'auto' }} key={route}>
+        <div style={{ flex: 1, overflowY: 'auto' }} key={route.startsWith('settings') ? 'settings' : route}>
           {renderScreen()}
         </div>
       </main>
