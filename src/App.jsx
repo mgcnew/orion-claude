@@ -107,6 +107,13 @@ export default function App() {
     setTimeout(() => setToasts((ts) => ts.filter((x) => x.id !== id)), 3500);
   }, []);
 
+  // Derived from session — safe to compute before early returns (will be null/[] when no session)
+  const userId = session?.user?.id ?? null;
+  const ownedCompanyIds = useMemo(
+    () => companies.filter(c => c.owner_id === userId).map(c => c.id),
+    [companies, userId]
+  );
+
   // ===== LOADING =====
   if (authLoading) {
     return (
@@ -177,11 +184,6 @@ export default function App() {
   const isAdmin = session?.user?.app_metadata?.role === 'admin';
   const userName = session?.user?.user_metadata?.name || session?.user?.email?.split('@')[0] || 'Usuário';
   const userEmail = session?.user?.email || '';
-  const userId = session?.user?.id;
-  const ownedCompanyIds = useMemo(
-    () => companies.filter(c => c.owner_id === userId).map(c => c.id),
-    [companies, userId]
-  );
 
   return (
     <PermissionsProvider userId={userId} activeCompanyId={activeCompany?.id} ownedCompanyIds={ownedCompanyIds}>
