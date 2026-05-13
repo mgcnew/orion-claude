@@ -143,13 +143,15 @@ export function useDashboardData() {
         { data: documents },
         { data: warnings },
         { data: vacations },
-        { data: activities }
+        { data: activities },
+        { data: onboardingPending }
       ] = await Promise.all([
         supabase.from('employees').select('*'),
         supabase.from('documents').select('*'),
         supabase.from('employee_warnings').select('*, employees(name)'),
         supabase.from('employee_vacations').select('*, employees(name)'),
-        supabase.from('activities').select('*').order('created_at', { ascending: false }).limit(10)
+        supabase.from('activities').select('*').order('created_at', { ascending: false }).limit(10),
+        supabase.from('onboarding_docs').select('id').eq('status', 'pending')
       ]);
 
       // Calculate employee counts
@@ -161,9 +163,9 @@ export function useDashboardData() {
       });
       const totalEmployees = employees?.length || 0;
 
-      // Pending documents
+      // Pending documents (regular + onboarding checklist)
       const pendingDocs = documents?.filter(d => d.status === 'pendente' || d.status === 'warn') || [];
-      const pendingDocsCount = pendingDocs.length;
+      const pendingDocsCount = pendingDocs.length + (onboardingPending?.length ?? 0);
 
       // Warnings this month
       const warningsThisMonth = warnings?.filter(w => {

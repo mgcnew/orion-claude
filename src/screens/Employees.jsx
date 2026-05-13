@@ -2,8 +2,33 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import Icon from '../components/Icon.jsx';
 import Avatar from '../components/Avatar.jsx';
-import { useEmployees, useEmployee, useEmployeeCounts, useEmployeeWarnings, useEmployeeVacations, useEmployeeDocuments, useEmployeeHistory, useEmployeeTimeEntries, clockIn, clockOut, createEmployee, updateEmployee, updateEmployeeStatus, createDocuments, useCompanies } from '../hooks/useEmployees.js';
+import { useEmployees, useEmployee, useEmployeeCounts, useEmployeeWarnings, useEmployeeVacations, useEmployeeDocuments, useEmployeeHistory, useEmployeeTimeEntries, clockIn, clockOut, createEmployee, updateEmployee, updateEmployeeStatus, createDocuments, useCompanies, useOnboardingDocs, createOnboardingDocs, markOnboardingDocUploaded, useAllPendingOnboarding } from '../hooks/useEmployees.js';
 import { supabase } from '../lib/supabase.js';
+
+// ── Checklist de admissão ─────────────────────────────────────
+const ONBOARDING_BASE = [
+  { name: 'RG (frente e verso)',               category: 'rg-cpf'    },
+  { name: 'CPF',                               category: 'rg-cpf'    },
+  { name: 'Comprovante de residência',          category: 'contratos' },
+  { name: 'Foto 3×4',                          category: 'rg-cpf'    },
+  { name: 'PIS / PASEP',                       category: 'contratos' },
+  { name: 'Dados bancários (agência e conta)', category: 'contratos' },
+  { name: 'Atestado de saúde admissional',     category: 'exames'    },
+];
+const ONBOARDING_CLT         = [{ name: 'Carteira de Trabalho (CTPS)',                category: 'contratos' }];
+const ONBOARDING_CASADO      = [{ name: 'Certidão de casamento',                      category: 'contratos' }];
+const ONBOARDING_DEPENDENTES = [
+  { name: 'Certidão de nascimento dos dependentes', category: 'contratos' },
+  { name: 'Comprovante de vacinação (dependentes)', category: 'contratos' },
+];
+
+function buildOnboardingList(form) {
+  const docs = [...ONBOARDING_BASE];
+  if (form.contract?.startsWith('CLT')) docs.push(...ONBOARDING_CLT);
+  if (form.civil_status === 'Casado(a)')    docs.push(...ONBOARDING_CASADO);
+  if (form.has_dependents)                  docs.push(...ONBOARDING_DEPENDENTES);
+  return docs;
+}
 
 const fmtDate = (d) => d ? new Date(d + 'T00:00:00').toLocaleDateString('pt-BR') : '—';
 const normalizeDateForInput = (value) => {
@@ -119,11 +144,11 @@ const NEW_EMP_STEPS = [
 ];
 
 const BLANK_EMP = {
-  name: '', cpf: '', birth_date: '', civil_status: 'Solteiro(a)',
+  name: '', cpf: '', birth_date: '', civil_status: 'Solteiro(a)', has_dependents: false,
   role: '', dept: '', company: '', company_id: '', contract: 'CLT — Tempo indet.',
   admission: new Date().toISOString().slice(0, 10), salary: '', cost_center: '', workload: '44h semanais', regime: 'Presencial', supervisor: '',
   phone: '', email_personal: '', address: '', neighborhood: '', city: '', state: '', zip_code: '',
-  status: 'ativo',
+  status: 'ativo', generate_checklist: true,
 };
 
 export function NewEmployeeModal({ onClose, onCreated }) {
@@ -174,18 +199,23 @@ export function NewEmployeeModal({ onClose, onCreated }) {
     };
     const { created, error } = await createEmployee(payload);
     if (error) { setSaving(false); alert('Erro ao salvar: ' + error.message); return; }
-    if (created && docFiles.length > 0) {
+    if (created) {
       const { data: { user } } = await supabase.auth.getUser();
-      await createDocuments(
-        created.id,
-        docFiles.map(f => ({
-          name: f.name,
-          category: 'contratos',
-          size: f.size ? `${(f.size / 1024).toFixed(0)} KB` : '—',
-          type: f.type?.includes('image') ? 'image' : 'pdf',
-        })),
-        user?.id ?? null,
-      );
+      if (docFiles.length > 0) {
+        await createDocuments(
+          created.id,
+          docFiles.map(f => ({
+            name: f.name,
+            category: 'contratos',
+            size: f.size ? `${(f.size / 1024).toFixed(0)} KB` : '—',
+            type: f.type?.includes('image') ? 'image' : 'pdf',
+          })),
+          user?.id ?? null,
+        );
+      }
+      if (form.generate_checklist) {
+        await createOnboardingDocs(created.id, buildOnboardingList(form));
+      }
     }
     setSaving(false);
     onCreated?.();
@@ -289,6 +319,30 @@ export function NewEmployeeModal({ onClose, onCreated }) {
                   ))}
                 </div>
               </FL>
+              <FL label="Possui dependentes?" span={2}>
+                <button
+                  onClick={() => set('has_dependents', !form.has_dependents)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px',
+                    borderRadius: 8, border: '1px solid',
+                    borderColor: form.has_dependents ? 'var(--brand)' : 'var(--line)',
+                    background: form.has_dependents ? 'var(--brand-tint)' : 'var(--surface-2)',
+                    cursor: 'pointer', fontSize: 13,
+                  }}
+                >
+                  <div style={{
+                    width: 18, height: 18, borderRadius: 4, border: '2px solid',
+                    borderColor: form.has_dependents ? 'var(--brand)' : 'var(--muted)',
+                    background: form.has_dependents ? 'var(--brand)' : 'transparent',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                  }}>
+                    {form.has_dependents && <Icon name="check" size={11} style={{ color: 'var(--brand-ink)' }} />}
+                  </div>
+                  <span style={{ color: form.has_dependents ? 'var(--brand)' : 'var(--fg)', fontWeight: form.has_dependents ? 600 : 400 }}>
+                    Sim, possui filhos ou dependentes
+                  </span>
+                </button>
+              </FL>
             </div>
           )}
 
@@ -318,7 +372,7 @@ export function NewEmployeeModal({ onClose, onCreated }) {
               </FL>
               <FL label="Tipo de contrato">
                 <select className="field" value={form.contract} onChange={e => set('contract', e.target.value)}>
-                  {['CLT — Tempo indet.','CLT — Tempo det.','PJ','Estágio','Temporário','Aprendiz'].map(c => <option key={c}>{c}</option>)}
+                  {['CLT — Tempo indet.','CLT — Tempo det.','CLT — Experiência (90 dias)','PJ','Estágio','Temporário','Aprendiz'].map(c => <option key={c}>{c}</option>)}
                 </select>
               </FL>
               <FL label="Data de admissão *">
@@ -343,6 +397,35 @@ export function NewEmployeeModal({ onClose, onCreated }) {
                 <select className="field" value={form.regime} onChange={e => set('regime', e.target.value)}>
                   {['Presencial','Remoto','Híbrido (2×3)','Híbrido (3×2)'].map(c => <option key={c}>{c}</option>)}
                 </select>
+              </FL>
+              <FL label="Gerar checklist de admissão" span={2}>
+                <button
+                  onClick={() => set('generate_checklist', !form.generate_checklist)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px',
+                    borderRadius: 8, border: '1px solid',
+                    borderColor: form.generate_checklist ? 'var(--brand)' : 'var(--line)',
+                    background: form.generate_checklist ? 'var(--brand-tint)' : 'var(--surface-2)',
+                    cursor: 'pointer', fontSize: 13, width: '100%',
+                  }}
+                >
+                  <div style={{
+                    width: 18, height: 18, borderRadius: 4, border: '2px solid',
+                    borderColor: form.generate_checklist ? 'var(--brand)' : 'var(--muted)',
+                    background: form.generate_checklist ? 'var(--brand)' : 'transparent',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                  }}>
+                    {form.generate_checklist && <Icon name="check" size={11} style={{ color: 'var(--brand-ink)' }} />}
+                  </div>
+                  <div>
+                    <div style={{ color: form.generate_checklist ? 'var(--brand)' : 'var(--fg)', fontWeight: form.generate_checklist ? 600 : 400 }}>
+                      Gerar checklist de documentos de admissão
+                    </div>
+                    <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 2 }}>
+                      Lista de documentos exigidos sera vinculada ao perfil do funcionário
+                    </div>
+                  </div>
+                </button>
               </FL>
             </div>
           )}
@@ -403,6 +486,29 @@ export function NewEmployeeModal({ onClose, onCreated }) {
                   </div>
                 </div>
               ))}
+
+              {/* Checklist de admissão preview */}
+              {form.generate_checklist && (
+                <div style={{ background: 'var(--brand-tint)', borderRadius: 10, padding: 16, border: '1px solid var(--brand)', borderOpacity: 0.3 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                    <Icon name="check-circle" size={14} style={{ color: 'var(--brand)', flexShrink: 0 }} />
+                    <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--brand)', textTransform: 'uppercase', letterSpacing: 0.6 }}>
+                      Checklist de admissão
+                    </div>
+                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 10 }}>
+                    Os seguintes documentos serão solicitados ao funcionário:
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {buildOnboardingList(form).map((doc, i) => (
+                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5 }}>
+                        <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--brand)', flexShrink: 0 }} />
+                        <span>{doc.name}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Documentos iniciais */}
               <div style={{ background: 'var(--surface-2)', borderRadius: 10, padding: 16, border: '1px solid var(--line)' }}>
@@ -868,6 +974,7 @@ export function EmployeesList({ setRoute, setRouteParam, setRouteLabel, companyI
     admissionFrom: filters.admissionFrom || undefined,
     admissionTo: filters.admissionTo || undefined,
   });
+  const { pendingByEmployee } = useAllPendingOnboarding();
 
   const onSaved = () => { refetch(); refetchCounts(); };
 
@@ -1074,7 +1181,20 @@ export function EmployeesList({ setRoute, setRouteParam, setRouteLabel, companyI
                     </td>
                     <td style={td()}>
                       <div className="row gap-3">
-                        <Avatar name={emp.name} hue={emp.hue} size={34} />
+                        <div style={{ position: 'relative', flexShrink: 0 }}>
+                          <Avatar name={emp.name} hue={emp.hue} size={34} />
+                          {pendingByEmployee[emp.id] > 0 && (
+                            <div style={{
+                              position: 'absolute', top: -3, right: -3,
+                              width: 14, height: 14, borderRadius: '50%',
+                              background: 'var(--bad)', border: '2px solid var(--surface)',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              animation: 'pulse 1.8s ease-in-out infinite',
+                            }}>
+                              <span style={{ fontSize: 8, fontWeight: 700, color: '#fff', lineHeight: 1 }}>!</span>
+                            </div>
+                          )}
+                        </div>
                         <div>
                           <div style={{ fontWeight: 600 }}>{emp.name}</div>
                           <div style={{ fontSize: 12, color: 'var(--muted)' }}>
@@ -1132,7 +1252,20 @@ export function EmployeesList({ setRoute, setRouteParam, setRouteLabel, companyI
                 onClick={() => openProfile(emp.id, emp.name)}
               >
                 <div className="row" style={{ marginBottom: 12 }}>
-                  <Avatar name={emp.name} hue={emp.hue} size={42} />
+                  <div style={{ position: 'relative', flexShrink: 0 }}>
+                    <Avatar name={emp.name} hue={emp.hue} size={42} />
+                    {pendingByEmployee[emp.id] > 0 && (
+                      <div style={{
+                        position: 'absolute', top: -3, right: -3,
+                        width: 16, height: 16, borderRadius: '50%',
+                        background: 'var(--bad)', border: '2px solid var(--surface)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        animation: 'pulse 1.8s ease-in-out infinite',
+                      }}>
+                        <span style={{ fontSize: 9, fontWeight: 700, color: '#fff', lineHeight: 1 }}>!</span>
+                      </div>
+                    )}
+                  </div>
                   <span className="grow" />
                   <StatusPill status={emp.status} />
                   <div onClick={e => e.stopPropagation()}>
@@ -1457,7 +1590,7 @@ function EditEmployeeModal({ employee, onClose, onSaved }) {
               </FL>
               <FL label="Tipo de contrato">
                 <select className="field" value={form.contract} onChange={e => set('contract', e.target.value)}>
-                  {['CLT — Tempo indet.','CLT — Tempo det.','PJ','Estágio','Temporário','Aprendiz'].map(c => <option key={c}>{c}</option>)}
+                  {['CLT — Tempo indet.','CLT — Tempo det.','CLT — Experiência (90 dias)','PJ','Estágio','Temporário','Aprendiz'].map(c => <option key={c}>{c}</option>)}
                 </select>
               </FL>
               <FL label="Data de admissão">
@@ -1550,6 +1683,8 @@ export function EmployeeProfile({ setRoute, employeeId }) {
   const { documents, refetch: refetchDocs } = useEmployeeDocuments(employeeId);
   const { history } = useEmployeeHistory(employeeId);
   const { timeEntries, refetch: refetchTimeEntries } = useEmployeeTimeEntries(employeeId);
+  const { docs: onboardingDocs, refetch: refetchOnboarding } = useOnboardingDocs(employeeId);
+  const pendingOnboarding = onboardingDocs.filter(d => d.status === 'pending');
 
   const tabs = [
     { id: 'dados', l: 'Dados pessoais', icon: 'user' },
@@ -1586,6 +1721,37 @@ export function EmployeeProfile({ setRoute, employeeId }) {
       <button className="btn ghost sm" style={{ alignSelf: 'flex-start' }} onClick={() => setRoute('employees')}>
         <Icon name="chevron-left" size={13} /> Funcionários
       </button>
+
+      {/* Onboarding warning banner */}
+      {pendingOnboarding.length > 0 && (
+        <div
+          style={{
+            background: 'rgba(var(--bad-rgb, 239,68,68), 0.1)', border: '1px solid var(--bad)',
+            borderRadius: 10, padding: '12px 16px',
+            display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer',
+          }}
+          onClick={() => setTab('docs')}
+        >
+          <div style={{
+            width: 28, height: 28, borderRadius: '50%', background: 'var(--bad)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+            animation: 'pulse 1.8s ease-in-out infinite',
+          }}>
+            <span style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>!</span>
+          </div>
+          <div>
+            <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--bad)' }}>
+              Documentos pendentes de admissão
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
+              {pendingOnboarding.length} documento{pendingOnboarding.length > 1 ? 's' : ''} ainda não entregue{pendingOnboarding.length > 1 ? 's' : ''} — clique para ver a lista
+            </div>
+          </div>
+          <span style={{ marginLeft: 'auto', color: 'var(--bad)' }}>
+            <Icon name="chevron-right" size={14} />
+          </span>
+        </div>
+      )}
 
       {/* Header card */}
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
@@ -1755,7 +1921,7 @@ export function EmployeeProfile({ setRoute, employeeId }) {
 
       {tab === 'dados' && <DadosPessoais emp={emp} />}
       {tab === 'prof' && <DadosProfissionais emp={emp} />}
-      {tab === 'docs' && <DocsTab employeeId={emp.id} documents={documents} refetch={refetchDocs} />}
+      {tab === 'docs' && <DocsTab employeeId={emp.id} documents={documents} refetch={refetchDocs} onboardingDocs={onboardingDocs} refetchOnboarding={refetchOnboarding} />}
       {tab === 'ponto' && <PontoTab employeeId={emp.id} timeEntries={timeEntries} refetch={refetchTimeEntries} />}
       {tab === 'warn' && <WarnTab employeeId={emp.id} />}
       {tab === 'pay' && <PayTab emp={emp} documents={documents} />}
@@ -2208,14 +2374,110 @@ function DocPreviewModal({ doc, onClose }) {
 // ============================================================
 // TAB DOCUMENTOS
 // ============================================================
-function DocsTab({ employeeId, documents = [], refetch }) {
+function DocsTab({ employeeId, documents = [], refetch, onboardingDocs = [], refetchOnboarding }) {
   const [showUpload, setShowUpload] = useState(false);
   const [preview, setPreview] = useState(null);
+  const [uploadingId, setUploadingId] = useState(null);
+  const sharedFileRef = useRef();
+  const pendingDocIdRef = useRef(null);
 
   const catOf = (id) => DOC_CATEGORIES.find(c => c.id === id);
 
+  const uploadedChecklist = onboardingDocs.filter(d => d.status === 'uploaded');
+
+  const triggerChecklistUpload = (docId) => {
+    pendingDocIdRef.current = docId;
+    sharedFileRef.current?.click();
+  };
+
+  const handleFileChosen = async (e) => {
+    const file = e.target.files?.[0];
+    const docId = pendingDocIdRef.current;
+    e.target.value = '';
+    if (!file || !docId) return;
+    setUploadingId(docId);
+    try {
+      const item = onboardingDocs.find(d => d.id === docId);
+      const { data: { user } } = await supabase.auth.getUser();
+      await createDocuments(employeeId, [{
+        name: item?.name ?? file.name,
+        category: item?.category ?? 'contratos',
+        size: file.size ? `${(file.size / 1024).toFixed(0)} KB` : '—',
+        type: file.type?.includes('image') ? 'image' : 'pdf',
+      }], user?.id ?? null);
+      const { data: newDoc } = await supabase
+        .from('documents')
+        .select('id')
+        .eq('employee_id', employeeId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+      await markOnboardingDocUploaded(docId, newDoc?.id ?? null);
+      refetch?.();
+      refetchOnboarding?.();
+    } finally {
+      setUploadingId(null);
+      pendingDocIdRef.current = null;
+    }
+  };
+
   return (
     <>
+      {/* Hidden file input shared for checklist uploads */}
+      <input type="file" ref={sharedFileRef} style={{ display: 'none' }} onChange={handleFileChosen} />
+
+      {/* Checklist de admissão */}
+      {onboardingDocs.length > 0 && (
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 10 }}>
+            Checklist de admissão
+            <span style={{ marginLeft: 8, fontWeight: 400, textTransform: 'none', letterSpacing: 0, color: uploadedChecklist.length < onboardingDocs.length ? 'var(--bad)' : 'var(--ok)' }}>
+              {uploadedChecklist.length}/{onboardingDocs.length} entregues
+            </span>
+          </div>
+          <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+            {onboardingDocs.map((item, i) => (
+              <div
+                key={item.id}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 12,
+                  padding: '10px 16px',
+                  borderTop: i === 0 ? 'none' : '1px solid var(--line-soft)',
+                }}
+              >
+                <div style={{
+                  width: 22, height: 22, borderRadius: '50%', flexShrink: 0,
+                  background: item.status === 'uploaded' ? 'var(--ok)' : 'var(--line)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  {item.status === 'uploaded'
+                    ? <Icon name="check" size={11} style={{ color: '#fff' }} />
+                    : <span style={{ fontSize: 9, color: 'var(--muted)' }}>–</span>
+                  }
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 500, color: item.status === 'uploaded' ? 'var(--muted)' : 'var(--fg)', textDecoration: item.status === 'uploaded' ? 'line-through' : 'none' }}>
+                    {item.name}
+                  </div>
+                </div>
+                {item.status === 'pending' && (
+                  <button
+                    className="btn ghost sm"
+                    disabled={!!uploadingId}
+                    onClick={() => triggerChecklistUpload(item.id)}
+                  >
+                    {uploadingId === item.id ? '…' : <><Icon name="upload" size={12} /> Enviar</>}
+                  </button>
+                )}
+                {item.status === 'uploaded' && (
+                  <span style={{ fontSize: 11, color: 'var(--ok)', fontWeight: 600 }}>Entregue</span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
         {/* Toolbar */}
         <div className="row" style={{ marginBottom: 14 }}>

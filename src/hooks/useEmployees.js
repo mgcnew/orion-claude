@@ -355,6 +355,73 @@ export async function createVacation(data) {
   return { created, error };
 }
 
+// ============================================================
+// CHECKLIST DE ADMISSÃO (onboarding_docs)
+// ============================================================
+
+export function useOnboardingDocs(employeeId) {
+  const [docs, setDocs] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetch = useCallback(() => {
+    if (!employeeId) return;
+    setLoading(true);
+    supabase
+      .from('onboarding_docs')
+      .select('*, documents(id, name, file_url)')
+      .eq('employee_id', employeeId)
+      .order('created_at')
+      .then(({ data }) => { setDocs(data ?? []); setLoading(false); });
+  }, [employeeId]);
+
+  useEffect(() => { fetch(); }, [fetch]);
+  return { docs, loading, refetch: fetch };
+}
+
+export async function createOnboardingDocs(employee_id, items) {
+  if (!items || items.length === 0) return { error: null };
+  const rows = items.map(item => ({
+    employee_id,
+    name: item.name,
+    category: item.category || 'contratos',
+    required: item.required !== false,
+    status: 'pending',
+  }));
+  const { error } = await supabase.from('onboarding_docs').insert(rows);
+  return { error };
+}
+
+export async function markOnboardingDocUploaded(id, documentId) {
+  const { error } = await supabase
+    .from('onboarding_docs')
+    .update({ status: 'uploaded', document_id: documentId })
+    .eq('id', id);
+  return { error };
+}
+
+// Retorna { pendingByEmployee: Map<empId, count>, totalPending: number }
+export function useAllPendingOnboarding() {
+  const [pendingByEmployee, setPendingByEmployee] = useState({});
+  const [totalPending, setTotalPending] = useState(0);
+  const [loading, setLoading] = useState(true);
+
+  const fetch = useCallback(async () => {
+    setLoading(true);
+    const { data } = await supabase
+      .from('onboarding_docs')
+      .select('employee_id')
+      .eq('status', 'pending');
+    const map = {};
+    (data ?? []).forEach(r => { map[r.employee_id] = (map[r.employee_id] || 0) + 1; });
+    setPendingByEmployee(map);
+    setTotalPending(data?.length ?? 0);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { fetch(); }, [fetch]);
+  return { pendingByEmployee, totalPending, loading, refetch: fetch };
+}
+
 // Inserir documentos associados a um funcionário
 export async function createDocuments(employee_id, docs, uploaded_by = null) {
   if (!docs || docs.length === 0) return { data: null, error: null };
