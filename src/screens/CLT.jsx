@@ -505,19 +505,19 @@ function SimuladorTab() {
 
         <div>
           <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Salário bruto (R$)</label>
-          <input className="input" type="number" placeholder="Ex: 3500" value={salario} onChange={e => setSalario(e.target.value)} style={{ width: '100%' }} />
+          <input className="field" type="number" placeholder="Ex: 3500" value={salario} onChange={e => setSalario(e.target.value)} style={{ width: '100%' }} />
         </div>
         <div>
           <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Data de admissão</label>
-          <input className="input" type="date" value={admissao} onChange={e => setAdmissao(e.target.value)} style={{ width: '100%' }} />
+          <input className="field" type="date" value={admissao} onChange={e => setAdmissao(e.target.value)} style={{ width: '100%' }} />
         </div>
         <div>
           <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Dias trabalhados no mês corrente</label>
-          <input className="input" type="number" min="1" max="31" value={diasTrabalhados} onChange={e => setDiasTrabalhados(e.target.value)} style={{ width: '100%' }} />
+          <input className="field" type="number" min="1" max="31" value={diasTrabalhados} onChange={e => setDiasTrabalhados(e.target.value)} style={{ width: '100%' }} />
         </div>
         <div>
           <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Saldo FGTS acumulado (opcional)</label>
-          <input className="input" type="number" placeholder="Deixe em branco para estimar" value={saldoFgtsManual} onChange={e => setSaldoFgtsManual(e.target.value)} style={{ width: '100%' }} />
+          <input className="field" type="number" placeholder="Deixe em branco para estimar" value={saldoFgtsManual} onChange={e => setSaldoFgtsManual(e.target.value)} style={{ width: '100%' }} />
           <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>Se não informado, o sistema estima com base no salário e tempo de serviço.</div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -638,11 +638,11 @@ export default function CLTScreen() {
           <div style={{ position: 'relative', flexShrink: 0 }}>
             <Icon name="search" size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--muted)', pointerEvents: 'none' }} />
             <input
-              className="input"
+              className="field"
               placeholder="Buscar por palavra-chave ou artigo…"
               value={search}
               onChange={e => setSearch(e.target.value)}
-              style={{ paddingLeft: 32, width: 280 }}
+              style={{ paddingLeft: 32, width: 280, background: 'var(--surface-2)' }}
             />
           </div>
         )}
