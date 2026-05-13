@@ -778,6 +778,31 @@ export async function sendInvite({ email, role, companyIds }) {
   return { data, error };
 }
 
+export async function deleteInvite(id) {
+  const { error } = await supabase.from('pending_invites').delete().eq('id', id);
+  return { error };
+}
+
+export function usePendingInvitesByCompany(companyId) {
+  const [invites, setInvites] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetch = useCallback(async () => {
+    if (!companyId) { setInvites([]); setLoading(false); return; }
+    setLoading(true);
+    const { data } = await supabase
+      .from('pending_invites')
+      .select('*')
+      .order('created_at', { ascending: false });
+    // Filter client-side: invite must include this company
+    setInvites((data ?? []).filter(inv => inv.company_ids?.includes(companyId)));
+    setLoading(false);
+  }, [companyId]);
+
+  useEffect(() => { fetch(); }, [fetch]);
+  return { invites, loading, refetch: fetch };
+}
+
 // ============================================================
 // PERMISSÕES
 // ============================================================

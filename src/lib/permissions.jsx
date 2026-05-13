@@ -67,24 +67,35 @@ export function usePermissions() {
 }
 
 // ── Provider ──────────────────────────────────────────────────
-export function PermissionsProvider({ children, userId, activeCompanyId, ownedCompanyIds }) {
-  const [state, setState] = useState({ role: 'Operacional', grants: {}, loading: true });
-
-  const isOwner = Boolean(activeCompanyId && ownedCompanyIds?.includes(activeCompanyId));
-  const noCompany = !activeCompanyId;
+// Queries the DB directly — no timing dependency on parent props
+export function PermissionsProvider({ children, userId, activeCompanyId }) {
+  const [state, setState] = useState({ isOwner: false, role: 'Operacional', grants: {}, loading: true });
 
   useEffect(() => {
     if (!userId) {
-      setState({ role: 'Operacional', grants: {}, loading: false });
+      setState({ isOwner: false, role: 'Operacional', grants: {}, loading: false });
       return;
     }
-    if (!activeCompanyId || isOwner) {
-      setState({ role: 'Administrador', grants: {}, loading: false });
+    if (!activeCompanyId) {
+      // "All companies" view → treat as full access so admin menu stays visible
+      setState({ isOwner: true, role: 'Administrador', grants: {}, loading: false });
       return;
     }
     let cancelled = false;
     (async () => {
       setState(s => ({ ...s, loading: true }));
+      // Check ownership directly from DB — reliable regardless of prop timing
+      const { data: owned } = await supabase
+        .from('companies')
+        .select('id')
+        .eq('id', activeCompanyId)
+        .eq('owner_id', userId)
+        .maybeSingle();
+      if (owned) {
+        if (!cancelled) setState({ isOwner: true, role: 'Administrador', grants: {}, loading: false });
+        return;
+      }
+      // Not owner — check membership
       const { data } = await supabase
         .from('user_companies')
         .select('role, grants')
@@ -92,19 +103,19 @@ export function PermissionsProvider({ children, userId, activeCompanyId, ownedCo
         .eq('company_id', activeCompanyId)
         .maybeSingle();
       if (!cancelled) {
-        setState({ role: data?.role ?? 'Operacional', grants: data?.grants ?? {}, loading: false });
+        setState({ isOwner: false, role: data?.role ?? 'Operacional', grants: data?.grants ?? {}, loading: false });
       }
     })();
     return () => { cancelled = true; };
-  }, [userId, activeCompanyId, isOwner]);
+  }, [userId, activeCompanyId]);
 
   const can = useCallback((module, perm) => {
-    if (noCompany) return true;
-    return resolve(module, perm, { isOwner, role: state.role, grants: state.grants });
-  }, [isOwner, noCompany, state.role, state.grants]);
+    if (state.isOwner) return true;
+    return resolve(module, perm, { isOwner: false, role: state.role, grants: state.grants });
+  }, [state]);
 
   return (
-    <PermissionsContext.Provider value={{ can, isOwner, role: state.role, loading: state.loading }}>
+    <PermissionsContext.Provider value={{ can, isOwner: state.isOwner, role: state.role, loading: state.loading }}>
       {children}
     </PermissionsContext.Provider>
   );

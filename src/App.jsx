@@ -178,10 +178,9 @@ export default function App() {
   const userName = session?.user?.user_metadata?.name || session?.user?.email?.split('@')[0] || 'Usuário';
   const userEmail = session?.user?.email || '';
   const userId = session?.user?.id;
-  const ownedCompanyIds = companies.filter(c => c.owner_id === userId).map(c => c.id);
 
   return (
-    <PermissionsProvider userId={userId} activeCompanyId={activeCompany?.id} ownedCompanyIds={ownedCompanyIds}>
+    <PermissionsProvider userId={userId} activeCompanyId={activeCompany?.id}>
     <div
       style={{
         display: 'flex',
