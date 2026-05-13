@@ -67,6 +67,9 @@ export default function Sidebar({ route, setRoute, collapsed, setCollapsed, mobi
   });
   const [tip, setTip] = useState(null); // { label, y }
 
+  // No drawer mobile sempre mostra expandido (ícone + label)
+  const col = mobileOpen ? false : collapsed;
+
   const isActive = (id) =>
     route === id || (id !== 'dashboard' && route.startsWith(id));
 
@@ -75,7 +78,7 @@ export default function Sidebar({ route, setRoute, collapsed, setCollapsed, mobi
     <aside
       className={`orion-sidebar${mobileOpen ? ' mobile-open' : ''}`}
       style={{
-        width: collapsed ? 68 : 248,
+        width: col ? 68 : 248,
         background: 'var(--sidebar)',
         borderRight: '1px solid var(--line)',
         display: 'flex',
@@ -95,8 +98,8 @@ export default function Sidebar({ route, setRoute, collapsed, setCollapsed, mobi
           borderBottom: '1px solid var(--line)',
         }}
       >
-        <Logo collapsed={collapsed} />
-        {!collapsed && (
+        <Logo collapsed={col} />
+        {!col && !mobileOpen && (
           <button
             className="btn ghost icon sm"
             onClick={() => setCollapsed(true)}
@@ -108,7 +111,7 @@ export default function Sidebar({ route, setRoute, collapsed, setCollapsed, mobi
       </div>
 
       {/* Seletor de empresa — visível quando expandido e houver empresas */}
-      {!collapsed && companies.length > 0 && (
+      {!col && companies.length > 0 && (
         <div style={{ padding: '8px 10px', borderBottom: '1px solid var(--line)' }}>
           <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--muted-2)', letterSpacing: 1, marginBottom: 5, paddingLeft: 2 }}>
             EMPRESA
@@ -156,7 +159,7 @@ export default function Sidebar({ route, setRoute, collapsed, setCollapsed, mobi
         {NAV.map((item, i) => {
           if (item.perm && !can(item.perm[0], item.perm[1])) return null;
           if (item.id === 'section') {
-            return collapsed ? (
+            return col ? (
               <div key={i} style={{ height: 12 }} />
             ) : (
               <div
@@ -174,7 +177,7 @@ export default function Sidebar({ route, setRoute, collapsed, setCollapsed, mobi
             );
           }
           const active = isActive(item.id);
-          const hasSub = item.sub && !collapsed;
+          const hasSub = item.sub && !col;
           const expanded = open[item.id];
           return (
             <div key={item.id}>
@@ -188,8 +191,8 @@ export default function Sidebar({ route, setRoute, collapsed, setCollapsed, mobi
                   display: 'flex',
                   alignItems: 'center',
                   gap: 10,
-                  padding: collapsed ? '9px 0' : '8px 10px',
-                  justifyContent: collapsed ? 'center' : 'flex-start',
+                  padding: col ? '9px 0' : '8px 10px',
+                  justifyContent: col ? 'center' : 'flex-start',
                   borderRadius: 8,
                   border: 'none',
                   background: active ? 'var(--brand-tint)' : 'transparent',
@@ -203,7 +206,7 @@ export default function Sidebar({ route, setRoute, collapsed, setCollapsed, mobi
                 }}
                 onMouseEnter={(e) => {
                   if (!active) e.currentTarget.style.background = 'var(--hover)';
-                  if (collapsed) {
+                  if (col) {
                     const rect = e.currentTarget.getBoundingClientRect();
                     setTip({ label: item.label, y: rect.top + rect.height / 2 });
                   }
@@ -214,13 +217,13 @@ export default function Sidebar({ route, setRoute, collapsed, setCollapsed, mobi
                 }}
               >
                 <Icon name={item.icon} size={18} />
-                {!collapsed && <span style={{ flex: 1 }}>{item.label}</span>}
-                {!collapsed && item.badge != null && (
+                {!col && <span style={{ flex: 1 }}>{item.label}</span>}
+                {!col && item.badge != null && (
                   <span className="pill brand" style={{ padding: '1px 7px', fontSize: 10.5 }}>
                     {item.badge}
                   </span>
                 )}
-                {hasSub && !collapsed && (
+                {hasSub && !col && (
                   <Icon
                     name="chevron-down"
                     size={14}
@@ -274,7 +277,7 @@ export default function Sidebar({ route, setRoute, collapsed, setCollapsed, mobi
 
       {/* User card / collapse toggle */}
       <div style={{ padding: 10, borderTop: '1px solid var(--line)' }}>
-        {collapsed ? (
+        {col ? (
           <div className="col gap-2" style={{ alignItems: 'center' }}>
             <button
               className="btn ghost icon sm"
