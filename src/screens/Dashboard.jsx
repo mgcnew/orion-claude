@@ -261,7 +261,14 @@ export function useDashboardData(companyId) {
   return { data, loading };
 }
 
-export default function Dashboard({ setRoute, addToast, activeCompany }) {
+function greeting(name) {
+  const h = new Date().getHours();
+  const period = h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite';
+  const first = name?.split(' ')[0];
+  return first ? `${period}, ${first}` : period;
+}
+
+export default function Dashboard({ setRoute, addToast, activeCompany, userName }) {
   const { data, loading } = useDashboardData(activeCompany?.id);
   const today = new Date();
   
@@ -306,7 +313,7 @@ export default function Dashboard({ setRoute, addToast, activeCompany }) {
             {formatDatePtBR(today)}
           </div>
           <h1 style={{ fontSize: 24, fontWeight: 700, letterSpacing: -0.5, margin: '0 0 4px' }}>
-            Bom dia 👋
+            {greeting(userName)}
           </h1>
           <p style={{ fontSize: 13.5, color: 'var(--muted)', margin: 0 }}>
             Você tem <strong style={{ color: 'var(--ink-soft)' }}>{data.alerts.length} alertas</strong> aguardando ação e{' '}

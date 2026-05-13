@@ -185,7 +185,7 @@ export default function App() {
 
   // ===== ROUTING =====
   const renderScreen = () => {
-    if (route === 'dashboard') return <Dashboard setRoute={setRoute} addToast={addToast} activeCompany={activeCompany} />;
+    if (route === 'dashboard') return <Dashboard setRoute={setRoute} addToast={addToast} activeCompany={activeCompany} userName={userName} />;
     if (route === 'employees') return <EmployeesList setRoute={setRoute} setRouteParam={setRouteParam} setRouteLabel={setRouteLabel} companyId={activeCompany?.id} />;
     if (route === 'employees-profile') return <EmployeeProfile setRoute={setRoute} employeeId={routeParam} />;
     if (route.startsWith('documents'))
