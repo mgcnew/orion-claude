@@ -57,6 +57,7 @@ export function PermissionsScreen({ addToast, embedded, activeCompany: propCompa
   const [inviteEmail, setInviteEmail] = useState('');
   const [promoting, setPromoting] = useState(null);
   const [revoking, setRevoking] = useState(false);
+  const [showWithoutAccess, setShowWithoutAccess] = useState(false);
 
   const { employees: companyEmployees } = useEmployees({ companyId });
 
@@ -300,24 +301,43 @@ export function PermissionsScreen({ addToast, embedded, activeCompany: propCompa
                 </>
               )}
 
-              {/* Funcionários sem acesso ao sistema */}
+              {/* Funcionários sem acesso ao sistema — recolhível */}
               {employeesWithoutAccess.length > 0 && (
                 <>
-                  <div style={{ padding: '10px 13px 4px', fontSize: 10.5, fontWeight: 700, color: 'var(--muted-2)', letterSpacing: 0.8, textTransform: 'uppercase' }}>
-                    Funcionários sem acesso
-                  </div>
-                  {employeesWithoutAccess.map((emp) => (
+                  <button
+                    onClick={() => setShowWithoutAccess(v => !v)}
+                    style={{
+                      width: '100%', display: 'flex', alignItems: 'center', gap: 8,
+                      padding: '9px 13px', border: 'none', borderTop: '1px solid var(--line)',
+                      background: showWithoutAccess ? 'var(--surface-2)' : 'transparent',
+                      cursor: 'pointer', textAlign: 'left',
+                    }}
+                  >
+                    <Icon name="users" size={13} style={{ color: 'var(--muted)', flexShrink: 0 }} />
+                    <span style={{ flex: 1, fontSize: 11.5, color: 'var(--muted)', fontWeight: 500 }}>
+                      {employeesWithoutAccess.length} funcionário{employeesWithoutAccess.length !== 1 ? 's' : ''} sem acesso
+                    </span>
+                    <span style={{
+                      fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 20,
+                      background: 'var(--surface-2)', color: 'var(--muted-2)', border: '1px solid var(--line)',
+                    }}>
+                      {showWithoutAccess ? 'Recolher' : 'Gerenciar'}
+                    </span>
+                  </button>
+
+                  {showWithoutAccess && employeesWithoutAccess.map((emp) => (
                     <div
                       key={emp.id}
                       style={{
                         display: 'flex', gap: 10, alignItems: 'center',
                         padding: '9px 13px', borderBottom: '1px solid var(--line-soft)',
+                        background: 'var(--surface-2)',
                       }}
                     >
                       <Avatar name={emp.name} size={30} hue={emp.hue ?? 215} />
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: 12.5, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{emp.name}</div>
-                        <div style={{ fontSize: 11, color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{emp.email_personal}</div>
+                        <div style={{ fontSize: 11, color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{emp.email_personal || '—'}</div>
                       </div>
                       <button
                         className="btn ghost sm"
