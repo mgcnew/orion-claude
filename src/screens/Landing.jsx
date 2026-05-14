@@ -254,7 +254,7 @@ export default function LandingPage() {
       <div className="lp-nav-outer">
         <nav className="lp-nav">
           <img src={logoFullLight} alt="Orion Gestão" style={{ height: 30, objectFit: 'contain' }} />
-          <div style={{ width: 1, height: 20, background: 'rgba(0,0,0,.1)' }} />
+          <span style={{ flex: 1 }} />
           <button
             onClick={openLogin}
             style={{ height: 34, padding: '0 16px', borderRadius: 999, background: '#2A5BFF', color: '#fff', border: 'none', fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, transition: 'opacity .15s', whiteSpace: 'nowrap' }}
