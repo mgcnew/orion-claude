@@ -1,4 +1,7 @@
-import { useState, useEffect, Fragment, useMemo, useRef } from 'react';
+import { useState, useEffect, Fragment, useMemo, useRef, useCallback } from 'react';
+import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import Icon from '../components/Icon.jsx';
 import Avatar from '../components/Avatar.jsx';
 import * as D from '../data/mock.js';
@@ -1189,6 +1192,59 @@ function useReportData(reportId, filters, employees, warnings, vacations, docume
   }, [reportId, filters, employees, warnings, vacations, documents, timecards]);
 }
 
+function ExportDropdown({ onExport }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const h = (e) => { if (!ref.current?.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, [open]);
+
+  const formats = [
+    { id: 'XLSX', label: 'Excel (.xlsx)', icon: 'download', desc: 'Planilha editável' },
+    { id: 'CSV',  label: 'CSV (.csv)',    icon: 'download', desc: 'Dados separados por ponto-e-vírgula' },
+    { id: 'PDF',  label: 'PDF (.pdf)',    icon: 'pdf',      desc: 'Documento formatado para impressão' },
+  ];
+
+  return (
+    <div ref={ref} style={{ position: 'relative' }}>
+      <button className="btn sm primary" onClick={() => setOpen(o => !o)}>
+        <Icon name="download" size={13} />
+        Exportar
+        <Icon name="chevron-down" size={12} style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }} />
+      </button>
+      {open && (
+        <div style={{
+          position: 'absolute', top: 'calc(100% + 4px)', right: 0, zIndex: 600,
+          background: 'var(--surface)', border: '1px solid var(--line)',
+          borderRadius: 10, boxShadow: 'var(--shadow-pop)', padding: '4px 0', minWidth: 220,
+        }}>
+          {formats.map(f => (
+            <button key={f.id} onClick={() => { onExport(f.id); setOpen(false); }} style={{
+              width: '100%', display: 'flex', alignItems: 'center', gap: 10,
+              padding: '9px 14px', border: 'none', background: 'transparent',
+              cursor: 'pointer', textAlign: 'left', transition: 'background .08s',
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = 'var(--hover)'}
+            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+              <div style={{ width: 30, height: 30, borderRadius: 7, background: 'var(--surface-2)', border: '1px solid var(--line)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <Icon name={f.icon} size={14} style={{ color: 'var(--brand)' }} />
+              </div>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>{f.label}</div>
+                <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 1 }}>{f.desc}</div>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function FilterModal({ report, selectedId, onSelectReport, filters, setFilters, employees, depts, companies, onClose, onClear }) {
   return (
     <div
@@ -1281,13 +1337,65 @@ export function ReportsScreen({ addToast, activeCompany }) {
   const companies = useMemo(() => [...new Set(employees.map(e => e.company).filter(Boolean))].sort(), [employees]);
   const rows      = useReportData(selectedId, filters, employees, warnings, vacations, documents, timecards);
 
-  const handleExport = (format) => {
-    setHistory(h => [{
-      id: Date.now(), report: selected.label, format, rows: rows.length,
-      at: new Date().toLocaleString('pt-BR'),
-    }, ...h].slice(0, 8));
-    addToast({ kind: 'ok', msg: `${selected.label} exportado como ${format} (${rows.length} registros)` });
-  };
+  const handleExport = useCallback((format) => {
+    if (!selected || rows.length === 0) return;
+    const headers = selected.columns;
+    const data    = rows.map(r => r.cells);
+    const filename = `${selected.label.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0,10)}`;
+
+    const triggerDownload = (url, name) => {
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = name;
+      a.style.display = 'none';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 100);
+    };
+
+    try {
+      if (format === 'CSV') {
+        const csv = [headers, ...data].map(row => row.map(c => `"${String(c ?? '').replace(/"/g, '""')}"`).join(';')).join('\n');
+        const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+        triggerDownload(URL.createObjectURL(blob), filename + '.csv');
+      }
+
+      if (format === 'XLSX') {
+        const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, selected.label.slice(0, 31));
+        XLSX.writeFile(wb, filename + '.xlsx');
+      }
+
+      if (format === 'PDF') {
+        const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+        doc.setFontSize(13);
+        doc.text(selected.label, 14, 14);
+        doc.setFontSize(9);
+        doc.setTextColor(120);
+        doc.text(`Gerado em ${new Date().toLocaleString('pt-BR')} · ${rows.length} registros`, 14, 20);
+        autoTable(doc, {
+          head: [headers],
+          body: data,
+          startY: 26,
+          styles: { fontSize: 8, cellPadding: 2 },
+          headStyles: { fillColor: [42, 91, 255], textColor: 255, fontStyle: 'bold' },
+          alternateRowStyles: { fillColor: [248, 248, 252] },
+        });
+        doc.save(filename + '.pdf');
+      }
+
+      setHistory(h => [{
+        id: Date.now(), report: selected.label, format, rows: rows.length,
+        at: new Date().toLocaleString('pt-BR'),
+      }, ...h].slice(0, 8));
+      addToast({ kind: 'ok', msg: `${selected.label} exportado como ${format} (${rows.length} registros)` });
+    } catch (err) {
+      console.error('Export error:', err);
+      addToast({ kind: 'bad', msg: `Erro ao exportar: ${err.message}` });
+    }
+  }, [selected, rows, addToast]);
 
   const selectReport = (id) => { setSelectedId(id); setFilters({}); };
   const activeFiltersCount = Object.values(filters).filter(v => v).length;
@@ -1341,19 +1449,7 @@ export function ReportsScreen({ addToast, activeCompany }) {
                   Limpar filtros
                 </button>
               )}
-              {rows.length > 0 && (
-                <>
-                  <button className="btn sm" onClick={() => handleExport('XLSX')}>
-                    <Icon name="download" size={13} /> XLSX
-                  </button>
-                  <button className="btn sm" onClick={() => handleExport('CSV')}>
-                    <Icon name="download" size={13} /> CSV
-                  </button>
-                  <button className="btn sm primary" onClick={() => handleExport('PDF')}>
-                    <Icon name="pdf" size={13} /> PDF
-                  </button>
-                </>
-              )}
+              {rows.length > 0 && <ExportDropdown onExport={handleExport} />}
             </div>
           </div>
 
