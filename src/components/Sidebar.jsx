@@ -43,7 +43,7 @@ function Logo({ collapsed, theme }) {
     <img
       src={logoLanding}
       alt="SR Gestão de Documentos"
-      style={{ height: 130, width: '100%', maxWidth: 230, objectFit: 'contain', objectPosition: 'center center', margin: '-30px 0' }}
+      style={{ height: 145, width: '100%', maxWidth: 230, objectFit: 'contain', objectPosition: 'center center', margin: '-30px 0 -38px' }}
     />
   );
 }
