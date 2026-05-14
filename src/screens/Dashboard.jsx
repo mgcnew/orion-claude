@@ -33,7 +33,12 @@ function Sparkline({ data, color, height = 40, width = 120, fill = true }) {
 
 function StatCard({ icon, label, value, delta, deltaKind = 'ok', series, accent = 'var(--brand)' }) {
   return (
-    <div className="card" style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 12 }}>
+    <div
+      className="card"
+      style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 12, transition: 'transform .15s ease, box-shadow .15s ease', cursor: 'default' }}
+      onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 20px rgba(0,0,0,.08)'; }}
+      onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = ''; }}
+    >
       <div className="row gap-2">
         <div
           style={{
