@@ -48,9 +48,11 @@ function CompanyInitial({ name }) {
   );
 }
 
-function CompanyPicker({ companies, activeCompany, setActiveCompany }) {
+function CompanyPicker({ companies, activeCompany, setActiveCompany, theme }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
+
+  useEffect(() => { setOpen(false); }, [theme]);
 
   useEffect(() => {
     if (!open) return;
@@ -223,6 +225,7 @@ export default function Sidebar({ route, setRoute, collapsed, setCollapsed, mobi
           companies={companies}
           activeCompany={activeCompany}
           setActiveCompany={setActiveCompany}
+          theme={theme}
         />
       )}
 
