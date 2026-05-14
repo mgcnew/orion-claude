@@ -65,16 +65,13 @@ function QuickEntry({ employees, defaultEmpId, onSaved }) {
         {/* Funcionário */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: '1 1 180px', minWidth: 150 }}>
           <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600 }}>Funcionário</span>
-          <select value={empId} onChange={e => setEmpId(e.target.value)} style={{ ...field, paddingRight: 28 }}>
-            <option value="">Selecionar…</option>
-            {employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
-          </select>
+          <EmpDropdown employees={employees} value={empId} onChange={setEmpId} placeholder="Selecionar…" />
         </div>
 
         {/* Data */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600 }}>Data</span>
-          <input type="date" value={date} onChange={e => setDate(e.target.value)} style={{ ...field, width: 140 }} />
+          <DateDropdown value={date} onChange={setDate} />
         </div>
 
         {/* Tipo */}
@@ -1026,6 +1023,414 @@ const NEW_ACTIONS = [
   { id:'ajuste', label:'Ajuste manual de ponto',  icon:'edit'    },
 ];
 
+// ── EmpDropdown ───────────────────────────────────────────────
+function EmpDropdown({ employees, value, onChange, loading, placeholder = 'Todos os funcionários' }) {
+  const [open, setOpen] = useState(false);
+  const [rect, setRect] = useState(null);
+  const triggerRef = useRef();
+  const panelRef   = useRef();
+  const selected   = employees.find(e => e.id === value);
+
+  useEffect(() => {
+    if (!open) return;
+    const h = (e) => {
+      if (!panelRef.current?.contains(e.target) && !triggerRef.current?.contains(e.target))
+        setOpen(false);
+    };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const update = () => { if (triggerRef.current) setRect(triggerRef.current.getBoundingClientRect()); };
+    window.addEventListener('scroll', update, true);
+    window.addEventListener('resize', update);
+    return () => { window.removeEventListener('scroll', update, true); window.removeEventListener('resize', update); };
+  }, [open]);
+
+  const handleToggle = () => {
+    if (!open) setRect(triggerRef.current?.getBoundingClientRect());
+    setOpen(o => !o);
+  };
+
+  const pick = (id) => { onChange(id); setOpen(false); };
+
+  const trigBtn = {
+    display: 'flex', alignItems: 'center', gap: 8,
+    height: 36, padding: '0 12px', borderRadius: 8,
+    border: '1px solid var(--line)', background: 'var(--surface-2)',
+    color: 'var(--ink)', fontSize: 13, fontWeight: 500,
+    cursor: 'pointer', minWidth: 180, maxWidth: 280,
+    transition: 'border-color .12s, background .12s',
+  };
+
+  return (
+    <>
+      <button
+        ref={triggerRef}
+        onClick={handleToggle}
+        disabled={loading}
+        style={{ ...trigBtn, borderColor: open ? 'var(--brand)' : 'var(--line)' }}
+        onMouseEnter={e => { if (!open) e.currentTarget.style.borderColor = 'var(--muted-2)'; }}
+        onMouseLeave={e => { if (!open) e.currentTarget.style.borderColor = 'var(--line)'; }}
+      >
+        {selected
+          ? <Avatar name={selected.name} hue={selected.hue ?? 215} size={22} />
+          : <Icon name="user" size={15} style={{ color: 'var(--muted)', flexShrink: 0 }} />
+        }
+        <span style={{ flex: 1, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {selected ? selected.name : placeholder}
+        </span>
+        <Icon name="chevron-down" size={12} style={{ color: 'var(--muted)', flexShrink: 0, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }} />
+      </button>
+
+      {open && rect && createPortal(
+        <div
+          ref={panelRef}
+          style={{
+            position: 'fixed', top: rect.bottom + 4, left: rect.left,
+            minWidth: Math.max(rect.width, 240), maxWidth: 320,
+            background: 'var(--surface)', border: '1px solid var(--line)',
+            borderRadius: 10, boxShadow: '0 8px 32px rgba(0,0,0,.16)',
+            zIndex: 1200, overflow: 'hidden',
+          }}
+        >
+          {/* "Todos" option */}
+          <button
+            onClick={() => pick('')}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 10,
+              width: '100%', padding: '10px 14px', border: 'none',
+              background: !value ? 'var(--brand-tint)' : 'transparent',
+              color: !value ? 'var(--brand)' : 'var(--ink)',
+              fontSize: 13, fontWeight: !value ? 700 : 500, cursor: 'pointer', textAlign: 'left',
+            }}
+            onMouseEnter={e => { if (value) e.currentTarget.style.background = 'var(--hover)'; }}
+            onMouseLeave={e => { if (value) e.currentTarget.style.background = 'transparent'; }}
+          >
+            <Icon name="user" size={15} style={{ color: !value ? 'var(--brand)' : 'var(--muted)', flexShrink: 0 }} />
+            <span style={{ flex: 1 }}>{placeholder}</span>
+            {!value && <Icon name="check" size={13} style={{ color: 'var(--brand)' }} />}
+          </button>
+
+          {employees.length > 0 && <div style={{ height: 1, background: 'var(--line)', margin: '2px 0' }} />}
+
+          <div style={{ maxHeight: 280, overflowY: 'auto' }}>
+            {employees.map(emp => {
+              const active = value === emp.id;
+              return (
+                <button
+                  key={emp.id}
+                  onClick={() => pick(emp.id)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 10,
+                    width: '100%', padding: '8px 14px', border: 'none',
+                    background: active ? 'var(--brand-tint)' : 'transparent',
+                    color: 'var(--ink)', fontSize: 13, cursor: 'pointer', textAlign: 'left',
+                  }}
+                  onMouseEnter={e => { if (!active) e.currentTarget.style.background = 'var(--hover)'; }}
+                  onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent'; }}
+                >
+                  <Avatar name={emp.name} hue={emp.hue ?? 215} size={26} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: active ? 700 : 500, fontSize: 13, color: active ? 'var(--brand)' : 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{emp.name}</div>
+                    {emp.dept && <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 1 }}>{emp.dept}</div>}
+                  </div>
+                  {active && <Icon name="check" size={13} style={{ color: 'var(--brand)', flexShrink: 0 }} />}
+                </button>
+              );
+            })}
+          </div>
+        </div>,
+        document.body
+      )}
+    </>
+  );
+}
+
+// ── DateDropdown ──────────────────────────────────────────────
+function DateDropdown({ value, onChange }) {
+  const [open, setOpen]       = useState(false);
+  const [rect, setRect]       = useState(null);
+  const [viewYM, setViewYM]   = useState(() => value.slice(0, 7));
+  const triggerRef = useRef();
+  const panelRef   = useRef();
+
+  useEffect(() => {
+    if (!open) return;
+    const h = (e) => {
+      if (!panelRef.current?.contains(e.target) && !triggerRef.current?.contains(e.target))
+        setOpen(false);
+    };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const update = () => { if (triggerRef.current) setRect(triggerRef.current.getBoundingClientRect()); };
+    window.addEventListener('scroll', update, true);
+    window.addEventListener('resize', update);
+    return () => { window.removeEventListener('scroll', update, true); window.removeEventListener('resize', update); };
+  }, [open]);
+
+  const handleToggle = () => {
+    if (!open) {
+      setRect(triggerRef.current?.getBoundingClientRect());
+      setViewYM(value.slice(0, 7));
+    }
+    setOpen(o => !o);
+  };
+
+  const prevMonth = () => {
+    const [y, m] = viewYM.split('-').map(Number);
+    const d = new Date(y, m - 2, 1);
+    setViewYM(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+  };
+  const nextMonth = () => {
+    const [y, m] = viewYM.split('-').map(Number);
+    const d = new Date(y, m, 1);
+    setViewYM(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+  };
+
+  const pick = (day) => {
+    onChange(`${viewYM}-${String(day).padStart(2, '0')}`);
+    setOpen(false);
+  };
+
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const [vy, vm] = viewYM.split('-').map(Number);
+  const totalDays = new Date(vy, vm, 0).getDate();
+  const firstDow  = new Date(vy, vm - 1, 1).getDay();
+
+  const fmtDateShort = (iso) => {
+    if (!iso) return '';
+    const [y, m, d] = iso.split('-');
+    return `${d}/${m}/${y}`;
+  };
+
+  const trigBtn = {
+    display: 'flex', alignItems: 'center', gap: 8,
+    height: 34, padding: '0 10px', borderRadius: 7,
+    border: '1px solid var(--line)', background: 'var(--surface-2)',
+    color: 'var(--ink)', fontSize: 13, fontWeight: 500,
+    cursor: 'pointer', whiteSpace: 'nowrap', width: 140,
+    transition: 'border-color .12s',
+  };
+
+  return (
+    <>
+      <button
+        ref={triggerRef}
+        onClick={handleToggle}
+        style={{ ...trigBtn, borderColor: open ? 'var(--brand)' : 'var(--line)' }}
+        onMouseEnter={e => { if (!open) e.currentTarget.style.borderColor = 'var(--muted-2)'; }}
+        onMouseLeave={e => { if (!open) e.currentTarget.style.borderColor = 'var(--line)'; }}
+      >
+        <Icon name="calendar" size={13} style={{ color: 'var(--muted)', flexShrink: 0 }} />
+        <span style={{ flex: 1, textAlign: 'left' }}>{fmtDateShort(value)}</span>
+        <Icon name="chevron-down" size={11} style={{ color: 'var(--muted)', flexShrink: 0, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }} />
+      </button>
+
+      {open && rect && createPortal(
+        <div
+          ref={panelRef}
+          style={{
+            position: 'fixed', top: rect.bottom + 4, left: rect.left,
+            width: 248,
+            background: 'var(--surface)', border: '1px solid var(--line)',
+            borderRadius: 10, boxShadow: '0 8px 32px rgba(0,0,0,.16)',
+            zIndex: 1200, padding: '12px 12px 10px',
+          }}
+        >
+          {/* Month/year header */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+            <button onClick={prevMonth} style={{ width: 26, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', background: 'transparent', borderRadius: 6, cursor: 'pointer', color: 'var(--muted)' }}
+              onMouseEnter={e => e.currentTarget.style.background = 'var(--hover)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+              <Icon name="chevron-left" size={13} />
+            </button>
+            <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--ink)' }}>
+              {MONTHS_PT[vm - 1]} {vy}
+            </span>
+            <button onClick={nextMonth} style={{ width: 26, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', background: 'transparent', borderRadius: 6, cursor: 'pointer', color: 'var(--muted)' }}
+              onMouseEnter={e => e.currentTarget.style.background = 'var(--hover)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+              <Icon name="chevron-right" size={13} />
+            </button>
+          </div>
+
+          {/* Day-of-week labels */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', marginBottom: 4 }}>
+            {DAYS_PT.map(d => (
+              <div key={d} style={{ textAlign: 'center', fontSize: 10.5, fontWeight: 700, color: 'var(--muted)', padding: '2px 0' }}>{d}</div>
+            ))}
+          </div>
+
+          {/* Day grid */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2 }}>
+            {Array.from({ length: firstDow }).map((_, i) => <div key={`e${i}`} />)}
+            {Array.from({ length: totalDays }, (_, i) => i + 1).map(day => {
+              const iso = `${viewYM}-${String(day).padStart(2, '0')}`;
+              const isSelected = iso === value;
+              const isToday    = iso === todayStr;
+              return (
+                <button
+                  key={day}
+                  onClick={() => pick(day)}
+                  style={{
+                    height: 30, borderRadius: 6, border: 'none',
+                    background: isSelected ? 'var(--brand)' : 'transparent',
+                    color: isSelected ? '#fff' : isToday ? 'var(--brand)' : 'var(--ink)',
+                    fontWeight: isSelected || isToday ? 700 : 400,
+                    fontSize: 12.5, cursor: 'pointer',
+                    outline: isToday && !isSelected ? '2px solid var(--brand)' : 'none',
+                    outlineOffset: -2,
+                    transition: 'background .1s',
+                  }}
+                  onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = 'var(--hover)'; }}
+                  onMouseLeave={e => { if (!isSelected) e.currentTarget.style.background = 'transparent'; }}
+                >
+                  {day}
+                </button>
+              );
+            })}
+          </div>
+        </div>,
+        document.body
+      )}
+    </>
+  );
+}
+
+// ── MonthDropdown ─────────────────────────────────────────────
+function MonthDropdown({ value, onChange }) {
+  const [open, setOpen] = useState(false);
+  const [rect, setRect] = useState(null);
+  const [viewYear, setViewYear] = useState(() => parseInt(value.split('-')[0]));
+  const triggerRef = useRef();
+  const panelRef   = useRef();
+
+  useEffect(() => {
+    if (!open) return;
+    const h = (e) => {
+      if (!panelRef.current?.contains(e.target) && !triggerRef.current?.contains(e.target))
+        setOpen(false);
+    };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const update = () => { if (triggerRef.current) setRect(triggerRef.current.getBoundingClientRect()); };
+    window.addEventListener('scroll', update, true);
+    window.addEventListener('resize', update);
+    return () => { window.removeEventListener('scroll', update, true); window.removeEventListener('resize', update); };
+  }, [open]);
+
+  const handleToggle = () => {
+    if (!open) {
+      setRect(triggerRef.current?.getBoundingClientRect());
+      setViewYear(parseInt(value.split('-')[0]));
+    }
+    setOpen(o => !o);
+  };
+
+  const pick = (monthIdx) => {
+    onChange(`${viewYear}-${String(monthIdx + 1).padStart(2, '0')}`);
+    setOpen(false);
+  };
+
+  const [selYear, selMonth] = value.split('-').map(Number);
+
+  const trigBtn = {
+    display: 'flex', alignItems: 'center', gap: 8,
+    height: 36, padding: '0 12px', borderRadius: 8,
+    border: '1px solid var(--line)', background: 'var(--surface-2)',
+    color: 'var(--ink)', fontSize: 13, fontWeight: 500,
+    cursor: 'pointer', whiteSpace: 'nowrap',
+    transition: 'border-color .12s, background .12s',
+  };
+
+  return (
+    <>
+      <button
+        ref={triggerRef}
+        onClick={handleToggle}
+        style={{ ...trigBtn, borderColor: open ? 'var(--brand)' : 'var(--line)' }}
+        onMouseEnter={e => { if (!open) e.currentTarget.style.borderColor = 'var(--muted-2)'; }}
+        onMouseLeave={e => { if (!open) e.currentTarget.style.borderColor = 'var(--line)'; }}
+      >
+        <Icon name="history" size={15} style={{ color: 'var(--muted)', flexShrink: 0 }} />
+        <span>{fmtMonth(value)}</span>
+        <Icon name="chevron-down" size={12} style={{ color: 'var(--muted)', flexShrink: 0, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }} />
+      </button>
+
+      {open && rect && createPortal(
+        <div
+          ref={panelRef}
+          style={{
+            position: 'fixed', top: rect.bottom + 4, left: rect.left,
+            width: 240,
+            background: 'var(--surface)', border: '1px solid var(--line)',
+            borderRadius: 10, boxShadow: '0 8px 32px rgba(0,0,0,.16)',
+            zIndex: 1200, padding: '12px 14px',
+          }}
+        >
+          {/* Year navigation */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+            <button
+              onClick={() => setViewYear(y => y - 1)}
+              style={{ width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', background: 'transparent', borderRadius: 6, cursor: 'pointer', color: 'var(--muted)' }}
+              onMouseEnter={e => e.currentTarget.style.background = 'var(--hover)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+            >
+              <Icon name="chevron-left" size={14} />
+            </button>
+            <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--ink)' }}>{viewYear}</span>
+            <button
+              onClick={() => setViewYear(y => y + 1)}
+              style={{ width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', background: 'transparent', borderRadius: 6, cursor: 'pointer', color: 'var(--muted)' }}
+              onMouseEnter={e => e.currentTarget.style.background = 'var(--hover)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+            >
+              <Icon name="chevron-right" size={14} />
+            </button>
+          </div>
+
+          {/* Month grid */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 4 }}>
+            {MONTHS_PT.map((m, i) => {
+              const isSelected = viewYear === selYear && i + 1 === selMonth;
+              return (
+                <button
+                  key={m}
+                  onClick={() => pick(i)}
+                  style={{
+                    padding: '7px 4px', borderRadius: 7, border: 'none',
+                    background: isSelected ? 'var(--brand)' : 'transparent',
+                    color: isSelected ? '#fff' : 'var(--ink)',
+                    fontSize: 12.5, fontWeight: isSelected ? 700 : 500,
+                    cursor: 'pointer', textAlign: 'center',
+                    transition: 'background .1s',
+                  }}
+                  onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = 'var(--hover)'; }}
+                  onMouseLeave={e => { if (!isSelected) e.currentTarget.style.background = 'transparent'; }}
+                >
+                  {m.slice(0, 3)}
+                </button>
+              );
+            })}
+          </div>
+        </div>,
+        document.body
+      )}
+    </>
+  );
+}
+
 export function TimeScreen({ addToast, activeCompany }) {
   const { employees, loading:empLoading } = useEmployees({ companyId: activeCompany?.id });
   const [tab,     setTab]     = useState('jornada');
@@ -1108,17 +1513,12 @@ export function TimeScreen({ addToast, activeCompany }) {
 
       {/* ── Filtros ── */}
       <div style={{ display:'flex', gap:10, flexWrap:'wrap', padding:'12px 16px', background:'var(--surface)', border:'1px solid var(--line)', borderRadius:10, alignItems:'center' }}>
-        <Icon name="user" size={15} style={{ color:'var(--muted)', flexShrink:0 }} />
-        <select className="field" value={empId} onChange={e => setEmpId(e.target.value)} disabled={empLoading} style={{ flex:1, maxWidth:280, height:36, fontSize:13 }}>
-          <option value="">Todos os funcionários</option>
-          {employees.map(e => <option key={e.id} value={e.id}>{e.name}{e.dept?` — ${e.dept}`:''}</option>)}
-        </select>
-        <div style={{ width:1, height:24, background:'var(--line)', margin:'0 4px' }} />
-        <Icon name="history" size={15} style={{ color:'var(--muted)', flexShrink:0 }} />
-        <input type="month" className="field" value={month} onChange={e => setMonth(e.target.value)} style={{ width:160, height:36, fontSize:13 }} />
+        <EmpDropdown employees={employees} value={empId} onChange={setEmpId} loading={empLoading} />
+        <div style={{ width:1, height:24, background:'var(--line)', margin:'0 2px' }} />
+        <MonthDropdown value={month} onChange={setMonth} />
         {empId && selectedEmp && (
           <>
-            <div style={{ width:1, height:24, background:'var(--line)', margin:'0 4px' }} />
+            <div style={{ width:1, height:24, background:'var(--line)', margin:'0 2px' }} />
             <div style={{ display:'flex', alignItems:'center', gap:8 }}>
               <Avatar name={selectedEmp.name} hue={selectedEmp.hue} size={28} />
               <div>
