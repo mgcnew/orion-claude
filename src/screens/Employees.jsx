@@ -125,6 +125,52 @@ function Modal({ title, subtitle, onClose, children, width = 560 }) {
   );
 }
 
+function PhotoPicker({ name, url, onPick, onRemove, size = 84 }) {
+  const ref = useRef();
+  const [busy, setBusy] = useState(false);
+  const handle = async (e) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    setBusy(true);
+    await onPick(f);
+    setBusy(false);
+    e.target.value = '';
+  };
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+      <div style={{ position: 'relative' }}>
+        <Avatar name={name || 'F'} size={size} hue={215} url={url} />
+        <button
+          type="button"
+          onClick={() => ref.current?.click()}
+          disabled={busy}
+          style={{
+            position: 'absolute', bottom: 0, right: 0,
+            width: 28, height: 28, borderRadius: '50%',
+            background: 'var(--brand)', border: '2px solid var(--surface)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer', color: 'white',
+          }}
+          title={url ? 'Trocar foto' : 'Adicionar foto'}
+        >
+          <Icon name={busy ? 'loader' : 'camera'} size={13} />
+        </button>
+        <input ref={ref} type="file" accept="image/*" style={{ display: 'none' }} onChange={handle} />
+      </div>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button type="button" className="btn ghost sm" onClick={() => ref.current?.click()} disabled={busy} style={{ fontSize: 12 }}>
+          <Icon name="upload" size={12} /> {busy ? 'Enviando…' : url ? 'Trocar foto' : 'Adicionar foto'}
+        </button>
+        {url && (
+          <button type="button" className="btn ghost sm" onClick={onRemove} style={{ fontSize: 12, color: 'var(--muted)' }}>
+            Remover
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function FL({ label, children, span }) {
   return (
     <div style={{ gridColumn: span ? `1 / -1` : undefined, display: 'flex', flexDirection: 'column', gap: 5, minWidth: 0 }}>
@@ -150,7 +196,18 @@ const BLANK_EMP = {
   admission: new Date().toISOString().slice(0, 10), salary: '', cost_center: '', workload: '44h semanais', regime: 'Presencial', supervisor: '',
   phone: '', email_personal: '', address: '', neighborhood: '', city: '', state: '', zip_code: '',
   status: 'ativo', generate_checklist: true,
+  avatar_url: null,
 };
+
+// Faz upload de uma foto de funcionário e retorna a URL pública
+async function uploadEmployeePhoto(file, key) {
+  const ext = (file.name.split('.').pop() || 'png').toLowerCase();
+  const path = `${key}/avatar.${ext}`;
+  const { error } = await supabase.storage.from('employee-avatars').upload(path, file, { upsert: true });
+  if (error) return { error };
+  const { data: { publicUrl } } = supabase.storage.from('employee-avatars').getPublicUrl(path);
+  return { url: `${publicUrl}?t=${Date.now()}` };
+}
 
 export function NewEmployeeModal({ onClose, onCreated }) {
   const [step, setStep]     = useState(0);
@@ -198,6 +255,7 @@ export function NewEmployeeModal({ onClose, onCreated }) {
       state: form.state, zip_code: form.zip_code,
       cpf: form.cpf, birth_date: form.birth_date || null, civil_status: form.civil_status,
       status: 'ativo', hue: Math.floor(Math.random() * 360),
+      avatar_url: form.avatar_url || null,
     };
     const { created, error } = await createEmployee(payload);
     if (error) { setSaving(false); alert('Erro ao salvar: ' + error.message); return; }
@@ -300,6 +358,19 @@ export function NewEmployeeModal({ onClose, onCreated }) {
         <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, padding: '20px 20px 8px' }}>
           {step === 0 && (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14 }}>
+              <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'center', marginBottom: 4 }}>
+                <PhotoPicker
+                  name={form.name}
+                  url={form.avatar_url}
+                  onPick={async (file) => {
+                    const tempKey = `temp-${crypto.randomUUID()}`;
+                    const { url, error } = await uploadEmployeePhoto(file, tempKey);
+                    if (error) { alert('Erro ao enviar foto: ' + error.message); return; }
+                    set('avatar_url', url);
+                  }}
+                  onRemove={() => set('avatar_url', null)}
+                />
+              </div>
               <FL label="Nome completo *" span={2}>
                 <input className={`field ${errors.name ? 'error' : ''}`} value={form.name} onChange={e => set('name', e.target.value)} placeholder="Nome completo do colaborador" />
                 {errors.name && <span style={{ fontSize: 11, color: 'var(--bad)' }}>{errors.name}</span>}
@@ -733,7 +804,7 @@ export function ReativacaoModal({ employee, onClose, onSaved }) {
     <Modal title="Reativar funcionário" subtitle={employee?.name} onClose={onClose} width={440}>
       <div style={{ padding: '20px 24px' }}>
         <div style={{ display: 'flex', gap: 14, alignItems: 'center', padding: 16, background: 'var(--ok-bg,#dcfce7)', border: '1px solid #86efac', borderRadius: 10, marginBottom: 16 }}>
-          <Avatar name={employee?.name || '?'} hue={employee?.hue || 120} size={44} />
+          <Avatar name={employee?.name || '?'} hue={employee?.hue || 120} size={44} url={employee?.avatar_url} />
           <div>
             <div style={{ fontWeight: 700, fontSize: 15 }}>{employee?.name}</div>
             <div style={{ fontSize: 12.5, color: 'var(--muted)', marginTop: 2 }}>{employee?.role} · {employee?.dept}</div>
@@ -1192,7 +1263,7 @@ export function EmployeesList({ setRoute, setRouteParam, setRouteLabel, companyI
                     <td style={td()}>
                       <div className="row gap-3">
                         <div style={{ position: 'relative', flexShrink: 0 }}>
-                          <Avatar name={emp.name} hue={emp.hue} size={34} />
+                          <Avatar name={emp.name} hue={emp.hue} size={34} url={emp.avatar_url} />
                           {pendingByEmployee[emp.id] > 0 && (
                             <div style={{
                               position: 'absolute', top: -3, right: -3,
@@ -1263,7 +1334,7 @@ export function EmployeesList({ setRoute, setRouteParam, setRouteLabel, companyI
               >
                 <div className="row" style={{ marginBottom: 12 }}>
                   <div style={{ position: 'relative', flexShrink: 0 }}>
-                    <Avatar name={emp.name} hue={emp.hue} size={42} />
+                    <Avatar name={emp.name} hue={emp.hue} size={42} url={emp.avatar_url} />
                     {pendingByEmployee[emp.id] > 0 && (
                       <div style={{
                         position: 'absolute', top: -3, right: -3,
@@ -1794,7 +1865,34 @@ export function EmployeeProfile({ setRoute, employeeId }) {
           }}
         >
           <div style={{ position: 'relative' }}>
-            <Avatar name={emp.name} hue={emp.hue} size={86} />
+            <Avatar name={emp.name} hue={emp.hue} size={86} url={emp.avatar_url} />
+            <button
+              type="button"
+              onClick={async () => {
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.accept = 'image/*';
+                input.onchange = async () => {
+                  const f = input.files?.[0];
+                  if (!f) return;
+                  const { url, error } = await uploadEmployeePhoto(f, emp.id);
+                  if (error) { alert('Erro ao enviar foto: ' + error.message); return; }
+                  await updateEmployee(emp.id, { avatar_url: url });
+                  refetchEmp();
+                };
+                input.click();
+              }}
+              style={{
+                position: 'absolute', bottom: 2, right: 2,
+                width: 30, height: 30, borderRadius: '50%',
+                background: 'var(--brand)', border: '2px solid var(--surface)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: 'pointer', color: 'white',
+              }}
+              title={emp.avatar_url ? 'Trocar foto' : 'Adicionar foto'}
+            >
+              <Icon name="camera" size={13} />
+            </button>
           </div>
           <div className="grow" style={{ minWidth: 240, paddingTop: 36 }}>
             <div className="row gap-2">
