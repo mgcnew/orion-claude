@@ -12,7 +12,7 @@ import TweaksPanel from './components/TweaksPanel.jsx';
 import ProfilePanel from './components/ProfilePanel.jsx';
 import Icon from './components/Icon.jsx';
 
-import { LoginScreen, InviteScreen, SendInviteModal, CompleteRegistrationScreen } from './screens/Auth.jsx';
+import { LoginScreen, SendInviteModal, CompleteRegistrationScreen } from './screens/Auth.jsx';
 import Dashboard from './screens/Dashboard.jsx';
 import { EmployeesList, EmployeeProfile } from './screens/Employees.jsx';
 import DocumentsScreen from './screens/Documents.jsx';
@@ -46,7 +46,6 @@ export default function App() {
   const [tweaks, setTweak] = useTweaks(TWEAK_DEFAULTS);
   const [session, setSession] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
-  const [authView, setAuthView] = useState('login');
   const [isInviteFlow, setIsInviteFlow] = useState(() => {
     const hash = new URLSearchParams(window.location.hash.slice(1));
     return hash.get('type') === 'invite';
@@ -205,24 +204,7 @@ export default function App() {
   if (!session) {
     return (
       <>
-        {authView === 'login' ? (
-          <LoginScreen onLogin={() => {}} />
-        ) : (
-          <InviteScreen
-            onAccept={() => {}}
-            onBack={() => setAuthView('login')}
-          />
-        )}
-        <div style={{ position: 'fixed', bottom: 16, left: 16, zIndex: 50 }}>
-          <button
-            className="btn ghost sm"
-            style={{ background: 'var(--surface)', border: '1px solid var(--line)' }}
-            onClick={() => setAuthView(authView === 'login' ? 'invite' : 'login')}
-          >
-            <Icon name="mail" size={13} /> Ver tela de{' '}
-            {authView === 'login' ? 'convite' : 'login'}
-          </button>
-        </div>
+        <LoginScreen onLogin={() => {}} />
         <TweaksPanel tweaks={tweaks} setTweak={setTweak} />
       </>
     );
