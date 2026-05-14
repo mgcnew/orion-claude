@@ -73,7 +73,7 @@ function CompanyPicker({ companies, activeCompany, setActiveCompany }) {
           width: '100%', display: 'flex', alignItems: 'center', gap: 8,
           padding: '7px 8px 7px 8px', borderRadius: 8,
           border: `1px solid ${open ? 'var(--brand)' : 'var(--line)'}`,
-          background: open ? 'var(--brand-tint)' : 'var(--surface)',
+          background: open ? 'var(--brand-tint)' : 'var(--sidebar)',
           color: 'var(--ink)', cursor: 'pointer',
           transition: 'border-color .15s, background .15s',
           boxShadow: open ? '0 0 0 2px var(--brand-tint)' : 'none',
@@ -94,9 +94,10 @@ function CompanyPicker({ companies, activeCompany, setActiveCompany }) {
       {open && (
         <div style={{
           position: 'absolute', left: 10, right: 10, top: 'calc(100% - 4px)',
-          background: 'var(--surface)', border: '1px solid var(--line)',
+          background: 'var(--sidebar)', border: '1px solid var(--line)',
           borderRadius: 10, zIndex: 50, overflow: 'hidden',
           boxShadow: '0 8px 24px rgba(0,0,0,.10), 0 2px 6px rgba(0,0,0,.06)',
+          transition: 'background-color 0.12s ease, border-color 0.12s ease',
         }}>
           {all.map((c) => {
             const isActive = (c.id === '' && !activeCompany) || c.id === activeCompany?.id;
