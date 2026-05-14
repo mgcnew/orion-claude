@@ -308,19 +308,39 @@ export default function LandingPage() {
 
         {/* Hero image — float animation */}
         <div className="lp-hero-img">
-          <img
-            src={heroImg}
-            alt="Método antigo vs método novo"
-            style={{
-              width: '100%',
-              maxWidth: 520,
-              borderRadius: 22,
-              objectFit: 'contain',
-              display: 'block',
-              boxShadow: '0 24px 64px rgba(0,0,0,.12)',
-              animation: 'lp-float 4.5s ease-in-out infinite',
-            }}
-          />
+          {/* Glow backdrop */}
+          <div style={{ position: 'relative', display: 'inline-block', maxWidth: 520, width: '100%' }}>
+            {/* Blob azul atrás */}
+            <div style={{
+              position: 'absolute',
+              inset: '-18%',
+              borderRadius: '50%',
+              background: 'radial-gradient(ellipse at center, rgba(42,91,255,.13) 0%, rgba(42,91,255,.04) 55%, transparent 75%)',
+              pointerEvents: 'none',
+            }} />
+            {/* Anel decorativo */}
+            <div style={{
+              position: 'absolute',
+              inset: -14,
+              borderRadius: 32,
+              border: '1.5px solid rgba(42,91,255,.12)',
+              background: 'linear-gradient(135deg, rgba(42,91,255,.06) 0%, rgba(99,179,237,.04) 100%)',
+              pointerEvents: 'none',
+            }} />
+            <img
+              src={heroImg}
+              alt="Método antigo vs método novo"
+              style={{
+                width: '100%',
+                borderRadius: 22,
+                objectFit: 'contain',
+                display: 'block',
+                position: 'relative',
+                boxShadow: '0 20px 60px rgba(42,91,255,.14), 0 4px 16px rgba(0,0,0,.08)',
+                animation: 'lp-float 4.5s ease-in-out infinite',
+              }}
+            />
+          </div>
         </div>
       </section>
 
