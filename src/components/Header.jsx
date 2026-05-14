@@ -53,7 +53,7 @@ function ThemeToggle({ theme, setTheme }) {
   const handleClick = () => {
     setAnim(true);
     setTimeout(() => {
-      setTheme(t => t === 'dark' ? 'light' : 'dark');
+      setTheme(theme === 'dark' ? 'light' : 'dark');
       setAnim(false);
     }, 260);
   };
