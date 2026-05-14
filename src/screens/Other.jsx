@@ -2102,6 +2102,18 @@ function AparenciaTab({ tweaks, setTweak }) {
             options={[{ value: 'expanded', label: 'Expandida' }, { value: 'collapsed', label: 'Colapsada' }]}
           />
         </SettingRow>
+        <SettingRow label="Filtro de luz azul" description="Adiciona um tom quente à tela para reduzir o cansaço visual em uso prolongado.">
+          <SegControl
+            value={tweaks.blueLight}
+            onChange={v => setTweak('blueLight', v)}
+            options={[
+              { value: 'off',    label: 'Desligado' },
+              { value: 'low',    label: 'Suave' },
+              { value: 'medium', label: 'Médio' },
+              { value: 'high',   label: 'Forte' },
+            ]}
+          />
+        </SettingRow>
       </div>
 
       {/* Cor primária */}

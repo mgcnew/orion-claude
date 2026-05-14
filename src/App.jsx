@@ -39,6 +39,7 @@ const TWEAK_DEFAULTS = {
   fontSize:  'md',
   sidebarDefault: 'expanded',
   inactivityLock: 'off',
+  blueLight: 'off',
 };
 
 export default function App() {
@@ -113,6 +114,21 @@ export default function App() {
     const zoomMap = { sm: 0.88, md: 1, lg: 1.12 };
     document.body.style.zoom = zoomMap[tweaks.fontSize] ?? 1;
   }, [tweaks.primary, tweaks.radius, tweaks.fontSize]);
+
+  // Blue light filter overlay
+  useEffect(() => {
+    const intensityMap = { off: 0, low: 0.06, medium: 0.13, high: 0.22 };
+    const opacity = intensityMap[tweaks.blueLight] ?? 0;
+    let overlay = document.getElementById('orion-bluelight');
+    if (opacity === 0) { if (overlay) overlay.remove(); return; }
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.id = 'orion-bluelight';
+      overlay.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:99999;background:rgba(255,147,41,VAL);transition:background .3s';
+      document.body.appendChild(overlay);
+    }
+    overlay.style.background = `rgba(255,147,41,${opacity})`;
+  }, [tweaks.blueLight]);
 
   // Cmd/Ctrl+K palette · ESC closes overlays
   useEffect(() => {
