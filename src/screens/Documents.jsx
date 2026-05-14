@@ -191,14 +191,16 @@ function AddDocModal({ onClose, onSaved, employees = [], companyId = null }) {
       position: 'fixed', inset: 0, zIndex: 400,
       background: 'rgba(0,0,0,.5)', backdropFilter: 'blur(4px)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      padding: 'clamp(8px,2vw,24px)',
+      padding: 'clamp(8px,3vh,32px) clamp(8px,2vw,24px)',
+      overflowY: 'auto',
     }} onClick={onClose}>
       <div style={{
         width: '100%', maxWidth: step === 'category' ? 560 : 500,
         background: 'var(--surface)', borderRadius: 16,
         boxShadow: '0 32px 80px rgba(0,0,0,.25)',
         overflow: 'hidden', display: 'flex', flexDirection: 'column',
-        maxHeight: 'calc(100vh - 32px)',
+        maxHeight: 'min(90vh, 700px)',
+        margin: 'auto',
       }} onClick={e => e.stopPropagation()}>
 
         {/* Header */}
@@ -219,7 +221,7 @@ function AddDocModal({ onClose, onSaved, employees = [], companyId = null }) {
           <button className="btn ghost icon sm" onClick={onClose}><Icon name="x" size={15} /></button>
         </div>
 
-        <div style={{ overflowY: 'auto', flex: 1, minHeight: 0 }}>
+        <div className="scroll-hidden" style={{ overflowY: 'auto', flex: 1, minHeight: 0 }}>
           {step === 'category' ? (
             <div style={{ padding: 20, display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
               {CATEGORIES.map(c => (

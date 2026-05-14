@@ -580,7 +580,7 @@ export default function JusticeScreen({ addToast, activeCompany }) {
 
   return (
     <>
-      <div className="fade-up" style={{ padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: 0, maxWidth: 1280, margin: '0 auto', width: '100%', height: '100%', boxSizing: 'border-box' }}>
+      <div className="fade-up" style={{ padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: 0, maxWidth: 1280, margin: '0 auto', width: '100%', minHeight: '100%', boxSizing: 'border-box' }}>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20, flexWrap: 'wrap' }}>
           <div style={{ width: 38, height: 38, borderRadius: 10, background: 'var(--brand-tint)', color: 'var(--brand)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -602,7 +602,7 @@ export default function JusticeScreen({ addToast, activeCompany }) {
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid var(--line)', marginBottom: 22, overflowX: 'auto' }}>
+        <div className="scroll-hidden" style={{ display: 'flex', gap: 0, borderBottom: '1px solid var(--line)', marginBottom: 22, overflowX: 'auto', flexShrink: 0 }}>
           {TABS.map(t => (
             <button key={t.id} onClick={() => setTab(t.id)} style={{
               display: 'flex', alignItems: 'center', gap: 7,

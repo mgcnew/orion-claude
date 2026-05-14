@@ -1,4 +1,4 @@
-import { useState, useEffect, Fragment, useMemo } from 'react';
+import { useState, useEffect, Fragment, useMemo, useRef } from 'react';
 import Icon from '../components/Icon.jsx';
 import Avatar from '../components/Avatar.jsx';
 import * as D from '../data/mock.js';
@@ -762,6 +762,174 @@ function fmtDate(d) {
   return new Date(d + 'T00:00:00').toLocaleDateString('pt-BR');
 }
 
+// ── CustomSelect ─────────────────────────────────────────────
+function CustomSelect({ value, onChange, options = [], groups, placeholder = 'Selecionar…' }) {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef(null);
+  const allOpts = groups ? groups.flatMap(g => g.items.map(r => ({ value: r.id, label: r.label, icon: r.icon, group: g.color }))) : options;
+  const sel = allOpts.find(o => o.value === value || o === value);
+  const display = sel?.label ?? sel ?? placeholder;
+
+  useEffect(() => {
+    if (!open) return;
+    const h = (e) => { if (!wrapRef.current?.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, [open]);
+
+  const pickOption = (val) => { onChange(val); setOpen(false); };
+
+  const renderOpt = (opt) => {
+    const val = opt.value ?? opt;
+    const label = opt.label ?? opt;
+    const active = val === value;
+    return (
+      <button key={val} onClick={() => pickOption(val)} style={{
+        width: '100%', display: 'flex', alignItems: 'center', gap: 8,
+        padding: '8px 12px', border: 'none', textAlign: 'left', cursor: 'pointer',
+        background: active ? 'var(--brand-tint)' : 'transparent',
+        color: active ? 'var(--brand)' : 'var(--ink)', fontWeight: active ? 600 : 400, fontSize: 13,
+        transition: 'background .08s',
+      }}
+      onMouseEnter={e => { if (!active) e.currentTarget.style.background = 'var(--hover)'; }}
+      onMouseLeave={e => { e.currentTarget.style.background = active ? 'var(--brand-tint)' : 'transparent'; }}>
+        {opt.icon && <Icon name={opt.icon} size={13} style={{ color: active ? 'var(--brand)' : opt.group ?? 'var(--muted)', flexShrink: 0 }} />}
+        <span style={{ flex: 1 }}>{label}</span>
+        {active && <Icon name="check" size={13} style={{ color: 'var(--brand)', flexShrink: 0 }} />}
+      </button>
+    );
+  };
+
+  return (
+    <div ref={wrapRef} style={{ position: 'relative' }}>
+      <button onClick={() => setOpen(o => !o)} style={{
+        width: '100%', display: 'flex', alignItems: 'center', gap: 8,
+        padding: '8px 12px', borderRadius: 8, border: '1px solid var(--line)',
+        background: 'var(--surface-2)', color: value ? 'var(--ink)' : 'var(--muted)',
+        fontSize: 13, cursor: 'pointer', textAlign: 'left', transition: 'border-color .12s',
+      }}>
+        <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{display}</span>
+        <Icon name="chevron-down" size={13} style={{ color: 'var(--muted)', flexShrink: 0, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }} />
+      </button>
+      {open && (
+        <div className="scroll-hidden" style={{
+          position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, zIndex: 700,
+          background: 'var(--surface)', border: '1px solid var(--line)',
+          borderRadius: 10, boxShadow: 'var(--shadow-pop)', maxHeight: 220, overflowY: 'auto', padding: '4px 0',
+        }}>
+          {groups ? groups.map(g => (
+            <div key={g.group}>
+              <div style={{ padding: '8px 12px 2px', fontSize: 10, fontWeight: 700, color: 'var(--muted-2)', textTransform: 'uppercase', letterSpacing: 1 }}>{g.group}</div>
+              {g.items.map(r => renderOpt({ value: r.id, label: r.label, icon: r.icon, group: g.color }))}
+            </div>
+          )) : options.map(renderOpt)}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── DatePicker ────────────────────────────────────────────────
+const MONTHS_CAL = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+const DAYS_CAL   = ['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'];
+
+function DatePicker({ value, onChange, placeholder = 'dd/mm/aaaa' }) {
+  const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState({ top: 0, left: 0, openUp: false });
+  const [view, setView] = useState(() => value ? new Date(value + 'T00:00') : new Date());
+  const btnRef = useRef(null);
+  const calRef = useRef(null);
+  const selected = value ? new Date(value + 'T00:00') : null;
+  const display = selected ? selected.toLocaleDateString('pt-BR') : '';
+  const CAL_W = 260, CAL_H = 290;
+
+  useEffect(() => { if (value) setView(new Date(value + 'T00:00')); }, [value]);
+
+  useEffect(() => {
+    if (!open) return;
+    const h = (e) => {
+      if (!btnRef.current?.contains(e.target) && !calRef.current?.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, [open]);
+
+  const handleOpen = () => {
+    if (!open && btnRef.current) {
+      const r = btnRef.current.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - r.bottom;
+      const openUp = spaceBelow < CAL_H && r.top > CAL_H;
+      let left = r.left;
+      if (left + CAL_W > window.innerWidth - 8) left = r.right - CAL_W;
+      setPos({ top: openUp ? r.top - CAL_H - 4 : r.bottom + 4, left, openUp });
+    }
+    setOpen(o => !o);
+  };
+
+  const year = view.getFullYear(), month = view.getMonth();
+  const startOffset = (new Date(year, month, 1).getDay() + 6) % 7;
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const days = [...Array(startOffset).fill(null), ...Array.from({ length: daysInMonth }, (_, i) => i + 1)];
+  const today = new Date();
+  const isSel = (d) => d && selected && year === selected.getFullYear() && month === selected.getMonth() && d === selected.getDate();
+  const isToday = (d) => d && year === today.getFullYear() && month === today.getMonth() && d === today.getDate();
+
+  const pick = (d) => {
+    if (!d) return;
+    onChange(`${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`);
+    setOpen(false);
+  };
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <button ref={btnRef} onClick={handleOpen} style={{
+        width: '100%', display: 'flex', alignItems: 'center', gap: 8,
+        padding: '8px 12px', borderRadius: 8, border: '1px solid var(--line)',
+        background: 'var(--surface-2)', color: display ? 'var(--ink)' : 'var(--muted)',
+        fontSize: 13, cursor: 'pointer', textAlign: 'left',
+      }}>
+        <Icon name="calendar" size={14} style={{ color: 'var(--muted)', flexShrink: 0 }} />
+        <span style={{ flex: 1 }}>{display || placeholder}</span>
+        {value && (
+          <span onClick={e => { e.stopPropagation(); onChange(''); }} style={{ display: 'flex', cursor: 'pointer', color: 'var(--muted-2)' }}>
+            <Icon name="x" size={12} />
+          </span>
+        )}
+      </button>
+      {open && (
+        <div ref={calRef} style={{
+          position: 'fixed', top: pos.top, left: pos.left, zIndex: 9999, width: CAL_W,
+          background: 'var(--surface)', border: '1px solid var(--line)',
+          borderRadius: 10, boxShadow: 'var(--shadow-pop)', padding: 12,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', marginBottom: 10, gap: 4 }}>
+            <button className="btn ghost icon sm" onClick={() => setView(new Date(year, month - 1, 1))}><Icon name="chevron-left" size={14} /></button>
+            <span style={{ flex: 1, textAlign: 'center', fontSize: 13, fontWeight: 700 }}>{MONTHS_CAL[month]} {year}</span>
+            <button className="btn ghost icon sm" onClick={() => setView(new Date(year, month + 1, 1))}><Icon name="chevron-right" size={14} /></button>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2, marginBottom: 4 }}>
+            {DAYS_CAL.map(d => <div key={d} style={{ textAlign: 'center', fontSize: 10, fontWeight: 700, color: 'var(--muted-2)', padding: '2px 0' }}>{d}</div>)}
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2 }}>
+            {days.map((d, i) => (
+              <button key={i} onClick={() => pick(d)} disabled={!d} style={{
+                width: '100%', aspectRatio: '1', borderRadius: 6, border: 'none', fontSize: 12.5, cursor: d ? 'pointer' : 'default',
+                background: isSel(d) ? 'var(--brand)' : isToday(d) ? 'var(--brand-tint)' : 'transparent',
+                color: isSel(d) ? '#fff' : isToday(d) ? 'var(--brand)' : d ? 'var(--ink)' : 'transparent',
+                fontWeight: isSel(d) || isToday(d) ? 700 : 400, transition: 'background .08s',
+              }}
+              onMouseEnter={e => { if (d && !isSel(d)) e.currentTarget.style.background = 'var(--hover)'; }}
+              onMouseLeave={e => { if (d && !isSel(d)) e.currentTarget.style.background = isToday(d) ? 'var(--brand-tint)' : 'transparent'; }}>
+                {d || ''}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ReportFilters({ report, filters, setFilters, employees, depts, companies }) {
   const set = (k, v) => setFilters(f => ({ ...f, [k]: v }));
   const has = (f) => report.filters.includes(f);
@@ -774,8 +942,8 @@ function ReportFilters({ report, filters, setFilters, employees, depts, companie
             Período
           </label>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-            <input type="date" className="field" value={filters.inicio || ''} onChange={e => set('inicio', e.target.value)} />
-            <input type="date" className="field" value={filters.fim || ''} onChange={e => set('fim', e.target.value)} />
+            <DatePicker value={filters.inicio || ''} onChange={v => set('inicio', v)} placeholder="Início" />
+            <DatePicker value={filters.fim || ''} onChange={v => set('fim', v)} placeholder="Fim" />
           </div>
         </div>
       )}
@@ -786,8 +954,8 @@ function ReportFilters({ report, filters, setFilters, employees, depts, companie
             Admissão (intervalo)
           </label>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-            <input type="date" className="field" value={filters.admissao_ini || ''} onChange={e => set('admissao_ini', e.target.value)} />
-            <input type="date" className="field" value={filters.admissao_fim || ''} onChange={e => set('admissao_fim', e.target.value)} />
+            <DatePicker value={filters.admissao_ini || ''} onChange={v => set('admissao_ini', v)} placeholder="Início" />
+            <DatePicker value={filters.admissao_fim || ''} onChange={v => set('admissao_fim', v)} placeholder="Fim" />
           </div>
         </div>
       )}
@@ -797,10 +965,12 @@ function ReportFilters({ report, filters, setFilters, employees, depts, companie
           <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.6, display: 'block', marginBottom: 6 }}>
             Empresa
           </label>
-          <select className="field" value={filters.empresa || ''} onChange={e => set('empresa', e.target.value)}>
-            <option value="">Todas</option>
-            {companies.map(c => <option key={c} value={c}>{c}</option>)}
-          </select>
+          <CustomSelect
+            value={filters.empresa || ''}
+            onChange={v => set('empresa', v)}
+            placeholder="Todas"
+            options={[{ value: '', label: 'Todas' }, ...companies.map(c => ({ value: c, label: c }))]}
+          />
         </div>
       )}
 
@@ -809,10 +979,12 @@ function ReportFilters({ report, filters, setFilters, employees, depts, companie
           <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.6, display: 'block', marginBottom: 6 }}>
             Departamento
           </label>
-          <select className="field" value={filters.departamento || ''} onChange={e => set('departamento', e.target.value)}>
-            <option value="">Todos</option>
-            {depts.map(d => <option key={d} value={d}>{d}</option>)}
-          </select>
+          <CustomSelect
+            value={filters.departamento || ''}
+            onChange={v => set('departamento', v)}
+            placeholder="Todos"
+            options={[{ value: '', label: 'Todos' }, ...depts.map(d => ({ value: d, label: d }))]}
+          />
         </div>
       )}
 
@@ -840,10 +1012,12 @@ function ReportFilters({ report, filters, setFilters, employees, depts, companie
           <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.6, display: 'block', marginBottom: 6 }}>
             Funcionário
           </label>
-          <select className="field" value={filters.funcionario || ''} onChange={e => set('funcionario', e.target.value)}>
-            <option value="">Todos</option>
-            {employees.filter(e => e.status === 'ativo').map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
-          </select>
+          <CustomSelect
+            value={filters.funcionario || ''}
+            onChange={v => set('funcionario', v)}
+            placeholder="Todos"
+            options={[{ value: '', label: 'Todos' }, ...employees.filter(e => e.status === 'ativo').map(e => ({ value: e.id, label: e.name }))]}
+          />
         </div>
       )}
 
@@ -890,10 +1064,12 @@ function ReportFilters({ report, filters, setFilters, employees, depts, companie
           <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.6, display: 'block', marginBottom: 6 }}>
             Categoria
           </label>
-          <select className="field" value={filters.categoria_doc || ''} onChange={e => set('categoria_doc', e.target.value)}>
-            <option value="">Todas</option>
-            {['Admissão','Contratos','Holerites','Atestados','Treinamentos','Rescisão','Férias'].map(c => <option key={c}>{c}</option>)}
-          </select>
+          <CustomSelect
+            value={filters.categoria_doc || ''}
+            onChange={v => set('categoria_doc', v)}
+            placeholder="Todas"
+            options={[{ value: '', label: 'Todas' }, ...['Admissão','Contratos','Holerites','Atestados','Treinamentos','Rescisão','Férias'].map(c => ({ value: c, label: c }))]}
+          />
         </div>
       )}
     </div>
@@ -1013,7 +1189,7 @@ function useReportData(reportId, filters, employees, warnings, vacations, docume
   }, [reportId, filters, employees, warnings, vacations, documents, timecards]);
 }
 
-function FilterModal({ report, filters, setFilters, employees, depts, companies, onClose, onClear }) {
+function FilterModal({ report, selectedId, onSelectReport, filters, setFilters, employees, depts, companies, onClose, onClear }) {
   return (
     <div
       style={{ position: 'fixed', inset: 0, zIndex: 400, background: 'rgba(0,0,0,.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
@@ -1024,33 +1200,52 @@ function FilterModal({ report, filters, setFilters, employees, depts, companies,
         style={{
           background: 'var(--surface)', borderRadius: 'var(--radius-lg)',
           boxShadow: '0 8px 40px rgba(0,0,0,.18)', border: '1px solid var(--line)',
-          width: '100%', maxWidth: 400,
+          width: '100%', maxWidth: 480,
           display: 'flex', flexDirection: 'column',
-          maxHeight: 'calc(100dvh - 32px)',
+          maxHeight: 'min(90vh, 680px)',
         }}
       >
         {/* Header */}
         <div style={{ flexShrink: 0, padding: '16px 20px 14px', borderBottom: '1px solid var(--line)', display: 'flex', alignItems: 'center', gap: 10 }}>
           <Icon name="filter" size={15} style={{ color: 'var(--brand)' }} />
           <span style={{ fontSize: 14.5, fontWeight: 700, flex: 1 }}>Filtros</span>
-          <span style={{ fontSize: 11.5, color: 'var(--muted)', flex: 1 }}>
-            {report.label}
-          </span>
           <button className="btn ghost icon sm" onClick={onClose}>
             <Icon name="x" size={14} />
           </button>
         </div>
 
         {/* Body (scrollable) */}
-        <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, padding: '18px 20px' }}>
-          <ReportFilters
-            report={report}
-            filters={filters}
-            setFilters={setFilters}
-            employees={employees}
-            depts={depts}
-            companies={companies}
-          />
+        <div className="scroll-hidden" style={{ flex: 1, overflowY: 'auto', minHeight: 0, padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 20 }}>
+
+          {/* Seleção de relatório */}
+          <div>
+            <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 6 }}>
+              Tipo de relatório
+            </label>
+            <CustomSelect
+              value={selectedId}
+              onChange={onSelectReport}
+              groups={REPORT_CATALOG}
+            />
+          </div>
+
+          {/* Divisor */}
+          <div style={{ borderTop: '1px solid var(--line)' }} />
+
+          {/* Filtros do relatório selecionado */}
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>
+              Filtros — {report.label}
+            </div>
+            <ReportFilters
+              report={report}
+              filters={filters}
+              setFilters={setFilters}
+              employees={employees}
+              depts={depts}
+              companies={companies}
+            />
+          </div>
         </div>
 
         {/* Footer */}
@@ -1071,7 +1266,6 @@ export function ReportsScreen({ addToast, activeCompany }) {
   const [selectedId, setSelectedId]     = useState('headcount');
   const [filters, setFilters]           = useState({});
   const [history, setHistory]           = useState([]);
-  const [catalogOpen, setCatalogOpen]   = useState(true);
   const [filterModalOpen, setFilterModalOpen] = useState(false);
 
   const { employees, loading: empLoading } = useEmployees({ companyId: activeCompany?.id });
@@ -1102,62 +1296,12 @@ export function ReportsScreen({ addToast, activeCompany }) {
     <>
     <div className="fade-up" style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
 
-      {/* ── Catálogo (toggle) ── */}
-      {catalogOpen && (
-        <div style={{
-          width: 220, flexShrink: 0,
-          borderRight: '1px solid var(--line)',
-          overflowY: 'auto',
-          display: 'flex', flexDirection: 'column',
-        }}>
-          <div style={{ padding: '14px 10px 6px', display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 1, flex: 1, padding: '0 4px' }}>
-              Relatórios
-            </span>
-            <button className="btn ghost icon sm" onClick={() => setCatalogOpen(false)} title="Recolher">
-              <Icon name="panel-left" size={14} />
-            </button>
-          </div>
-          {REPORT_CATALOG.map(group => (
-            <div key={group.group}>
-              <div style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--muted-2)', textTransform: 'uppercase', letterSpacing: 1, padding: '10px 14px 4px' }}>
-                {group.group}
-              </div>
-              {group.items.map(r => {
-                const active = r.id === selectedId;
-                return (
-                  <button key={r.id} onClick={() => selectReport(r.id)} title={r.label} style={{
-                    display: 'flex', alignItems: 'center', gap: 8,
-                    padding: '7px 10px', borderRadius: 7, border: 'none', margin: '1px 4px', width: 'calc(100% - 8px)',
-                    background: active ? 'var(--brand-tint)' : 'transparent',
-                    color: active ? 'var(--brand)' : 'var(--ink-soft)',
-                    fontWeight: active ? 600 : 400, fontSize: 13, cursor: 'pointer', textAlign: 'left',
-                  }}
-                  onMouseEnter={e => { if (!active) e.currentTarget.style.background = 'var(--hover)'; }}
-                  onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent'; }}>
-                    <Icon name={r.icon} size={14} style={{ color: active ? 'var(--brand)' : group.color, flexShrink: 0 }} />
-                    <span style={{ lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-          ))}
-        </div>
-      )}
-
       {/* ── Área principal ── */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
 
         {/* Barra de topo do relatório */}
         <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-
-            {/* Botão reabrir catálogo */}
-            {!catalogOpen && (
-              <button className="btn ghost icon sm" onClick={() => setCatalogOpen(true)} title="Abrir catálogo">
-                <Icon name="panel-left" size={14} />
-              </button>
-            )}
 
             {/* Info do relatório */}
             <div style={{ flex: 1, minWidth: 0 }}>
@@ -1305,6 +1449,8 @@ export function ReportsScreen({ addToast, activeCompany }) {
     {filterModalOpen && (
       <FilterModal
         report={selected}
+        selectedId={selectedId}
+        onSelectReport={(id) => { setSelectedId(id); setFilters({}); }}
         filters={filters}
         setFilters={setFilters}
         employees={employees}

@@ -319,7 +319,7 @@ export default function App() {
           profile={userProfile}
           onOpenProfile={() => setProfileOpen(true)}
         />
-        <div style={{ flex: 1, overflowY: 'auto' }} key={route.startsWith('settings') ? 'settings' : route}>
+        <div className="scroll-hidden" style={{ flex: 1, overflowY: 'auto' }} key={route.startsWith('settings') ? 'settings' : route}>
           {renderScreen()}
         </div>
       </main>
