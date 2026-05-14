@@ -204,13 +204,14 @@ export default function LandingPage() {
   const openLogin = () => setLoginOpen(true);
 
   return (
-    <div style={{ minHeight: '100vh', background: '#fff', color: '#0f172a', fontFamily: 'inherit' }}>
+    <div style={{ minHeight: '100vh', background: '#fff', color: '#0f172a', fontFamily: 'inherit', overflowX: 'hidden' }}>
       <style>{`
         @keyframes lp-float {
           0%,100% { transform: translateY(0px); }
           50%      { transform: translateY(-14px); }
         }
         .lp-nav       { padding: 0 48px; }
+        .lp-hero-wrap { background: linear-gradient(160deg, #eef3ff 0%, #f5f8ff 45%, #fff 100%); }
         .lp-hero      { padding: 80px 48px 64px; display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: center; max-width: 1200px; margin: 0 auto; }
         .lp-hero-h1   { font-size: 52px; }
         .lp-hero-img  { display: flex; justify-content: center; align-items: center; }
@@ -261,6 +262,7 @@ export default function LandingPage() {
       </nav>
 
       {/* ── HERO ──────────────────────────────────────────────── */}
+      <div className="lp-hero-wrap">
       <section className="lp-hero">
         <div>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: '#EEF3FF', color: '#2A5BFF', borderRadius: 20, padding: '5px 12px', fontSize: 12, fontWeight: 700, marginBottom: 24, letterSpacing: 0.3 }}>
@@ -306,43 +308,26 @@ export default function LandingPage() {
           </div>
         </div>
 
-        {/* Hero image — float animation */}
+        {/* Hero image — float + mask fade */}
         <div className="lp-hero-img">
-          {/* Glow backdrop */}
-          <div style={{ position: 'relative', display: 'inline-block', maxWidth: 520, width: '100%' }}>
-            {/* Blob azul atrás */}
-            <div style={{
-              position: 'absolute',
-              inset: '-18%',
-              borderRadius: '50%',
-              background: 'radial-gradient(ellipse at center, rgba(42,91,255,.13) 0%, rgba(42,91,255,.04) 55%, transparent 75%)',
-              pointerEvents: 'none',
-            }} />
-            {/* Anel decorativo */}
-            <div style={{
-              position: 'absolute',
-              inset: -14,
-              borderRadius: 32,
-              border: '1.5px solid rgba(42,91,255,.12)',
-              background: 'linear-gradient(135deg, rgba(42,91,255,.06) 0%, rgba(99,179,237,.04) 100%)',
-              pointerEvents: 'none',
-            }} />
-            <img
-              src={heroImg}
-              alt="Método antigo vs método novo"
-              style={{
-                width: '100%',
-                borderRadius: 22,
-                objectFit: 'contain',
-                display: 'block',
-                position: 'relative',
-                boxShadow: '0 20px 60px rgba(42,91,255,.14), 0 4px 16px rgba(0,0,0,.08)',
-                animation: 'lp-float 4.5s ease-in-out infinite',
-              }}
-            />
-          </div>
+          <img
+            src={heroImg}
+            alt="Método antigo vs método novo"
+            style={{
+              width: '100%',
+              maxWidth: 520,
+              borderRadius: 24,
+              objectFit: 'contain',
+              display: 'block',
+              boxShadow: '0 24px 64px rgba(42,91,255,.15), 0 4px 16px rgba(0,0,0,.06)',
+              animation: 'lp-float 4.5s ease-in-out infinite',
+              maskImage: 'radial-gradient(ellipse 92% 88% at 50% 50%, black 60%, transparent 100%)',
+              WebkitMaskImage: 'radial-gradient(ellipse 92% 88% at 50% 50%, black 60%, transparent 100%)',
+            }}
+          />
         </div>
       </section>
+      </div>
 
       {/* ── STATS ─────────────────────────────────────────────── */}
       <section className="lp-stats-pad" style={{ background: '#f8fafc', borderTop: '1px solid #e2e8f0', borderBottom: '1px solid #e2e8f0' }}>
