@@ -1837,30 +1837,13 @@ export function EmployeeProfile({ setRoute, employeeId }) {
 
       {/* Header card */}
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-        <div
-          style={{
-            height: 100,
-            background: 'linear-gradient(135deg, var(--brand) 0%, var(--brand-700) 100%)',
-            position: 'relative',
-          }}
-        >
-          <div
-            style={{
-              position: 'absolute',
-              inset: 0,
-              backgroundImage:
-                'linear-gradient(rgba(255,255,255,.06) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.06) 1px, transparent 1px)',
-              backgroundSize: '24px 24px',
-            }}
-          />
-        </div>
+        <div style={{ height: 4, background: 'var(--brand)' }} />
         <div
           className="row"
           style={{
-            padding: '0 24px 18px',
-            marginTop: -36,
-            alignItems: 'flex-end',
-            gap: 16,
+            padding: '22px 24px',
+            alignItems: 'center',
+            gap: 18,
             flexWrap: 'wrap',
           }}
         >
@@ -1894,7 +1877,7 @@ export function EmployeeProfile({ setRoute, employeeId }) {
               <Icon name="camera" size={13} />
             </button>
           </div>
-          <div className="grow" style={{ minWidth: 240, paddingTop: 36 }}>
+          <div className="grow" style={{ minWidth: 240 }}>
             <div className="row gap-2">
               <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, letterSpacing: -0.4 }}>
                 {emp.name}
