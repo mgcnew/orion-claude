@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from './lib/supabase.js';
-import { useCompanies, logAudit } from './hooks/useEmployees.js';
+import { useCompanies, logAudit, useNotifications } from './hooks/useEmployees.js';
 import { PermissionsProvider } from './lib/permissions.jsx';
 
 import Sidebar from './components/Sidebar.jsx';
@@ -65,6 +65,7 @@ export default function App() {
   const [profileOpen, setProfileOpen] = useState(false);
   const [userProfile, setUserProfile] = useState(null);
   const { companies } = useCompanies();
+  const { items: notifItems, loading: notifLoading, refetch: notifRefetch } = useNotifications();
 
   const navigate = (r, intent = null) => { setRoute(r); setRouteIntent(intent); setMobileOpen(false); };
   useEffect(() => { const t = setTimeout(() => setRouteIntent(null), 80); return () => clearTimeout(t); }, [route]);
@@ -294,6 +295,7 @@ export default function App() {
           setTheme={(t) => setTweak('theme', t)}
           openCmd={() => setCmdOpen(true)}
           openNotif={() => setNotifOpen(!notifOpen)}
+          notifCount={notifItems.length}
           userName={userName}
           userEmail={userEmail}
           isAdmin={isAdmin}
@@ -312,7 +314,7 @@ export default function App() {
         setOpen={setCmdOpen}
         setRoute={(r) => setRoute(r)}
       />
-      <NotificationsPanel open={notifOpen} onClose={() => setNotifOpen(false)} />
+      <NotificationsPanel open={notifOpen} onClose={() => setNotifOpen(false)} items={notifItems} loading={notifLoading} refetch={notifRefetch} />
       <ProfilePanel
         open={profileOpen}
         onClose={() => setProfileOpen(false)}

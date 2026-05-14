@@ -65,6 +65,7 @@ export default function Header({
   setTheme,
   openCmd,
   openNotif,
+  notifCount = 0,
   userName,
   userEmail,
   routeLabel,
@@ -150,18 +151,20 @@ export default function Header({
         <div style={{ position: 'relative' }}>
           <button className="btn ghost icon" onClick={openNotif} title="Notificações">
             <Icon name="bell" size={17} />
-            <span
-              style={{
-                position: 'absolute',
-                top: 6,
-                right: 7,
-                width: 7,
-                height: 7,
-                borderRadius: '50%',
-                background: 'var(--bad)',
-                border: '2px solid var(--surface)',
-              }}
-            />
+            {notifCount > 0 && (
+              <span
+                style={{
+                  position: 'absolute',
+                  top: 6,
+                  right: 7,
+                  width: 7,
+                  height: 7,
+                  borderRadius: '50%',
+                  background: 'var(--bad)',
+                  border: '2px solid var(--surface)',
+                }}
+              />
+            )}
           </button>
         </div>
       </div>

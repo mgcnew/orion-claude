@@ -1,11 +1,9 @@
 import { useState } from 'react';
 import Icon from './Icon.jsx';
-import { useNotifications } from '../hooks/useEmployees.js';
 
 const MAX = 5;
 
-export default function NotificationsPanel({ open, onClose }) {
-  const { items, loading, refetch } = useNotifications();
+export default function NotificationsPanel({ open, onClose, items = [], loading = false, refetch }) {
   const [clearedAt, setClearedAt] = useState(null);
 
   if (!open) return null;
