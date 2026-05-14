@@ -162,16 +162,18 @@ export default function Sidebar({ route, setRoute, collapsed, setCollapsed, mobi
           if (item.perm && !can(item.perm[0], item.perm[1])) return null;
           if (item.id === 'section') {
             return col ? (
-              <div key={i} style={{ height: 12 }} />
+              <div key={i} style={{ height: 14, margin: '8px 12px 0', borderTop: '1px solid var(--line)' }} />
             ) : (
               <div
                 key={i}
                 style={{
-                  fontSize: 10.5,
+                  fontSize: 10,
                   color: 'var(--muted-2)',
-                  letterSpacing: 1.2,
+                  letterSpacing: 1.6,
                   fontWeight: 700,
-                  padding: '16px 10px 6px',
+                  padding: '14px 10px 6px',
+                  marginTop: 8,
+                  borderTop: '1px solid var(--line)',
                 }}
               >
                 {item.label}
@@ -205,20 +207,42 @@ export default function Sidebar({ route, setRoute, collapsed, setCollapsed, mobi
                   marginBottom: 2,
                   textAlign: 'left',
                   position: 'relative',
+                  transition: 'transform .15s ease, background .15s ease',
                 }}
                 onMouseEnter={(e) => {
-                  if (!active) e.currentTarget.style.background = 'var(--hover)';
+                  if (!active) {
+                    e.currentTarget.style.background = 'var(--hover)';
+                    if (!col) e.currentTarget.style.transform = 'translateX(2px)';
+                  }
                   if (col) {
                     const rect = e.currentTarget.getBoundingClientRect();
                     setTip({ label: item.label, y: rect.top + rect.height / 2 });
                   }
                 }}
                 onMouseLeave={(e) => {
-                  if (!active) e.currentTarget.style.background = 'transparent';
+                  if (!active) {
+                    e.currentTarget.style.background = 'transparent';
+                    e.currentTarget.style.transform = 'none';
+                  }
                   setTip(null);
                 }}
               >
-                <Icon name={item.icon} size={18} />
+                {active && !col && (
+                  <span
+                    aria-hidden
+                    style={{
+                      position: 'absolute',
+                      left: -8,
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      width: 3,
+                      height: 20,
+                      borderRadius: '0 3px 3px 0',
+                      background: 'var(--brand)',
+                    }}
+                  />
+                )}
+                <Icon name={item.icon} size={18} style={{ opacity: active ? 1 : 0.78 }} />
                 {!col && <span style={{ flex: 1 }}>{item.label}</span>}
                 {!col && item.badge != null && (
                   <span className="pill brand" style={{ padding: '1px 7px', fontSize: 10.5 }}>
