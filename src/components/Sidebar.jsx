@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import Icon from './Icon.jsx';
 import Avatar from './Avatar.jsx';
 import { usePermissions } from '../lib/permissions.jsx';
@@ -27,6 +27,110 @@ const NAV = [
   { id: 'audit',    label: 'Auditoria',       icon: 'history',  perm: ['Administração', 'logs'] },
   { id: 'settings', label: 'Configurações',   icon: 'settings', perm: ['Administração', 'config'] },
 ];
+
+function CompanyInitial({ name }) {
+  const letters = name
+    ? name.split(' ').filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('')
+    : '?';
+  const hue = name
+    ? [...name].reduce((acc, c) => acc + c.charCodeAt(0), 0) % 360
+    : 200;
+  return (
+    <div style={{
+      width: 26, height: 26, borderRadius: 6, flexShrink: 0,
+      background: `hsl(${hue},55%,50%)`,
+      color: '#fff', fontSize: 10.5, fontWeight: 700,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      letterSpacing: 0.3,
+    }}>
+      {letters}
+    </div>
+  );
+}
+
+function CompanyPicker({ companies, activeCompany, setActiveCompany }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  const label = activeCompany?.name || 'Todas as empresas';
+  const all = [{ id: '', name: 'Todas as empresas' }, ...companies];
+
+  return (
+    <div ref={ref} style={{ padding: '8px 10px', borderBottom: '1px solid var(--line)', position: 'relative' }}>
+      <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--muted-2)', letterSpacing: 1, marginBottom: 5, paddingLeft: 2 }}>
+        EMPRESA
+      </div>
+      <button
+        onClick={() => setOpen(o => !o)}
+        style={{
+          width: '100%', display: 'flex', alignItems: 'center', gap: 8,
+          padding: '7px 8px 7px 8px', borderRadius: 8,
+          border: `1px solid ${open ? 'var(--brand)' : 'var(--line)'}`,
+          background: open ? 'var(--brand-tint)' : 'var(--surface)',
+          color: 'var(--ink)', cursor: 'pointer',
+          transition: 'border-color .15s, background .15s',
+          boxShadow: open ? '0 0 0 2px var(--brand-tint)' : 'none',
+        }}
+      >
+        {activeCompany
+          ? <CompanyInitial name={activeCompany.name} />
+          : <div style={{ width: 26, height: 26, borderRadius: 6, background: 'var(--surface-2)', border: '1px solid var(--line)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Icon name="building" size={13} style={{ color: 'var(--muted)' }} />
+            </div>
+        }
+        <span style={{ flex: 1, textAlign: 'left', fontSize: 12.5, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {label}
+        </span>
+        <Icon name="chevron-down" size={13} style={{ color: 'var(--muted)', flexShrink: 0, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }} />
+      </button>
+
+      {open && (
+        <div style={{
+          position: 'absolute', left: 10, right: 10, top: 'calc(100% - 4px)',
+          background: 'var(--surface)', border: '1px solid var(--line)',
+          borderRadius: 10, zIndex: 50, overflow: 'hidden',
+          boxShadow: '0 8px 24px rgba(0,0,0,.10), 0 2px 6px rgba(0,0,0,.06)',
+        }}>
+          {all.map((c) => {
+            const isActive = (c.id === '' && !activeCompany) || c.id === activeCompany?.id;
+            return (
+              <button
+                key={c.id}
+                onClick={() => { setActiveCompany(c.id ? c : null); setOpen(false); }}
+                style={{
+                  width: '100%', display: 'flex', alignItems: 'center', gap: 8,
+                  padding: '8px 10px', border: 'none', textAlign: 'left',
+                  background: isActive ? 'var(--brand-tint)' : 'transparent',
+                  color: isActive ? 'var(--brand)' : 'var(--ink)',
+                  cursor: 'pointer', fontSize: 12.5, fontWeight: isActive ? 600 : 500,
+                  transition: 'background .1s',
+                }}
+                onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = 'var(--hover)'; }}
+                onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'transparent'; }}
+              >
+                {c.id
+                  ? <CompanyInitial name={c.name} />
+                  : <div style={{ width: 26, height: 26, borderRadius: 6, background: 'var(--surface-2)', border: '1px solid var(--line)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <Icon name="building" size={13} style={{ color: 'var(--muted)' }} />
+                    </div>
+                }
+                <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.name}</span>
+                {isActive && <Icon name="check" size={13} style={{ color: 'var(--brand)', flexShrink: 0 }} />}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function Logo({ collapsed, theme }) {
   return (
@@ -114,47 +218,11 @@ export default function Sidebar({ route, setRoute, collapsed, setCollapsed, mobi
 
       {/* Seletor de empresa — visível quando expandido e houver empresas */}
       {!col && companies.length > 0 && (
-        <div style={{ padding: '8px 10px', borderBottom: '1px solid var(--line)' }}>
-          <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--muted-2)', letterSpacing: 1, marginBottom: 5, paddingLeft: 2 }}>
-            EMPRESA
-          </div>
-          <div style={{ position: 'relative' }}>
-            <select
-              value={activeCompany?.id || ''}
-              onChange={(e) => {
-                const found = companies.find(c => c.id === e.target.value);
-                setActiveCompany(found || null);
-              }}
-              style={{
-                width: '100%',
-                padding: '7px 28px 7px 10px',
-                borderRadius: 8,
-                border: '1px solid var(--line)',
-                background: 'var(--surface)',
-                color: 'var(--ink)',
-                fontSize: 12.5,
-                fontWeight: 600,
-                cursor: 'pointer',
-                appearance: 'none',
-                WebkitAppearance: 'none',
-              }}
-            >
-              <option value="">Todas as empresas</option>
-              {companies.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
-            <Icon
-              name="chevron-down"
-              size={13}
-              style={{
-                position: 'absolute', right: 9, top: '50%',
-                transform: 'translateY(-50%)',
-                pointerEvents: 'none', color: 'var(--muted)',
-              }}
-            />
-          </div>
-        </div>
+        <CompanyPicker
+          companies={companies}
+          activeCompany={activeCompany}
+          setActiveCompany={setActiveCompany}
+        />
       )}
 
       <nav style={{ flex: 1, overflowY: 'auto', padding: '10px 8px' }}>
