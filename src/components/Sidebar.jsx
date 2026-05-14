@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import Icon from './Icon.jsx';
 import Avatar from './Avatar.jsx';
-import OrionGlyph from './OrionGlyph.jsx';
 import { usePermissions } from '../lib/permissions.jsx';
+import logoFullLight from '../assets/logo-full.png';
+import logoFullDark  from '../assets/logo-full-dark.png';
+import logoIcon      from '../assets/logo-icon.png';
 
 const NAV = [
   { id: 'dashboard', label: 'Dashboard', icon: 'dashboard' },
@@ -26,40 +28,26 @@ const NAV = [
   { id: 'settings', label: 'Configurações',   icon: 'settings', perm: ['Administração', 'config'] },
 ];
 
-function Logo({ collapsed }) {
+function Logo({ collapsed, theme }) {
+  if (collapsed) {
+    return (
+      <img
+        src={logoIcon}
+        alt="SR Central"
+        style={{ width: 44, height: 44, objectFit: 'contain' }}
+      />
+    );
+  }
   return (
-    <div className="row gap-2" style={{ alignItems: 'center' }}>
-      <div
-        style={{
-          width: 30,
-          height: 30,
-          borderRadius: 8,
-          background: 'linear-gradient(135deg, var(--brand) 0%, var(--brand-700) 100%)',
-          position: 'relative',
-          flexShrink: 0,
-          boxShadow: 'inset 0 -1px 0 rgba(0,0,0,.18), 0 1px 0 rgba(0,0,0,.06)',
-        }}
-      >
-        <div style={{ position: 'absolute', inset: 6 }}>
-          <OrionGlyph size={18} />
-        </div>
-      </div>
-      {!collapsed && (
-        <div style={{ lineHeight: 1.05 }}>
-          <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: -0.2 }}>
-            Orion{' '}
-            <span style={{ fontWeight: 500, color: 'var(--muted)' }}>Gestão</span>
-          </div>
-          <div style={{ fontSize: 10.5, color: 'var(--muted)', marginTop: 2 }}>
-            Plataforma corporativa
-          </div>
-        </div>
-      )}
-    </div>
+    <img
+      src={theme === 'dark' ? logoFullDark : logoFullLight}
+      alt="SR Central"
+      style={{ height: 90, width: '100%', maxWidth: 230, objectFit: 'contain', objectPosition: 'center center', margin: '-10px 0' }}
+    />
   );
 }
 
-export default function Sidebar({ route, setRoute, collapsed, setCollapsed, mobileOpen, setMobileOpen, userName, userEmail, isAdmin, onLogout, companies = [], activeCompany, setActiveCompany, profile, onOpenProfile }) {
+export default function Sidebar({ route, setRoute, collapsed, setCollapsed, mobileOpen, setMobileOpen, userName, userEmail, isAdmin, onLogout, companies = [], activeCompany, setActiveCompany, profile, onOpenProfile, theme }) {
   const { can } = usePermissions();
   const [open, setOpen] = useState({
     employees: route.startsWith('employees'),
@@ -99,7 +87,9 @@ export default function Sidebar({ route, setRoute, collapsed, setCollapsed, mobi
           borderBottom: '1px solid var(--line)',
         }}
       >
-        <Logo collapsed={col} />
+        <div style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
+          <Logo collapsed={col} theme={theme} />
+        </div>
         {!col && !mobileOpen && (
           <button
             className="btn ghost icon sm"

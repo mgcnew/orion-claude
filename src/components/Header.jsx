@@ -1,6 +1,5 @@
 import { Fragment } from 'react';
 import Icon from './Icon.jsx';
-import Avatar from './Avatar.jsx';
 import SearchBar from './SearchBar.jsx';
 
 function buildCrumbs(route, routeLabel) {
@@ -83,119 +82,89 @@ export default function Header({
         padding: '0 16px 0 12px',
         borderBottom: '1px solid var(--line)',
         background: 'var(--surface)',
-        display: 'flex',
+        display: 'grid',
+        gridTemplateColumns: '1fr auto 1fr',
         alignItems: 'center',
         gap: 12,
         flexShrink: 0,
         minWidth: 0,
       }}
     >
-      {/* Desktop: colapsa sidebar | Mobile: abre drawer */}
-      <button
-        className="btn ghost icon sm"
-        onClick={() => {
-          if (window.innerWidth < 768) setMobileOpen(o => !o);
-          else setCollapsed(c => !c);
-        }}
-      >
-        <Icon name="menu" size={18} />
-      </button>
-
-      <div className="row gap-2" style={{ minWidth: 0, flexShrink: 1 }}>
-        {crumbs.map((c, i) => (
-          <Fragment key={i}>
-            {i > 0 && (
-              <Icon name="chevron-right" size={13} style={{ color: 'var(--muted-2)' }} />
-            )}
-            <button
-              onClick={() => c.id && setRoute(c.id)}
-              style={{
-                border: 'none',
-                background: 'transparent',
-                padding: '4px 6px',
-                borderRadius: 6,
-                fontSize: 13.5,
-                fontWeight: i === crumbs.length - 1 ? 600 : 500,
-                color: i === crumbs.length - 1 ? 'var(--ink)' : 'var(--muted)',
-                cursor: c.id ? 'pointer' : 'default',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              {c.label}
-            </button>
-          </Fragment>
-        ))}
+      {/* Esquerda: menu + breadcrumbs */}
+      <div className="row gap-2" style={{ minWidth: 0 }}>
+        <button
+          className="btn ghost icon sm"
+          onClick={() => {
+            if (window.innerWidth < 768) setMobileOpen(o => !o);
+            else setCollapsed(c => !c);
+          }}
+        >
+          <Icon name="menu" size={18} />
+        </button>
+        <div className="row gap-2" style={{ minWidth: 0, flexShrink: 1 }}>
+          {crumbs.map((c, i) => (
+            <Fragment key={i}>
+              {i > 0 && (
+                <Icon name="chevron-right" size={13} style={{ color: 'var(--muted-2)' }} />
+              )}
+              <button
+                onClick={() => c.id && setRoute(c.id)}
+                style={{
+                  border: 'none',
+                  background: 'transparent',
+                  padding: '4px 6px',
+                  borderRadius: 6,
+                  fontSize: 13.5,
+                  fontWeight: i === crumbs.length - 1 ? 600 : 500,
+                  color: i === crumbs.length - 1 ? 'var(--ink)' : 'var(--muted)',
+                  cursor: c.id ? 'pointer' : 'default',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {c.label}
+              </button>
+            </Fragment>
+          ))}
+        </div>
       </div>
 
-      <div className="grow" />
-
-      {/* Global search */}
+      {/* Centro: busca global */}
       <SearchBar setRoute={setRoute} setRouteParam={setRouteParam} setRouteLabel={setRouteLabel} />
 
-      {isAdmin && onInvite && (
-        <button className="btn primary sm" onClick={onInvite} title="Convidar usuário">
-          <Icon name="user-plus" size={14} /> Convidar
+      {/* Direita: ações */}
+      <div className="row gap-2" style={{ justifyContent: 'flex-end' }}>
+        {isAdmin && onInvite && (
+          <button className="btn primary sm" onClick={onInvite} title="Convidar usuário">
+            <Icon name="user-plus" size={14} /> Convidar
+          </button>
+        )}
+
+        <button
+          className="btn ghost icon"
+          onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+          title="Modo"
+        >
+          <Icon name={theme === 'dark' ? 'sun' : 'moon'} size={17} />
         </button>
-      )}
 
-      <button
-        className="btn ghost icon"
-        onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-        title="Modo"
-      >
-        <Icon name={theme === 'dark' ? 'sun' : 'moon'} size={17} />
-      </button>
-
-      <div style={{ position: 'relative' }}>
-        <button className="btn ghost icon" onClick={openNotif} title="Notificações">
-          <Icon name="bell" size={17} />
-          <span
-            style={{
-              position: 'absolute',
-              top: 6,
-              right: 7,
-              width: 7,
-              height: 7,
-              borderRadius: '50%',
-              background: 'var(--bad)',
-              border: '2px solid var(--surface)',
-            }}
-          />
-        </button>
-      </div>
-
-      <button
-        className="row gap-2 orion-userchip"
-        onClick={onOpenProfile}
-        style={{
-          paddingLeft: 10,
-          borderLeft: '1px solid var(--line)',
-          marginLeft: 2,
-          flexShrink: 0,
-          background: 'none',
-          border: 'none',
-          borderLeft: '1px solid var(--line)',
-          cursor: 'pointer',
-          borderRadius: 8,
-          padding: '4px 8px 4px 10px',
-          transition: 'background .12s',
-        }}
-        onMouseEnter={e => e.currentTarget.style.background = 'var(--hover)'}
-        onMouseLeave={e => e.currentTarget.style.background = 'none'}
-        title="Meu perfil"
-      >
-        <Avatar name={userName || 'U'} size={30} hue={profile?.avatar_hue ?? 215} url={profile?.avatar_url ?? null} />
-        <div className="orion-userchip-text" style={{ lineHeight: 1.15 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap' }}>
-            {userName
-              ? userName.split(' ').slice(0, 2).map((n, i) => i === 1 ? n[0] + '.' : n).join(' ')
-              : '—'}
-          </div>
-          <div style={{ fontSize: 11, color: 'var(--muted)', whiteSpace: 'nowrap' }}>
-            {userEmail || ''}
-          </div>
+        <div style={{ position: 'relative' }}>
+          <button className="btn ghost icon" onClick={openNotif} title="Notificações">
+            <Icon name="bell" size={17} />
+            <span
+              style={{
+                position: 'absolute',
+                top: 6,
+                right: 7,
+                width: 7,
+                height: 7,
+                borderRadius: '50%',
+                background: 'var(--bad)',
+                border: '2px solid var(--surface)',
+              }}
+            />
+          </button>
         </div>
-      </button>
+      </div>
     </header>
   );
 }

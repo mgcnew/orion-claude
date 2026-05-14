@@ -268,6 +268,7 @@ export default function App() {
         setActiveCompany={setActiveCompany}
         profile={userProfile}
         onOpenProfile={() => { setProfileOpen(true); setMobileOpen(false); }}
+        theme={tweaks.theme}
       />
       <main
         style={{

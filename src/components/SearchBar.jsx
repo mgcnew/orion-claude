@@ -127,7 +127,6 @@ export default function SearchBar({ setRoute, setRouteParam, setRouteLabel }) {
             <Icon name="x" size={13} />
           </button>
         )}
-        {!query && <span className="kbd orion-search-kbd" style={{ fontSize: 11, flexShrink: 0 }}>⌘K</span>}
       </div>
 
       {/* Dropdown */}
