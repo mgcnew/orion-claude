@@ -30,6 +30,8 @@
   --bad-bg: #f8e5e0;
   --info-bg: #e5edfb;
 
+  --nav-ink: #3f4550;
+  --nav-ink-active: #1a1d24;
   --radius: 10px;
   --radius-lg: 14px;
   --shadow-card: 0 1px 0 rgba(20, 20, 30, 0.015);
@@ -43,6 +45,8 @@ html.dark {
   --sidebar: #0f1217;
   --ink: #e6e8ec;
   --ink-soft: #bfc3cb;
+  --nav-ink: #e6e8ec;
+  --nav-ink-active: #ffffff;
   --muted: #8a8f99;
   --muted-2: #6e7480;
   --line: #1f242c;

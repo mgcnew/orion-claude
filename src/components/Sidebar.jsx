@@ -187,7 +187,7 @@ export default function Sidebar({ route, setRoute, collapsed, setCollapsed, mobi
                   borderRadius: 8,
                   border: 'none',
                   background: active ? 'var(--brand-tint)' : 'transparent',
-                  color: active ? 'var(--brand)' : 'var(--ink-soft)',
+                  color: active ? 'var(--nav-ink-active)' : 'var(--nav-ink)',
                   fontSize: 13.5,
                   fontWeight: active ? 600 : 500,
                   cursor: 'pointer',

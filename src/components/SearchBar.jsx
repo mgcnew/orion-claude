@@ -92,7 +92,7 @@ export default function SearchBar({ setRoute, setRouteParam, setRouteLabel }) {
   const showDropdown = open && q.length > 0;
 
   return (
-    <div ref={wrapRef} style={{ position: 'relative', flexShrink: 1, minWidth: 0 }}>
+    <div ref={wrapRef} style={{ position: 'relative', flexShrink: 1, minWidth: 0, width: 'clamp(180px, 30vw, 400px)' }}>
       {/* Input */}
       <div
         style={{
@@ -103,7 +103,7 @@ export default function SearchBar({ setRoute, setRouteParam, setRouteLabel }) {
           background: 'var(--surface-2)',
           boxShadow: open ? '0 0 0 3px var(--brand-tint)' : 'none',
           transition: 'border-color .12s, box-shadow .12s',
-          width: 260,
+          width: '100%',
         }}
       >
         <Icon name="search" size={14} style={{ color: 'var(--muted)', flexShrink: 0 }} />
