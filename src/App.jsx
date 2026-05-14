@@ -112,7 +112,10 @@ export default function App() {
     root.setProperty('--radius-lg', tweaks.radius + 4 + 'px');
     // zoom escala todos os valores inline px sem precisar refatorar
     const zoomMap = { sm: 0.88, md: 1, lg: 1.12 };
-    document.body.style.zoom = zoomMap[tweaks.fontSize] ?? 1;
+    const zoom = zoomMap[tweaks.fontSize] ?? 1;
+    document.body.style.zoom = zoom;
+    // CSS var usada no container principal para compensar altura
+    root.setProperty('--app-h', `${(100 / zoom).toFixed(4)}vh`);
   }, [tweaks.primary, tweaks.radius, tweaks.fontSize]);
 
   // Blue light filter overlay
@@ -257,7 +260,7 @@ export default function App() {
     <div
       style={{
         display: 'flex',
-        height: '100vh',
+        height: 'var(--app-h, 100vh)',
         overflow: 'hidden',
         background: 'var(--bg)',
       }}

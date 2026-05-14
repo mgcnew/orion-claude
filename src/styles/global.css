@@ -32,6 +32,7 @@
 
   --nav-ink: #3f4550;
   --nav-ink-active: #1a1d24;
+  --app-h: 100vh;
   --radius: 10px;
   --radius-lg: 14px;
   --shadow-card: 0 1px 0 rgba(20, 20, 30, 0.015);
