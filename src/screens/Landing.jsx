@@ -209,8 +209,8 @@ export default function LandingPage() {
           0%,100% { transform: translateY(0px); }
           50%      { transform: translateY(-14px); }
         }
-        .lp-nav-outer { position: sticky; top: 0; z-index: 100; display: flex; justify-content: center; padding: 16px 24px; pointer-events: none; }
-        .lp-nav       { pointer-events: all; display: inline-flex; align-items: center; gap: 32px; height: 68px; padding: 0 16px 0 8px; min-width: 460px; border-radius: 999px; background: rgba(232,239,255,.45); backdrop-filter: blur(16px) saturate(160%); -webkit-backdrop-filter: blur(16px) saturate(160%); border: 1px solid rgba(255,255,255,.55); box-shadow: 0 2px 20px rgba(42,91,255,.08), 0 1px 0 rgba(255,255,255,.6) inset; }
+        .lp-nav-outer { position: sticky; top: 0; z-index: 100; display: flex; justify-content: center; padding: 24px 24px; pointer-events: none; }
+        .lp-nav       { pointer-events: all; display: inline-flex; align-items: center; gap: 32px; height: 68px; padding: 0 16px 0 8px; min-width: 460px; border-radius: 999px; overflow: visible; background: rgba(232,239,255,.45); backdrop-filter: blur(16px) saturate(160%); -webkit-backdrop-filter: blur(16px) saturate(160%); border: 1px solid rgba(255,255,255,.55); box-shadow: 0 2px 20px rgba(42,91,255,.08), 0 1px 0 rgba(255,255,255,.6) inset; }
         .lp-hero-wrap { background: linear-gradient(160deg, #e8efff 0%, #f2f6ff 40%, #f8faff 70%, #fff 100%); }
         .lp-hero      { padding: 80px 48px 64px; display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: center; max-width: 1200px; margin: 0 auto; }
         .lp-hero-h1   { font-size: 52px; }
@@ -252,7 +252,7 @@ export default function LandingPage() {
 
       <div className="lp-nav-outer">
         <nav className="lp-nav">
-          <img src={logoLanding} alt="SR Gestão de Documentos" style={{ height: 140, objectFit: 'contain', objectPosition: 'left center', marginTop: -36, marginBottom: -36, marginLeft: -4, alignSelf: 'center', display: 'block', transform: 'translateY(6px)' }} />
+          <img src={logoLanding} alt="SR Gestão de Documentos" style={{ height: 180, objectFit: 'contain', objectPosition: 'left center', marginTop: -56, marginBottom: -56, marginLeft: -4, alignSelf: 'center', display: 'block', transform: 'translateY(6px)' }} />
           <span style={{ flex: 1 }} />
           <button
             onClick={openLogin}

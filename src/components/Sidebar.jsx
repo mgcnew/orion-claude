@@ -4,7 +4,7 @@ import Avatar from './Avatar.jsx';
 import { usePermissions } from '../lib/permissions.jsx';
 import logoLanding  from '../assets/logo-landing-page.png';
 import logoNight    from '../assets/logo noturna.png';
-import logoIcon     from '../assets/icon.png';
+import logoIcon     from '../assets/icone novo.png';
 
 const NAV = [
   { id: 'dashboard', label: 'Dashboard', icon: 'dashboard' },
@@ -29,21 +29,31 @@ const NAV = [
 ];
 
 function Logo({ collapsed, theme }) {
-  if (collapsed) {
-    return (
+  return (
+    <div style={{ position: 'relative', width: collapsed ? 72 : '100%', height: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'width .18s ease' }}>
       <img
         src={logoIcon}
         alt="SR Central"
-        style={{ width: 44, height: 44, objectFit: 'contain' }}
+        style={{
+          position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)',
+          width: 72, height: 72, objectFit: 'contain', display: 'block',
+          opacity: collapsed ? 1 : 0,
+          transition: 'opacity .18s ease',
+          pointerEvents: 'none',
+        }}
       />
-    );
-  }
-  return (
-    <img
-      src={theme === 'dark' ? logoNight : logoLanding}
-      alt="SR Gestão de Documentos"
-      style={{ height: 200, width: '100%', maxWidth: 230, objectFit: 'contain', objectPosition: 'center center', margin: '-48px 0 -58px' }}
-    />
+      <img
+        src={theme === 'dark' ? logoNight : logoLanding}
+        alt="SR Gestão de Documentos"
+        style={{
+          position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)',
+          height: 170, width: '100%', maxWidth: 200, objectFit: 'contain', objectPosition: 'center center',
+          opacity: collapsed ? 0 : 1,
+          transition: 'opacity .18s ease',
+          pointerEvents: 'none',
+        }}
+      />
+    </div>
   );
 }
 
@@ -83,11 +93,12 @@ export default function Sidebar({ route, setRoute, collapsed, setCollapsed, mobi
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '0 14px',
+          padding: col ? 0 : '0 14px',
           borderBottom: '1px solid var(--line)',
+          overflow: 'visible',
         }}
       >
-        <div style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
+        <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', overflow: 'visible' }}>
           <Logo collapsed={col} theme={theme} />
         </div>
         {!col && !mobileOpen && (
