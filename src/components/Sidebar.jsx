@@ -5,6 +5,7 @@ import { usePermissions } from '../lib/permissions.jsx';
 import logoFullLight from '../assets/logo-full.png';
 import logoFullDark  from '../assets/logo-full-dark.png';
 import logoIcon      from '../assets/logo-icon.png';
+import logoLanding   from '../assets/logo-landing-page.png';
 
 const NAV = [
   { id: 'dashboard', label: 'Dashboard', icon: 'dashboard' },
@@ -40,8 +41,8 @@ function Logo({ collapsed, theme }) {
   }
   return (
     <img
-      src={theme === 'dark' ? logoFullDark : logoFullLight}
-      alt="SR Central"
+      src={logoLanding}
+      alt="SR Gestão de Documentos"
       style={{ height: 90, width: '100%', maxWidth: 230, objectFit: 'contain', objectPosition: 'center center', margin: '-10px 0' }}
     />
   );
