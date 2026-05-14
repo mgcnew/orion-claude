@@ -52,10 +52,14 @@ function ThemeToggle({ theme, setTheme }) {
 
   const handleClick = () => {
     setAnim(true);
+    document.documentElement.classList.add('theme-transitioning');
     setTimeout(() => {
       setTheme(theme === 'dark' ? 'light' : 'dark');
       setAnim(false);
     }, 260);
+    setTimeout(() => {
+      document.documentElement.classList.remove('theme-transitioning');
+    }, 480);
   };
 
   return (

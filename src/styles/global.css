@@ -85,6 +85,17 @@ html.dark {
 * {
   box-sizing: border-box;
 }
+
+/* Smooth theme transition — prevents flash on dark/light switch */
+html.theme-transitioning *,
+html.theme-transitioning *::before,
+html.theme-transitioning *::after {
+  transition:
+    background-color 0.18s ease,
+    border-color 0.18s ease,
+    color 0.12s ease,
+    box-shadow 0.18s ease !important;
+}
 html,
 body,
 #root {
