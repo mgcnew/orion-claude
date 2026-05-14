@@ -71,6 +71,17 @@ html.dark {
   --shadow-pop: 0 14px 38px rgba(0, 0, 0, 0.55), 0 2px 6px rgba(0, 0, 0, 0.4);
 }
 
+@keyframes sun-spin {
+  0%   { transform: rotate(0deg) scale(1); }
+  40%  { transform: rotate(200deg) scale(1.18); }
+  100% { transform: rotate(360deg) scale(1); }
+}
+@keyframes moon-set {
+  0%   { transform: translateY(0) rotate(-12deg); opacity: 1; }
+  45%  { transform: translateY(7px) rotate(4deg); opacity: 0.45; }
+  100% { transform: translateY(0) rotate(-12deg); opacity: 1; }
+}
+
 * {
   box-sizing: border-box;
 }

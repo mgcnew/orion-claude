@@ -1,6 +1,74 @@
-import { Fragment } from 'react';
+import { Fragment, useState } from 'react';
 import Icon from './Icon.jsx';
 import SearchBar from './SearchBar.jsx';
+
+function SunSVG({ spin }) {
+  const rays = [0, 45, 90, 135, 180, 225, 270, 315];
+  return (
+    <svg
+      width="19" height="19" viewBox="0 0 24 24" fill="none"
+      style={{ animation: spin ? 'sun-spin 0.52s ease forwards' : 'none', display: 'block' }}
+    >
+      <circle cx="12" cy="12" r="4.2" fill="#f59e0b" />
+      {rays.map((angle) => {
+        const rad = (angle * Math.PI) / 180;
+        return (
+          <line
+            key={angle}
+            x1={(12 + 6.4 * Math.cos(rad)).toFixed(2)}
+            y1={(12 + 6.4 * Math.sin(rad)).toFixed(2)}
+            x2={(12 + 9.6 * Math.cos(rad)).toFixed(2)}
+            y2={(12 + 9.6 * Math.sin(rad)).toFixed(2)}
+            stroke="#fbbf24" strokeWidth="1.8" strokeLinecap="round"
+          />
+        );
+      })}
+    </svg>
+  );
+}
+
+function MoonSVG({ drop }) {
+  return (
+    <svg
+      width="17" height="17" viewBox="0 0 24 24" fill="none"
+      style={{ animation: drop ? 'moon-set 0.48s ease forwards' : 'none', display: 'block' }}
+    >
+      {/* crescent: full circle minus offset circle via clip */}
+      <defs>
+        <mask id="moon-mask">
+          <rect width="24" height="24" fill="white" />
+          <circle cx="16.5" cy="9" r="7" fill="black" />
+        </mask>
+      </defs>
+      <circle cx="12" cy="12" r="8.5" fill="#94a3b8" mask="url(#moon-mask)" />
+      {/* subtle glow rim */}
+      <circle cx="12" cy="12" r="8.5" fill="none" stroke="#cbd5e1" strokeWidth="0.6" mask="url(#moon-mask)" opacity="0.6" />
+    </svg>
+  );
+}
+
+function ThemeToggle({ theme, setTheme }) {
+  const [anim, setAnim] = useState(false);
+
+  const handleClick = () => {
+    setAnim(true);
+    setTimeout(() => {
+      setTheme(t => t === 'dark' ? 'light' : 'dark');
+      setAnim(false);
+    }, 260);
+  };
+
+  return (
+    <button
+      className="btn ghost icon"
+      onClick={handleClick}
+      title={theme === 'dark' ? 'Modo claro' : 'Modo escuro'}
+      style={{ overflow: 'visible' }}
+    >
+      {theme === 'dark' ? <SunSVG spin={anim} /> : <MoonSVG drop={anim} />}
+    </button>
+  );
+}
 
 function buildCrumbs(route, routeLabel) {
   if (route === 'dashboard') return [{ label: 'Dashboard' }];
@@ -146,13 +214,7 @@ export default function Header({
           </button>
         )}
 
-        <button
-          className="btn ghost icon"
-          onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-          title="Modo"
-        >
-          <Icon name={theme === 'dark' ? 'sun' : 'moon'} size={17} />
-        </button>
+        <ThemeToggle theme={theme} setTheme={setTheme} />
 
         <div style={{ position: 'relative' }}>
           <button className="btn ghost icon" onClick={openNotif} title="Notificações">
