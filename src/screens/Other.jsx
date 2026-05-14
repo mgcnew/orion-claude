@@ -2690,7 +2690,6 @@ export function SettingsScreen({ initialTab, addToast, setRoute, activeCompany, 
     { id: 'aparencia',  l: 'Aparência',   i: 'sparkle' },
     { id: 'seguranca',  l: 'Segurança',   i: 'shield' },
     { id: 'permissoes', l: 'Permissões',  i: 'key' },
-    { id: 'integracao', l: 'Integrações', i: 'folder' },
   ];
 
   return (
@@ -2751,57 +2750,6 @@ export function SettingsScreen({ initialTab, addToast, setRoute, activeCompany, 
 
       {tab === 'permissoes' && <PermissionsScreen addToast={addToast} embedded={true} activeCompany={activeCompany} />}
 
-      {tab === 'integracao' && (
-        <div className="card" style={{ padding: 24 }}>
-          <h3 style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 700 }}>Integrações</h3>
-          <p style={{ margin: '0 0 18px', fontSize: 12.5, color: 'var(--muted)' }}>
-            Conecte serviços externos para sincronizar dados automaticamente.
-          </p>
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
-              gap: 12,
-            }}
-          >
-            {[
-              { n: 'Senior Sistemas', s: 'Folha & ponto',        on: true },
-              { n: 'TOTVS Protheus',  s: 'ERP',                  on: true },
-              { n: 'Gov.br',          s: 'Assinatura digital',   on: true },
-              { n: 'DocuSign',        s: 'Assinatura eletrônica',on: false },
-              { n: 'Slack',           s: 'Notificações',         on: false },
-            ].map((it, i) => (
-              <div
-                key={i}
-                className="row gap-3"
-                style={{ padding: 14, border: '1px solid var(--line-soft)', borderRadius: 10 }}
-              >
-                <div
-                  style={{
-                    width: 34,
-                    height: 34,
-                    borderRadius: 8,
-                    background: 'var(--surface-2)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: 'var(--muted)',
-                  }}
-                >
-                  <Icon name="folder" size={15} />
-                </div>
-                <div className="grow">
-                  <div style={{ fontSize: 13, fontWeight: 600 }}>{it.n}</div>
-                  <div style={{ fontSize: 11.5, color: 'var(--muted)' }}>{it.s}</div>
-                </div>
-                <span className={`pill ${it.on ? 'ok' : ''}`} style={{ fontSize: 10.5 }}>
-                  {it.on ? 'Conectado' : 'Conectar'}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
