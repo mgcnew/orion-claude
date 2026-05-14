@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import Icon from '../components/Icon.jsx';
+import Pagination from '../components/Pagination.jsx';
 import Avatar from '../components/Avatar.jsx';
 import {
   useAllWarnings, useAllVacations, useAllDocuments, useAllBenefits,
@@ -255,12 +256,18 @@ function AdvertenciasTab({ addToast, companyId, activeEmployees, can, warnings, 
   const TYPE_KIND  = { verbal: 'warn', escrita: 'bad', suspensao: 'bad' };
   const TYPE_NAME  = { verbal: 'Advertência verbal', escrita: 'Advertência escrita', suspensao: 'Suspensão' };
 
+  const [page,    setPage]    = useState(1);
+  const [perPage, setPerPage] = useState(10);
+
   const filtered = warnings.filter(w => {
     if (filter !== 'todas' && (w.severity || 'verbal') !== filter) return false;
     const str = ((w.employees?.name || '') + ' ' + (w.description || '')).toLowerCase();
     return !q || str.includes(q.toLowerCase());
   });
 
+  useEffect(() => { setPage(1); }, [filter, q]);
+
+  const paged = filtered.slice((page - 1) * perPage, page * perPage);
   const count = s => warnings.filter(w => (w.severity || 'verbal') === s).length;
 
   const handleSave = async () => {
@@ -345,6 +352,7 @@ function AdvertenciasTab({ addToast, companyId, activeEmployees, can, warnings, 
             <div>Nenhuma advertência encontrada.</div>
           </div>
         ) : (
+          <>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
               <tr style={{ background: 'var(--surface-2)', color: 'var(--muted)', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.6 }}>
@@ -357,7 +365,7 @@ function AdvertenciasTab({ addToast, companyId, activeEmployees, can, warnings, 
               </tr>
             </thead>
             <tbody>
-              {filtered.map(w => (
+              {paged.map(w => (
                 <tr key={w.id} style={{ borderTop: '1px solid var(--line-soft)' }}
                   onMouseEnter={e => e.currentTarget.style.background = 'var(--hover)'}
                   onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
@@ -390,6 +398,8 @@ function AdvertenciasTab({ addToast, companyId, activeEmployees, can, warnings, 
               ))}
             </tbody>
           </table>
+          <Pagination total={filtered.length} page={page} perPage={perPage} onPage={setPage} onPerPage={setPerPage} />
+          </>
         )}
       </div>
     </div>
@@ -463,8 +473,15 @@ function FeriasTab({ addToast, companyId, activeEmployees, can, vacations, loadi
   const STATUS_KIND  = { aprovado: 'ok', pendente: 'warn', concluído: 'info', concluido: 'info', recusado: 'bad' };
   const STATUS_LABEL = { aprovado: 'Aprovado', pendente: 'Pendente', concluído: 'Concluído', concluido: 'Concluído', recusado: 'Recusado' };
 
+  const [page,    setPage]    = useState(1);
+  const [perPage, setPerPage] = useState(10);
+
   const filtered = filter === 'todas' ? vacations : vacations.filter(v => v.status === filter);
   const countBy  = s => vacations.filter(v => v.status === s).length;
+
+  useEffect(() => { setPage(1); }, [filter]);
+
+  const paged = filtered.slice((page - 1) * perPage, page * perPage);
   const totalDays = vacations.reduce((a, v) => a + (v.days_count || v.days || 0), 0);
   const fmt = d => d ? new Date(d + 'T00:00:00').toLocaleDateString('pt-BR') : '—';
 
@@ -555,6 +572,7 @@ function FeriasTab({ addToast, companyId, activeEmployees, can, vacations, loadi
             <div>Nenhuma solicitação encontrada.</div>
           </div>
         ) : (
+          <>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
               <tr style={{ background: 'var(--surface-2)', color: 'var(--muted)', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.6 }}>
@@ -568,7 +586,7 @@ function FeriasTab({ addToast, companyId, activeEmployees, can, vacations, loadi
               </tr>
             </thead>
             <tbody>
-              {filtered.map(v => (
+              {paged.map(v => (
                 <tr key={v.id} style={{ borderTop: '1px solid var(--line-soft)' }}
                   onMouseEnter={e => e.currentTarget.style.background = 'var(--hover)'}
                   onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
@@ -619,6 +637,8 @@ function FeriasTab({ addToast, companyId, activeEmployees, can, vacations, loadi
               ))}
             </tbody>
           </table>
+          <Pagination total={filtered.length} page={page} perPage={perPage} onPage={setPage} onPerPage={setPerPage} />
+          </>
         )}
       </div>
     </div>
@@ -695,11 +715,18 @@ function BeneficiosTab({ addToast, companyId, activeEmployees, can, benefits, lo
     employee_id: '', type: BENEFIT_TYPES[0], value: '', start_date: '', end_date: '', notes: '',
   });
 
+  const [page,    setPage]    = useState(1);
+  const [perPage, setPerPage] = useState(10);
+
   const filtered = benefits.filter(b => {
     if (filterType !== 'todos' && b.type !== filterType) return false;
     if (q && !b.employees?.name?.toLowerCase().includes(q.toLowerCase()) && !b.type.toLowerCase().includes(q.toLowerCase())) return false;
     return true;
   });
+
+  useEffect(() => { setPage(1); }, [filterType, q]);
+
+  const paged = filtered.slice((page - 1) * perPage, page * perPage);
 
   const kpis = BENEFIT_TYPES.map(t => ({
     label: t,
@@ -827,7 +854,7 @@ function BeneficiosTab({ addToast, companyId, activeEmployees, can, benefits, lo
                 </td>
               </tr>
             )}
-            {filtered.map(b => (
+            {paged.map(b => (
               <tr key={b.id} style={{ borderTop: '1px solid var(--line)' }}>
                 <td style={{ padding: '10px 16px' }}>
                   <div className="row gap-2">
@@ -871,6 +898,7 @@ function BeneficiosTab({ addToast, companyId, activeEmployees, can, benefits, lo
             ))}
           </tbody>
         </table>
+        <Pagination total={filtered.length} page={page} perPage={perPage} onPage={setPage} onPerPage={setPerPage} />
       </div>
 
       {/* Modal */}
@@ -1066,6 +1094,13 @@ function HoleritesTab({ addToast, companyId, activeEmployees, can, payslips, ref
     return (d.who + ' ' + d.mes + ' ' + d.ano).toLowerCase().includes(q.toLowerCase());
   });
 
+  const [page,    setPage]    = useState(1);
+  const [perPage, setPerPage] = useState(10);
+
+  useEffect(() => { setPage(1); }, [q]);
+
+  const paged = filtered.slice((page - 1) * perPage, page * perPage);
+
   const handleSave = async () => {
     if (!form.employee_id || !form.mes_ref) return;
     setSaving(true);
@@ -1143,6 +1178,7 @@ function HoleritesTab({ addToast, companyId, activeEmployees, can, payslips, ref
             <div style={{ fontSize: 12 }}>{q ? 'Tente ajustar a busca' : 'Clique em "Adicionar holerite" para começar'}</div>
           </div>
         ) : (
+          <>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
               <tr style={{ background: 'var(--surface-2)', color: 'var(--muted)', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.6 }}>
@@ -1154,7 +1190,7 @@ function HoleritesTab({ addToast, companyId, activeEmployees, can, payslips, ref
               </tr>
             </thead>
             <tbody>
-              {filtered.map(d => (
+              {paged.map(d => (
                 <tr key={d.id} style={{ borderTop: '1px solid var(--line-soft)' }}
                   onMouseEnter={e => e.currentTarget.style.background = 'var(--hover)'}
                   onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
@@ -1190,6 +1226,8 @@ function HoleritesTab({ addToast, companyId, activeEmployees, can, payslips, ref
               ))}
             </tbody>
           </table>
+          <Pagination total={filtered.length} page={page} perPage={perPage} onPage={setPage} onPerPage={setPerPage} />
+          </>
         )}
       </div>
     </div>

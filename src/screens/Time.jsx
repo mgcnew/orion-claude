@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import Icon from '../components/Icon.jsx';
 import Avatar from '../components/Avatar.jsx';
+import Pagination from '../components/Pagination.jsx';
 import { useEmployees, useMonthEntries, createTimeEntry } from '../hooks/useEmployees.js';
 
 // ── QuickEntry ───────────────────────────────────────────────
@@ -1642,38 +1643,7 @@ export function TimeScreen({ addToast, activeCompany }) {
 
       {/* ── Banco de horas ── */}
       {tab==='banco' && (
-        <div style={{ background:'var(--surface)', border:'1px solid var(--line)', borderRadius:10, overflow:'hidden' }}>
-          {entLoading ? <div style={{ padding:40, textAlign:'center', color:'var(--muted)', fontSize:13 }}><div className="pulse">Carregando…</div></div>
-          : bancoRows.length===0 ? <EmptyState icon="chart" msg="Nenhum registro neste período." />
-          : (
-            <div style={{ overflowX:'auto' }}>
-              <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13, minWidth:500 }}>
-                <thead>
-                  <tr style={{ background:'var(--surface-2)', color:'var(--muted)', fontSize:11, textTransform:'uppercase', letterSpacing:0.5 }}>
-                    {['Funcionário','Presentes','Faltas','Atrasos','H. Trabalhadas','H. Extras (auto)','Ajustes'].map(h => (
-                      <th key={h} style={{ padding:'10px 18px', textAlign:'left', fontWeight:600, whiteSpace:'nowrap' }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {bancoRows.map((r,i) => (
-                    <tr key={i} style={{ borderTop:'1px solid var(--line-soft)' }}
-                      onMouseEnter={e => e.currentTarget.style.background='var(--hover)'}
-                      onMouseLeave={e => e.currentTarget.style.background='transparent'}>
-                      <td style={{ padding:'10px 18px', fontWeight:500 }}>{r.name}</td>
-                      <td style={{ padding:'10px 18px', color:'var(--muted)' }}>{r.presenteCount}d</td>
-                      <td style={{ padding:'10px 18px' }}>{r.faltaCount>0 ? <span className="pill bad" style={{ fontSize:11 }}>{r.faltaCount}d</span> : <span style={{ color:'var(--muted)' }}>—</span>}</td>
-                      <td style={{ padding:'10px 18px' }}>{r.atrasoCount>0 ? <span className="pill warn" style={{ fontSize:11 }}>{r.atrasoCount}x</span> : <span style={{ color:'var(--muted)' }}>—</span>}</td>
-                      <td style={{ padding:'10px 18px', fontFamily:'monospace' }}>{minutesToHM(r.workedMins)}</td>
-                      <td style={{ padding:'10px 18px' }}>{r.extraMins>0 ? <span style={{ color:'#7c3aed', fontWeight:600 }}>{minutesToHM(r.extraMins)}</span> : <span style={{ color:'var(--muted)' }}>—</span>}</td>
-                      <td style={{ padding:'10px 18px', color:'var(--muted)' }}>{r.ajusteCount>0?r.ajusteCount:'—'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
+        <BancoTable rows={bancoRows} loading={entLoading} />
       )}
 
       {/* ── Resumo (exportável) ── */}
@@ -2381,9 +2351,65 @@ function EmptyState({ icon, msg }) {
   );
 }
 
+// ── BancoTable ────────────────────────────────────────────────
+function BancoTable({ rows, loading }) {
+  const [page,    setPage]    = useState(1);
+  const [perPage, setPerPage] = useState(10);
+
+  useEffect(() => { setPage(1); }, [rows]);
+
+  const paged = rows.slice((page - 1) * perPage, page * perPage);
+
+  return (
+    <div style={{ background:'var(--surface)', border:'1px solid var(--line)', borderRadius:10, overflow:'hidden' }}>
+      {loading
+        ? <div style={{ padding:40, textAlign:'center', color:'var(--muted)', fontSize:13 }}><div className="pulse">Carregando…</div></div>
+        : rows.length===0
+          ? <EmptyState icon="chart" msg="Nenhum registro neste período." />
+          : (
+            <>
+              <div style={{ overflowX:'auto' }}>
+                <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13, minWidth:500 }}>
+                  <thead>
+                    <tr style={{ background:'var(--surface-2)', color:'var(--muted)', fontSize:11, textTransform:'uppercase', letterSpacing:0.5 }}>
+                      {['Funcionário','Presentes','Faltas','Atrasos','H. Trabalhadas','H. Extras (auto)','Ajustes'].map(h => (
+                        <th key={h} style={{ padding:'10px 18px', textAlign:'left', fontWeight:600, whiteSpace:'nowrap' }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paged.map((r,i) => (
+                      <tr key={i} style={{ borderTop:'1px solid var(--line-soft)' }}
+                        onMouseEnter={e => e.currentTarget.style.background='var(--hover)'}
+                        onMouseLeave={e => e.currentTarget.style.background='transparent'}>
+                        <td style={{ padding:'10px 18px', fontWeight:500 }}>{r.name}</td>
+                        <td style={{ padding:'10px 18px', color:'var(--muted)' }}>{r.presenteCount}d</td>
+                        <td style={{ padding:'10px 18px' }}>{r.faltaCount>0 ? <span className="pill bad" style={{ fontSize:11 }}>{r.faltaCount}d</span> : <span style={{ color:'var(--muted)' }}>—</span>}</td>
+                        <td style={{ padding:'10px 18px' }}>{r.atrasoCount>0 ? <span className="pill warn" style={{ fontSize:11 }}>{r.atrasoCount}x</span> : <span style={{ color:'var(--muted)' }}>—</span>}</td>
+                        <td style={{ padding:'10px 18px', fontFamily:'monospace' }}>{minutesToHM(r.workedMins)}</td>
+                        <td style={{ padding:'10px 18px' }}>{r.extraMins>0 ? <span style={{ color:'#7c3aed', fontWeight:600 }}>{minutesToHM(r.extraMins)}</span> : <span style={{ color:'var(--muted)' }}>—</span>}</td>
+                        <td style={{ padding:'10px 18px', color:'var(--muted)' }}>{r.ajusteCount>0?r.ajusteCount:'—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <Pagination total={rows.length} page={page} perPage={perPage} onPage={setPage} onPerPage={setPerPage} />
+            </>
+          )
+      }
+    </div>
+  );
+}
+
 function EntriesTable({ entries, loading, columns, emptyMsg, showEmployee }) {
   const ST_CLS   = { presente:'ok', ok:'ok', ajuste:'ok', falta:'bad', atraso:'warn', hora_extra:'info' };
   const ST_LABEL = { presente:'Presente', ok:'Presente', ajuste:'Ajuste', falta:'Falta', atraso:'Atraso', hora_extra:'Extra' };
+
+  const [page,    setPage]    = useState(1);
+  const [perPage, setPerPage] = useState(10);
+
+  useEffect(() => { setPage(1); }, [entries]);
 
   const cols = columns || [
     showEmployee && { key:'emp',      label:'Funcionário', render:r => r.employees?.name||'—' },
@@ -2399,6 +2425,8 @@ function EntriesTable({ entries, loading, columns, emptyMsg, showEmployee }) {
     { key:'notes',    label:'Obs.',    render:r => r.notes ? <span style={{ color:'var(--muted)', fontSize:12 }}>{r.notes}</span> : null },
   ].filter(Boolean);
 
+  const paged = entries.slice((page - 1) * perPage, page * perPage);
+
   return (
     <div style={{ background:'var(--surface)', border:'1px solid var(--line)', borderRadius:10, overflow:'hidden' }}>
       {loading ? (
@@ -2406,28 +2434,31 @@ function EntriesTable({ entries, loading, columns, emptyMsg, showEmployee }) {
       ) : entries.length===0 ? (
         <EmptyState icon="clock" msg={emptyMsg||'Nenhum registro encontrado.'} />
       ) : (
-        <div style={{ overflowX:'auto' }}>
-          <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13, minWidth:400 }}>
-            <thead>
-              <tr style={{ background:'var(--surface-2)', color:'var(--muted)', fontSize:11, textTransform:'uppercase', letterSpacing:0.5 }}>
-                {cols.map(c => <th key={c.key} style={{ padding:'10px 18px', textAlign:'left', fontWeight:600, whiteSpace:'nowrap' }}>{c.label}</th>)}
-              </tr>
-            </thead>
-            <tbody>
-              {entries.map(r => (
-                <tr key={r.id} style={{ borderTop:'1px solid var(--line-soft)' }}
-                  onMouseEnter={e => e.currentTarget.style.background='var(--hover)'}
-                  onMouseLeave={e => e.currentTarget.style.background='transparent'}>
-                  {cols.map(c => (
-                    <td key={c.key} style={{ padding:'10px 18px', color:'var(--ink)' }}>
-                      {c.render(r) ?? <span style={{ color:'var(--muted)' }}>—</span>}
-                    </td>
-                  ))}
+        <>
+          <div style={{ overflowX:'auto' }}>
+            <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13, minWidth:400 }}>
+              <thead>
+                <tr style={{ background:'var(--surface-2)', color:'var(--muted)', fontSize:11, textTransform:'uppercase', letterSpacing:0.5 }}>
+                  {cols.map(c => <th key={c.key} style={{ padding:'10px 18px', textAlign:'left', fontWeight:600, whiteSpace:'nowrap' }}>{c.label}</th>)}
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {paged.map(r => (
+                  <tr key={r.id} style={{ borderTop:'1px solid var(--line-soft)' }}
+                    onMouseEnter={e => e.currentTarget.style.background='var(--hover)'}
+                    onMouseLeave={e => e.currentTarget.style.background='transparent'}>
+                    {cols.map(c => (
+                      <td key={c.key} style={{ padding:'10px 18px', color:'var(--ink)' }}>
+                        {c.render(r) ?? <span style={{ color:'var(--muted)' }}>—</span>}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <Pagination total={entries.length} page={page} perPage={perPage} onPage={setPage} onPerPage={setPerPage} />
+        </>
       )}
     </div>
   );
