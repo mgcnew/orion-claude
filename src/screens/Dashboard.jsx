@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import Icon from '../components/Icon.jsx';
 import Avatar from '../components/Avatar.jsx';
 import { supabase } from '../lib/supabase.js';
@@ -196,7 +197,7 @@ export function useDashboardData(companyId) {
         
         employees?.forEach(e => {
           if (e.admission) {
-             const d = new Date(e.admission);
+             const d = new Date(e.admission + 'T00:00:00');
              if (d.getMonth() === m && d.getFullYear() === y) {
                admissionsSeries[i]++;
              }
@@ -268,6 +269,147 @@ function greeting(name) {
   const period = h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite';
   const first = name?.split(' ')[0];
   return first ? `${period}, ${first} 👋` : `${period} 👋`;
+}
+
+function AdmissionsChart({ admissions, dismissals, months, year }) {
+  const [tooltip, setTooltip] = useState(null); // { x, y, month, adm, dis }
+  const max = Math.max(...admissions, ...dismissals, 1);
+  const totalAdm = admissions.reduce((a, b) => a + b, 0);
+  const totalDis = dismissals.reduce((a, b) => a + b, 0);
+
+  const CHART_H = 160;
+  const Y_AXIS_W = 28;
+  const BAR_GAP = 3;
+  const BAR_W = 8;
+  const GROUP_W = BAR_W * 2 + BAR_GAP;
+
+  const gridSteps = 4;
+  const gridValues = Array.from({ length: gridSteps + 1 }, (_, i) =>
+    Math.round((max / gridSteps) * (gridSteps - i))
+  );
+
+  return (
+    <div className="card" style={{ padding: 20 }}>
+      {/* Header */}
+      <div className="row gap-4" style={{ marginBottom: 20, alignItems: 'flex-start' }}>
+        <div style={{ flex: 1 }}>
+          <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>Admissões e desligamentos</h3>
+          <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>Últimos 12 meses</div>
+        </div>
+        <div className="row gap-3">
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600, letterSpacing: 0.4 }}>ADMISSÕES</div>
+            <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--brand)', lineHeight: 1.2 }}>{totalAdm}</div>
+          </div>
+          <div style={{ width: 1, background: 'var(--line)', alignSelf: 'stretch' }} />
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600, letterSpacing: 0.4 }}>DESLIGAMENTOS</div>
+            <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--bad)', lineHeight: 1.2 }}>{totalDis}</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Chart area */}
+      <div style={{ display: 'flex', gap: 0 }}>
+        {/* Y-axis labels */}
+        <div style={{ width: Y_AXIS_W, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', paddingBottom: 20, flexShrink: 0 }}>
+          {gridValues.map((v, i) => (
+            <div key={i} style={{ fontSize: 10, color: 'var(--muted-2)', textAlign: 'right', paddingRight: 6, lineHeight: 1 }}>{v}</div>
+          ))}
+        </div>
+
+        {/* Bars + grid */}
+        <div style={{ flex: 1, position: 'relative' }}>
+          {/* Grid lines */}
+          <div style={{ position: 'absolute', inset: 0, bottom: 20, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', pointerEvents: 'none' }}>
+            {gridValues.map((_, i) => (
+              <div key={i} style={{ borderTop: `1px ${i === gridSteps ? 'solid' : 'dashed'} var(--line)`, opacity: i === gridSteps ? 1 : 0.5 }} />
+            ))}
+          </div>
+
+          {/* Columns */}
+          <div style={{ display: 'flex', alignItems: 'flex-end', height: CHART_H + 20, gap: 0, paddingBottom: 20 }}>
+            {admissions.map((adm, i) => {
+              const dis = dismissals[i];
+              const admH = adm > 0 ? Math.max((adm / max) * CHART_H, 4) : 0;
+              const disH = dis > 0 ? Math.max((dis / max) * CHART_H, 4) : 0;
+              const isLast = i === admissions.length - 1;
+              return (
+                <div
+                  key={i}
+                  style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%', cursor: (adm > 0 || dis > 0) ? 'default' : 'default', position: 'relative' }}
+                  onMouseEnter={(e) => {
+                    if (adm === 0 && dis === 0) return;
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    setTooltip({ x: rect.left + rect.width / 2, y: rect.top - 8, month: months[i], adm, dis });
+                  }}
+                  onMouseLeave={() => setTooltip(null)}
+                >
+                  {/* Hover highlight */}
+                  <div style={{
+                    position: 'absolute', inset: 0, bottom: 0, borderRadius: 4,
+                    background: 'transparent',
+                    transition: 'background .12s',
+                  }}
+                    onMouseEnter={e => { if (adm > 0 || dis > 0) e.currentTarget.style.background = 'var(--hover)'; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+                  />
+                  {/* Bars */}
+                  <div style={{ flex: 1, display: 'flex', alignItems: 'flex-end', gap: BAR_GAP, justifyContent: 'center', paddingBottom: 0, position: 'relative', zIndex: 1 }}>
+                    <div style={{ width: BAR_W, height: admH, background: 'var(--brand)', borderRadius: '3px 3px 0 0', transition: 'height .3s ease', opacity: isLast ? 1 : 0.85 }} />
+                    <div style={{ width: BAR_W, height: disH, background: 'var(--bad)', borderRadius: '3px 3px 0 0', transition: 'height .3s ease', opacity: 0.75 }} />
+                  </div>
+                  {/* Month label */}
+                  <div style={{ fontSize: 10, color: isLast ? 'var(--ink)' : 'var(--muted-2)', fontWeight: isLast ? 700 : 400, paddingTop: 5, flexShrink: 0 }}>{months[i]}</div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* Legend */}
+      <div className="row gap-4" style={{ marginTop: 12, justifyContent: 'flex-end' }}>
+        <span className="row gap-2" style={{ fontSize: 11.5, color: 'var(--muted)' }}>
+          <span style={{ width: 10, height: 10, borderRadius: 2, background: 'var(--brand)', display: 'inline-block' }} /> Admissões
+        </span>
+        <span className="row gap-2" style={{ fontSize: 11.5, color: 'var(--muted)' }}>
+          <span style={{ width: 10, height: 10, borderRadius: 2, background: 'var(--bad)', opacity: 0.75, display: 'inline-block' }} /> Desligamentos
+        </span>
+      </div>
+
+      {/* Tooltip portal */}
+      {tooltip && createPortal(
+        <div style={{
+          position: 'fixed',
+          left: tooltip.x,
+          top: tooltip.y,
+          transform: 'translate(-50%, -100%)',
+          background: 'var(--surface)',
+          border: '1px solid var(--line)',
+          borderRadius: 8,
+          padding: '8px 12px',
+          pointerEvents: 'none',
+          zIndex: 9999,
+          boxShadow: '0 4px 12px rgba(0,0,0,.12)',
+          minWidth: 130,
+        }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>{tooltip.month}</div>
+          <div className="row gap-2" style={{ fontSize: 12.5, marginBottom: 3 }}>
+            <span style={{ width: 8, height: 8, borderRadius: 2, background: 'var(--brand)', display: 'inline-block', flexShrink: 0, marginTop: 3 }} />
+            <span style={{ flex: 1 }}>Admissões</span>
+            <strong>{tooltip.adm}</strong>
+          </div>
+          <div className="row gap-2" style={{ fontSize: 12.5 }}>
+            <span style={{ width: 8, height: 8, borderRadius: 2, background: 'var(--bad)', display: 'inline-block', flexShrink: 0, marginTop: 3, opacity: 0.8 }} />
+            <span style={{ flex: 1 }}>Desligamentos</span>
+            <strong>{tooltip.dis}</strong>
+          </div>
+        </div>,
+        document.body
+      )}
+    </div>
+  );
 }
 
 export default function Dashboard({ setRoute, navigate, addToast, activeCompany, userName }) {
@@ -367,91 +509,12 @@ export default function Dashboard({ setRoute, navigate, addToast, activeCompany,
       {/* Main grid */}
       <div className="dash-grid-main" style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: 16 }}>
         {/* Admissions chart */}
-        <div className="card" style={{ padding: 20 }}>
-          <div className="row" style={{ marginBottom: 16 }}>
-            <div>
-              <div className="row gap-2">
-                <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>
-                  Admissões e desligamentos
-                </h3>
-                <span className="pill brand">{today.getFullYear()}</span>
-              </div>
-              <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
-                Comparativo dos últimos 12 meses
-              </div>
-            </div>
-            <span className="grow" />
-            <div className="dash-chart-legend row gap-3" style={{ fontSize: 11.5, color: 'var(--muted)' }}>
-              <span className="row gap-2">
-                <span style={{ width: 10, height: 10, background: 'var(--brand)', borderRadius: 2 }} />{' '}
-                Admissões
-              </span>
-              <span className="row gap-2">
-                <span
-                  style={{
-                    width: 10,
-                    height: 10,
-                    background: 'var(--bad)',
-                    borderRadius: 2,
-                    opacity: 0.7,
-                  }}
-                />{' '}
-                Desligamentos
-              </span>
-            </div>
-          </div>
-          <div style={{ height: 220, display: 'flex', alignItems: 'flex-end', gap: 10, padding: '0 4px' }}>
-            {data.admissionsSeries.map((v, i) => {
-              const out = data.absencesSeries[i];
-              const max = Math.max(...data.admissionsSeries, ...data.absencesSeries, 1);
-              return (
-                <div
-                  key={i}
-                  style={{
-                    flex: 1,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    gap: 4,
-                    minWidth: 0,
-                  }}
-                >
-                  <div
-                    style={{
-                      flex: 1,
-                      width: '100%',
-                      display: 'flex',
-                      alignItems: 'flex-end',
-                      gap: 3,
-                      justifyContent: 'center',
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: 10,
-                        height: `${(v / max) * 100}%`,
-                        background: 'var(--brand)',
-                        borderRadius: 2,
-                      }}
-                      title={`Admissões: ${v}`}
-                    />
-                    <div
-                      style={{
-                        width: 10,
-                        height: `${(out / max) * 100}%`,
-                        background: 'var(--bad)',
-                        opacity: 0.65,
-                        borderRadius: 2,
-                      }}
-                      title={`Saídas: ${out}`}
-                    />
-                  </div>
-                  <div style={{ fontSize: 11, color: 'var(--muted)' }}>{months[i]}</div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
+        <AdmissionsChart
+          admissions={data.admissionsSeries}
+          dismissals={data.absencesSeries}
+          months={months}
+          year={today.getFullYear()}
+        />
 
         {/* Composition donut */}
         <div className="card" style={{ padding: 20 }}>
