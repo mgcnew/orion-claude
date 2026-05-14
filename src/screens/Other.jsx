@@ -2110,17 +2110,18 @@ function EmpresasTab({ addToast }) {
           style={{
             position: 'fixed', inset: 0, zIndex: 200,
             background: 'rgba(0,0,0,.5)', backdropFilter: 'blur(4px)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
+            display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
+            padding: 24, overflowY: 'auto',
           }}
           onClick={() => setShowNew(false)}
         >
           <div
             style={{
-              width: '100%', maxWidth: 520,
+              width: '100%', maxWidth: 520, margin: 'auto',
               background: 'var(--surface)', borderRadius: 14,
               boxShadow: '0 24px 60px rgba(0,0,0,.2)',
               display: 'flex', flexDirection: 'column',
-              maxHeight: 'calc(100dvh - 48px)', overflow: 'hidden',
+              flexShrink: 0,
             }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -2134,8 +2135,8 @@ function EmpresasTab({ addToast }) {
               </button>
             </div>
 
-            {/* Body scrollável */}
-            <div style={{ overflowY: 'auto', padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {/* Body */}
+            <div style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 16 }}>
 
               {/* Upload de logo */}
               <div>
