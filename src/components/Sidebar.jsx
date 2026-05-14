@@ -2,10 +2,9 @@ import { useState } from 'react';
 import Icon from './Icon.jsx';
 import Avatar from './Avatar.jsx';
 import { usePermissions } from '../lib/permissions.jsx';
-import logoFullLight from '../assets/logo-full.png';
-import logoFullDark  from '../assets/logo-full-dark.png';
-import logoIcon      from '../assets/logo-icon.png';
-import logoLanding   from '../assets/logo-landing-page.png';
+import logoLanding  from '../assets/logo-landing-page.png';
+import logoNight    from '../assets/logo noturna.png';
+import logoIcon     from '../assets/icon.png';
 
 const NAV = [
   { id: 'dashboard', label: 'Dashboard', icon: 'dashboard' },
@@ -41,7 +40,7 @@ function Logo({ collapsed, theme }) {
   }
   return (
     <img
-      src={logoLanding}
+      src={theme === 'dark' ? logoNight : logoLanding}
       alt="SR Gestão de Documentos"
       style={{ height: 200, width: '100%', maxWidth: 230, objectFit: 'contain', objectPosition: 'center center', margin: '-48px 0 -58px' }}
     />
