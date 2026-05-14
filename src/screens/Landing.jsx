@@ -71,7 +71,7 @@ function LoginModal({ onClose }) {
           <Icon name="x" size={14} />
         </button>
 
-        <img src={logoLanding} alt="SR Gestão de Documentos" style={{ height: 56, objectFit: 'contain', objectPosition: 'left', marginBottom: 28, display: 'block' }} />
+        <img src={logoLanding} alt="SR Gestão de Documentos" style={{ height: 90, objectFit: 'contain', objectPosition: 'left', marginBottom: 20, marginTop: -8, display: 'block' }} />
 
         <h2 style={{ fontSize: 22, fontWeight: 800, letterSpacing: -0.5, margin: '0 0 4px', color: '#0f172a' }}>Acesse sua conta</h2>
         <p style={{ color: '#64748b', fontSize: 14, margin: '0 0 28px', lineHeight: 1.5 }}>Gestão de pessoas centralizada e segura.</p>
@@ -254,7 +254,7 @@ export default function LandingPage() {
 
       <div className="lp-nav-outer">
         <nav className="lp-nav">
-          <img src={logoLanding} alt="SR Gestão de Documentos" style={{ height: 52, objectFit: 'contain' }} />
+          <img src={logoLanding} alt="SR Gestão de Documentos" style={{ height: 96, objectFit: 'contain', margin: '-14px 0' }} />
           <span style={{ flex: 1 }} />
           <button
             onClick={openLogin}
@@ -436,7 +436,7 @@ export default function LandingPage() {
 
       {/* ── FOOTER ────────────────────────────────────────────── */}
       <footer className="lp-footer" style={{ borderTop: '1px solid #e2e8f0', background: '#f8fafc' }}>
-        <img src={logoLanding} alt="SR Gestão de Documentos" style={{ height: 44, objectFit: 'contain' }} />
+        <img src={logoLanding} alt="SR Gestão de Documentos" style={{ height: 72, objectFit: 'contain', margin: '-8px 0' }} />
         <span style={{ flex: 1 }} />
         <div className="lp-footer-links">
           <span style={{ fontSize: 12, color: '#94a3b8' }}>© 2026 Orion Gestão</span>
