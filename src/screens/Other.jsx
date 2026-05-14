@@ -1,4 +1,5 @@
 import { useState, useEffect, Fragment, useMemo, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -2105,7 +2106,7 @@ function EmpresasTab({ addToast }) {
       )}
 
       {/* Modal nova/editar empresa */}
-      {showNew && (
+      {showNew && createPortal(
         <div
           style={{
             position: 'fixed', inset: 0, zIndex: 200,
@@ -2261,7 +2262,8 @@ function EmpresasTab({ addToast }) {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
