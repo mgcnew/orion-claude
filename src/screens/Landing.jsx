@@ -212,7 +212,7 @@ export default function LandingPage() {
         }
         .lp-nav-outer { position: sticky; top: 0; z-index: 100; display: flex; justify-content: center; padding: 16px 24px; pointer-events: none; }
         .lp-nav       { pointer-events: all; display: inline-flex; align-items: center; gap: 24px; height: 52px; padding: 0 10px 0 20px; border-radius: 999px; background: rgba(255,255,255,.82); backdrop-filter: blur(20px) saturate(180%); -webkit-backdrop-filter: blur(20px) saturate(180%); border: 1px solid rgba(255,255,255,.6); box-shadow: 0 2px 16px rgba(0,0,0,.08), 0 1px 0 rgba(255,255,255,.5) inset; }
-        .lp-hero-wrap { background: linear-gradient(160deg, #eef3ff 0%, #f5f8ff 45%, #fff 100%); }
+        .lp-hero-wrap { background: linear-gradient(160deg, #e8efff 0%, #f2f6ff 40%, #f8faff 70%, #fff 100%); }
         .lp-hero      { padding: 80px 48px 64px; display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: center; max-width: 1200px; margin: 0 auto; }
         .lp-hero-h1   { font-size: 52px; }
         .lp-hero-img  { display: flex; justify-content: center; align-items: center; }
@@ -248,7 +248,9 @@ export default function LandingPage() {
         }
       `}</style>
 
-      {/* ── NAVBAR ────────────────────────────────────────────── */}
+      {/* ── NAVBAR + HERO — mesmo fundo ───────────────────────── */}
+      <div className="lp-hero-wrap">
+
       <div className="lp-nav-outer">
         <nav className="lp-nav">
           <img src={logoFullLight} alt="Orion Gestão" style={{ height: 30, objectFit: 'contain' }} />
@@ -264,8 +266,6 @@ export default function LandingPage() {
         </nav>
       </div>
 
-      {/* ── HERO ──────────────────────────────────────────────── */}
-      <div className="lp-hero-wrap">
       <section className="lp-hero">
         <div>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: '#EEF3FF', color: '#2A5BFF', borderRadius: 20, padding: '5px 12px', fontSize: 12, fontWeight: 700, marginBottom: 24, letterSpacing: 0.3 }}>
