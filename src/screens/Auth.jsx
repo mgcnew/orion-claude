@@ -2,14 +2,10 @@ import { useState } from 'react';
 import Icon from '../components/Icon.jsx';
 import { supabase } from '../lib/supabase.js';
 import { useCompanies, sendInvite } from '../hooks/useEmployees.js';
-import logoFullLight from '../assets/logo-full.png';
-import logoFullDark  from '../assets/logo-full-dark.png';
+import logoLanding from '../assets/logo-landing-page.png';
 
 function getLogoSrc() {
-  try {
-    const stored = JSON.parse(localStorage.getItem('orion.tweaks.v1') || '{}');
-    return stored.theme === 'dark' ? logoFullDark : logoFullLight;
-  } catch { return logoFullLight; }
+  return logoLanding;
 }
 
 export function LoginScreen({ onLogin }) {
