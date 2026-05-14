@@ -1,10 +1,21 @@
+import { useState } from 'react';
 import Icon from './Icon.jsx';
 import { useNotifications } from '../hooks/useEmployees.js';
 
+const MAX = 5;
+
 export default function NotificationsPanel({ open, onClose }) {
   const { items, loading, refetch } = useNotifications();
+  const [clearedAt, setClearedAt] = useState(null);
 
   if (!open) return null;
+
+  const visible = (clearedAt
+    ? items.filter(it => new Date(it.ts) > clearedAt)
+    : items
+  ).slice(0, MAX);
+
+  const handleClear = () => setClearedAt(new Date());
 
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 80 }}>
@@ -21,17 +32,24 @@ export default function NotificationsPanel({ open, onClose }) {
           boxShadow: 'var(--shadow-pop)',
         }}
       >
-        <div className="row" style={{ padding: '12px 14px', borderBottom: '1px solid var(--line)' }}>
+        {/* Header */}
+        <div className="row" style={{ padding: '12px 14px', borderBottom: '1px solid var(--line)', gap: 8 }}>
           <div style={{ fontWeight: 700, fontSize: 14 }}>Notificações</div>
-          {items.length > 0 && (
-            <span
-              className="pill bad"
-              style={{ fontSize: 10.5, padding: '1px 7px', marginLeft: 8 }}
-            >
-              {items.length}
+          {visible.length > 0 && (
+            <span className="pill bad" style={{ fontSize: 10.5, padding: '1px 7px' }}>
+              {visible.length}
             </span>
           )}
           <span className="grow" />
+          {visible.length > 0 && (
+            <button
+              className="btn ghost sm"
+              onClick={handleClear}
+              style={{ fontSize: 12, color: 'var(--muted)' }}
+            >
+              Limpar
+            </button>
+          )}
           <button
             className="btn ghost sm"
             onClick={refetch}
@@ -42,13 +60,14 @@ export default function NotificationsPanel({ open, onClose }) {
           </button>
         </div>
 
-        <div style={{ maxHeight: 440, overflowY: 'auto' }}>
+        {/* Body */}
+        <div style={{ maxHeight: MAX * 72, overflowY: 'auto' }}>
           {loading ? (
             <div style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>
               <div className="pulse">Carregando…</div>
             </div>
-          ) : items.length === 0 ? (
-            <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--muted)' }}>
+          ) : visible.length === 0 ? (
+            <div style={{ padding: '36px 20px', textAlign: 'center', color: 'var(--muted)' }}>
               <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'var(--ok-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
                 <Icon name="check" size={20} style={{ color: 'var(--ok)' }} />
               </div>
@@ -56,16 +75,11 @@ export default function NotificationsPanel({ open, onClose }) {
               <div style={{ fontSize: 12 }}>Nenhuma notificação recente.</div>
             </div>
           ) : (
-            items.map((it) => (
+            visible.map((it) => (
               <div
                 key={it.id}
                 className="row gap-3"
-                style={{
-                  padding: '11px 14px',
-                  borderBottom: '1px solid var(--line-soft)',
-                  alignItems: 'flex-start',
-                  cursor: 'default',
-                }}
+                style={{ padding: '11px 14px', borderBottom: '1px solid var(--line-soft)', alignItems: 'flex-start', cursor: 'default' }}
                 onMouseEnter={e => e.currentTarget.style.background = 'var(--hover)'}
                 onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
               >
@@ -91,23 +105,13 @@ export default function NotificationsPanel({ open, onClose }) {
           )}
         </div>
 
+        {/* Footer */}
         <button
           className="row gap-2"
-          style={{
-            width: '100%',
-            justifyContent: 'center',
-            padding: '12px',
-            border: 'none',
-            background: 'var(--surface-2)',
-            color: 'var(--brand)',
-            fontSize: 13,
-            fontWeight: 600,
-            cursor: 'pointer',
-            borderTop: '1px solid var(--line)',
-          }}
+          style={{ width: '100%', justifyContent: 'center', padding: '11px', border: 'none', background: 'var(--surface-2)', color: 'var(--muted)', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', borderTop: '1px solid var(--line)' }}
           onClick={onClose}
         >
-          Fechar <Icon name="x" size={13} />
+          Fechar <Icon name="x" size={12} />
         </button>
       </div>
     </div>
