@@ -2,9 +2,7 @@ import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import Icon from '../components/Icon.jsx';
 import { supabase } from '../lib/supabase.js';
-import logoFullLight from '../assets/logo-full.png';
-import logoFullDark  from '../assets/logo-full-dark.png';
-import logoLanding   from '../assets/logo-landing-page.png';
+import logoLanding from '../assets/logo-landing-page.png';
 import heroImg       from '../assets/hero-comparison.png';
 
 function getLogoSrc() {
