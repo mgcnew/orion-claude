@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import Icon from '../components/Icon.jsx';
 import Pagination from '../components/Pagination.jsx';
 import Avatar from '../components/Avatar.jsx';
@@ -707,10 +708,15 @@ const STATUS_LABELS = { ativo: 'Ativo', suspenso: 'Suspenso', encerrado: 'Encerr
 const STATUS_CLASS  = { ativo: 'good', suspenso: 'warn', encerrado: 'bad' };
 
 function BeneficiosTab({ addToast, companyId, activeEmployees, can, benefits, loading, refetch }) {
-  const [showModal, setShowModal] = useState(false);
-  const [filterType, setFilterType] = useState('todos');
-  const [q, setQ] = useState('');
-  const [saving, setSaving] = useState(false);
+  const [showModal,   setShowModal]   = useState(false);
+  const [filterType,  setFilterType]  = useState('todos');
+  const [filterMonth, setFilterMonth] = useState('');
+  const [q,           setQ]           = useState('');
+  const [saving,      setSaving]      = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [filtersRect, setFiltersRect] = useState(null);
+  const filtersRef      = useRef();
+  const filtersPanelRef = useRef();
   const [form, setForm] = useState({
     employee_id: '', type: BENEFIT_TYPES[0], value: '', start_date: '', end_date: '', notes: '',
   });
@@ -718,13 +724,34 @@ function BeneficiosTab({ addToast, companyId, activeEmployees, can, benefits, lo
   const [page,    setPage]    = useState(1);
   const [perPage, setPerPage] = useState(10);
 
+  useEffect(() => {
+    if (!filtersOpen) return;
+    const h = (e) => {
+      if (!filtersPanelRef.current?.contains(e.target) && !filtersRef.current?.contains(e.target))
+        setFiltersOpen(false);
+    };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, [filtersOpen]);
+
+  const MONTHS_PT = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+
   const filtered = benefits.filter(b => {
     if (filterType !== 'todos' && b.type !== filterType) return false;
     if (q && !b.employees?.name?.toLowerCase().includes(q.toLowerCase()) && !b.type.toLowerCase().includes(q.toLowerCase())) return false;
+    if (filterMonth) {
+      const [fy, fm] = filterMonth.split('-').map(Number);
+      const monthStart = new Date(fy, fm - 1, 1);
+      const monthEnd   = new Date(fy, fm, 0);
+      const start = b.start_date ? new Date(b.start_date + 'T00:00:00') : null;
+      const end   = b.end_date   ? new Date(b.end_date   + 'T00:00:00') : null;
+      if (start && start > monthEnd)   return false;
+      if (end   && end   < monthStart) return false;
+    }
     return true;
   });
 
-  useEffect(() => { setPage(1); }, [filterType, q]);
+  useEffect(() => { setPage(1); }, [filterType, filterMonth, q]);
 
   const paged = filtered.slice((page - 1) * perPage, page * perPage);
 
@@ -772,9 +799,11 @@ function BeneficiosTab({ addToast, companyId, activeEmployees, can, benefits, lo
     refetch();
   }
 
+  const activeFiltersCount = (filterType !== 'todos' ? 1 : 0) + (filterMonth ? 1 : 0);
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      {/* Header — linha 1: busca + CTA */}
+      {/* Header */}
       <div className="row" style={{ gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
         <div style={{ position: 'relative', flex: '1 1 200px', minWidth: 160, maxWidth: 300 }}>
           <Icon name="search" size={13} style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: 'var(--muted)', pointerEvents: 'none' }} />
@@ -786,6 +815,23 @@ function BeneficiosTab({ addToast, companyId, activeEmployees, can, benefits, lo
             style={{ paddingLeft: 30, width: '100%', height: 34, fontSize: 13 }}
           />
         </div>
+
+        {/* Botão Filtros */}
+        <button
+          ref={filtersRef}
+          className={`btn${activeFiltersCount > 0 ? ' primary' : ''}`}
+          onClick={() => { setFiltersRect(filtersRef.current?.getBoundingClientRect()); setFiltersOpen(o => !o); }}
+          style={{ gap: 6 }}
+        >
+          <Icon name="filter" size={14} />
+          Filtros
+          {activeFiltersCount > 0 && (
+            <span style={{ background: 'rgba(255,255,255,0.3)', borderRadius: 10, padding: '1px 6px', fontSize: 11, fontWeight: 700 }}>
+              {activeFiltersCount}
+            </span>
+          )}
+        </button>
+
         <span style={{ flex: 1 }} />
         {can('RH', 'benefícios') && (
           <button className="btn primary" onClick={() => setShowModal(true)}>
@@ -794,19 +840,78 @@ function BeneficiosTab({ addToast, companyId, activeEmployees, can, benefits, lo
         )}
       </div>
 
-      {/* Filtros por tipo — linha 2: chips com scroll horizontal em mobile */}
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-        {['todos', ...BENEFIT_TYPES].map(t => (
-          <button
-            key={t}
-            className={`btn sm${filterType === t ? ' primary' : ''}`}
-            onClick={() => setFilterType(t)}
-            style={{ fontSize: 11.5, whiteSpace: 'nowrap' }}
-          >
-            {t === 'todos' ? 'Todos' : t}
-          </button>
-        ))}
-      </div>
+      {/* Dropdown de filtros */}
+      {filtersOpen && filtersRect && createPortal(
+        <div
+          ref={filtersPanelRef}
+          style={{
+            position: 'fixed', top: filtersRect.bottom + 6, left: filtersRect.left,
+            width: 260,
+            background: 'var(--surface)', border: '1px solid var(--line)',
+            borderRadius: 10, boxShadow: '0 8px 32px rgba(0,0,0,.16)',
+            zIndex: 1200, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 14,
+          }}
+        >
+          {/* Tipo */}
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 8 }}>Tipo</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              {['todos', ...BENEFIT_TYPES].map(t => {
+                const active = filterType === t;
+                return (
+                  <button
+                    key={t}
+                    onClick={() => setFilterType(t)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 8,
+                      padding: '7px 10px', borderRadius: 7, border: 'none',
+                      background: active ? 'var(--brand-tint)' : 'transparent',
+                      color: active ? 'var(--brand)' : 'var(--ink)',
+                      fontSize: 13, fontWeight: active ? 700 : 400,
+                      cursor: 'pointer', textAlign: 'left', width: '100%',
+                    }}
+                    onMouseEnter={e => { if (!active) e.currentTarget.style.background = 'var(--hover)'; }}
+                    onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent'; }}
+                  >
+                    {active && <Icon name="check" size={12} style={{ color: 'var(--brand)', flexShrink: 0 }} />}
+                    {!active && <span style={{ width: 12 }} />}
+                    {t === 'todos' ? 'Todos os tipos' : t}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Mês */}
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 8 }}>Mês de referência</div>
+            <input
+              type="month"
+              className="field"
+              value={filterMonth}
+              onChange={e => setFilterMonth(e.target.value)}
+              style={{ width: '100%', height: 34, fontSize: 13 }}
+            />
+            {filterMonth && (
+              <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 5 }}>
+                {MONTHS_PT[parseInt(filterMonth.split('-')[1]) - 1]} {filterMonth.split('-')[0]}
+              </div>
+            )}
+          </div>
+
+          {/* Rodapé */}
+          {activeFiltersCount > 0 && (
+            <button
+              className="btn ghost sm"
+              style={{ width: '100%', justifyContent: 'center' }}
+              onClick={() => { setFilterType('todos'); setFilterMonth(''); }}
+            >
+              Limpar filtros
+            </button>
+          )}
+        </div>,
+        document.body
+      )}
 
       {/* KPI summary */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 10 }}>
@@ -913,25 +1018,32 @@ function BeneficiosTab({ addToast, companyId, activeEmployees, can, benefits, lo
       {/* Modal */}
       {showModal && (
         <div
-          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', backdropFilter: 'blur(3px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
           onClick={() => setShowModal(false)}
         >
           <div
             className="card"
-            style={{ width: '100%', maxWidth: 480, padding: 24, position: 'relative' }}
+            style={{ width: '100%', maxWidth: 460, padding: 0, overflow: 'hidden', maxHeight: 'calc(100vh - 48px)', display: 'flex', flexDirection: 'column' }}
             onClick={e => e.stopPropagation()}
           >
-            <div className="row" style={{ marginBottom: 20 }}>
-              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>Adicionar benefício</h3>
-              <span className="grow" />
+            {/* Cabeçalho */}
+            <div style={{ padding: '18px 20px', borderBottom: '1px solid var(--line)', display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ width: 34, height: 34, borderRadius: 8, background: 'var(--brand-tint)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <Icon name="gift" size={16} style={{ color: 'var(--brand)' }} />
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--ink)' }}>Adicionar benefício</div>
+                <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 1 }}>Vincule o benefício ao funcionário</div>
+              </div>
               <button className="btn ghost icon sm" onClick={() => setShowModal(false)}><Icon name="x" size={15} /></button>
             </div>
 
-            <div className="col gap-3">
+            {/* Corpo */}
+            <div style={{ padding: '20px', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div>
-                <label style={{ fontSize: 12, fontWeight: 600, display: 'block', marginBottom: 4 }}>Funcionário *</label>
+                <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.6, display: 'block', marginBottom: 6 }}>Funcionário *</label>
                 <select
-                  className="input"
+                  className="field"
                   value={form.employee_id}
                   onChange={e => setForm(f => ({ ...f, employee_id: e.target.value }))}
                   style={{ width: '100%' }}
@@ -942,9 +1054,9 @@ function BeneficiosTab({ addToast, companyId, activeEmployees, can, benefits, lo
               </div>
 
               <div>
-                <label style={{ fontSize: 12, fontWeight: 600, display: 'block', marginBottom: 4 }}>Tipo *</label>
+                <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.6, display: 'block', marginBottom: 6 }}>Tipo *</label>
                 <select
-                  className="input"
+                  className="field"
                   value={form.type}
                   onChange={e => setForm(f => ({ ...f, type: e.target.value }))}
                   style={{ width: '100%' }}
@@ -954,9 +1066,9 @@ function BeneficiosTab({ addToast, companyId, activeEmployees, can, benefits, lo
               </div>
 
               <div>
-                <label style={{ fontSize: 12, fontWeight: 600, display: 'block', marginBottom: 4 }}>Valor mensal (R$)</label>
+                <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.6, display: 'block', marginBottom: 6 }}>Valor mensal (R$)</label>
                 <input
-                  className="input"
+                  className="field"
                   type="number"
                   min="0"
                   step="0.01"
@@ -967,21 +1079,21 @@ function BeneficiosTab({ addToast, companyId, activeEmployees, can, benefits, lo
                 />
               </div>
 
-              <div className="row gap-3">
-                <div style={{ flex: 1 }}>
-                  <label style={{ fontSize: 12, fontWeight: 600, display: 'block', marginBottom: 4 }}>Data início</label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div>
+                  <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.6, display: 'block', marginBottom: 6 }}>Data início</label>
                   <input
-                    className="input"
+                    className="field"
                     type="date"
                     value={form.start_date}
                     onChange={e => setForm(f => ({ ...f, start_date: e.target.value }))}
                     style={{ width: '100%' }}
                   />
                 </div>
-                <div style={{ flex: 1 }}>
-                  <label style={{ fontSize: 12, fontWeight: 600, display: 'block', marginBottom: 4 }}>Data fim</label>
+                <div>
+                  <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.6, display: 'block', marginBottom: 6 }}>Data fim</label>
                   <input
-                    className="input"
+                    className="field"
                     type="date"
                     value={form.end_date}
                     onChange={e => setForm(f => ({ ...f, end_date: e.target.value }))}
@@ -991,22 +1103,29 @@ function BeneficiosTab({ addToast, companyId, activeEmployees, can, benefits, lo
               </div>
 
               <div>
-                <label style={{ fontSize: 12, fontWeight: 600, display: 'block', marginBottom: 4 }}>Observações</label>
+                <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.6, display: 'block', marginBottom: 6 }}>Observações</label>
                 <textarea
-                  className="input"
-                  rows={2}
+                  className="field"
+                  rows={3}
                   placeholder="Detalhes opcionais…"
                   value={form.notes}
                   onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
-                  style={{ width: '100%', resize: 'vertical' }}
+                  style={{ width: '100%', resize: 'vertical', fontFamily: 'inherit', fontSize: 13 }}
                 />
               </div>
             </div>
 
-            <div className="row gap-2" style={{ marginTop: 20, justifyContent: 'flex-end' }}>
-              <button className="btn" onClick={() => setShowModal(false)}>Cancelar</button>
-              <button className="btn primary" onClick={handleSave} disabled={saving}>
-                {saving ? 'Salvando…' : 'Salvar'}
+            {/* Rodapé */}
+            <div style={{ padding: '14px 20px', borderTop: '1px solid var(--line)', display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button className="btn ghost" onClick={() => setShowModal(false)}>Cancelar</button>
+              <button
+                className="btn primary"
+                onClick={handleSave}
+                disabled={saving || !form.employee_id || !form.type}
+                style={{ opacity: (!form.employee_id || !form.type) ? 0.5 : 1 }}
+              >
+                <Icon name={saving ? 'loader' : 'check'} size={13} />
+                {saving ? 'Salvando…' : 'Salvar benefício'}
               </button>
             </div>
           </div>
