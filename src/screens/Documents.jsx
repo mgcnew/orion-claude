@@ -111,8 +111,9 @@ function FileIcon({ type, color, size = 32 }) {
 // MODAL — Adicionar Documento (com "Adicionar e continuar")
 // ============================================================
 function AddDocModal({ onClose, onSaved, employees = [], companyId = null }) {
-  const [step, setStep]     = useState('category');
   const [cat, setCat]       = useState(null);
+  const [catOpen, setCatOpen] = useState(false);
+  const catRef = useRef(null);
   const [form, setForm]     = useState({ name: '', doc_date: '', employee_id: '', file: null });
   const [extras, setExtras] = useState({});
   const [saving, setSaving] = useState(false);
@@ -127,6 +128,13 @@ function AddDocModal({ onClose, onSaved, employees = [], companyId = null }) {
     window.addEventListener('keydown', esc);
     return () => window.removeEventListener('keydown', esc);
   }, [onClose]);
+
+  useEffect(() => {
+    if (!catOpen) return;
+    const handler = (e) => { if (catRef.current && !catRef.current.contains(e.target)) setCatOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [catOpen]);
 
   const catMeta    = CATEGORIES.find(c => c.id === cat);
   const extraFields = DOC_EXTRA_FIELDS[cat] ?? [];
@@ -185,7 +193,7 @@ function AddDocModal({ onClose, onSaved, employees = [], companyId = null }) {
 
   const handleSaveAndContinue = async () => {
     const ok = await doSave();
-    if (ok) { resetForm(); setStep('category'); setCat(null); }
+    if (ok) { resetForm(); setCat(null); }
   };
 
   return (
@@ -197,7 +205,7 @@ function AddDocModal({ onClose, onSaved, employees = [], companyId = null }) {
       overflowY: 'auto',
     }} onClick={onClose}>
       <div style={{
-        width: '100%', maxWidth: step === 'category' ? 560 : 500,
+        width: '100%', maxWidth: 520,
         background: 'var(--surface)', borderRadius: 16,
         boxShadow: '0 32px 80px rgba(0,0,0,.25)',
         overflow: 'hidden', display: 'flex', flexDirection: 'column',
@@ -207,47 +215,94 @@ function AddDocModal({ onClose, onSaved, employees = [], companyId = null }) {
 
         {/* Header */}
         <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--line)', display: 'flex', alignItems: 'center', gap: 10 }}>
-          {step === 'form' && (
-            <button className="btn ghost icon sm" onClick={() => setStep('category')}>
-              <Icon name="chevron-left" size={14} />
-            </button>
-          )}
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 15, fontWeight: 700 }}>
-              {step === 'category' ? 'Novo documento' : catMeta?.name}
+            <div style={{ fontSize: 15, fontWeight: 700 }}>Novo documento</div>
+            <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 1 }}>
+              {cat ? 'Preencha os dados do documento' : 'Selecione a categoria abaixo para começar'}
             </div>
-            {step === 'form' && (
-              <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 1 }}>Preencha os dados do documento</div>
-            )}
           </div>
           <button className="btn ghost icon sm" onClick={onClose}><Icon name="x" size={15} /></button>
         </div>
 
         <div className="scroll-hidden" style={{ overflowY: 'auto', flex: 1, minHeight: 0 }}>
-          {step === 'category' ? (
-            <div style={{ padding: 20, display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
-              {CATEGORIES.map(c => (
-                <button
-                  key={c.id}
-                  onClick={() => { setCat(c.id); resetForm(); setStep('form'); }}
-                  style={{
-                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                    gap: 8, padding: '16px 10px', borderRadius: 10, cursor: 'pointer',
-                    border: '1px solid var(--line)', background: 'var(--surface)', textAlign: 'center',
-                    transition: 'border-color .15s, background .15s',
-                  }}
-                  onMouseEnter={e => { e.currentTarget.style.borderColor = c.color; e.currentTarget.style.background = c.color + '10'; }}
-                  onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--line)'; e.currentTarget.style.background = 'var(--surface)'; }}
-                >
-                  <div style={{ width: 38, height: 38, borderRadius: 9, background: c.color + '1f', color: c.color, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Icon name={c.icon} size={17} />
-                  </div>
-                  <span style={{ fontSize: 12, fontWeight: 600, lineHeight: 1.3, color: 'var(--ink)' }}>{c.name}</span>
-                </button>
-              ))}
-            </div>
-          ) : (
             <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
+
+              {/* Categoria — dropdown */}
+              <div ref={catRef} style={{ display: 'flex', flexDirection: 'column', gap: 5, position: 'relative' }}>
+                <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.6 }}>Categoria *</label>
+                <button
+                  type="button"
+                  onClick={() => setCatOpen(o => !o)}
+                  style={{
+                    width: '100%', display: 'flex', alignItems: 'center', gap: 10,
+                    padding: '10px 12px', borderRadius: 8,
+                    border: `1px solid ${catOpen ? 'var(--brand)' : 'var(--line)'}`,
+                    background: 'var(--surface)', color: 'var(--ink)', cursor: 'pointer',
+                    fontSize: 13.5, fontWeight: 500, textAlign: 'left',
+                    boxShadow: catOpen ? '0 0 0 2px var(--brand-tint)' : 'none',
+                  }}
+                >
+                  {catMeta ? (
+                    <>
+                      <div style={{ width: 28, height: 28, borderRadius: 7, background: catMeta.color + '1f', color: catMeta.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <Icon name={catMeta.icon} size={14} />
+                      </div>
+                      <span style={{ flex: 1, fontWeight: 600 }}>{catMeta.name}</span>
+                    </>
+                  ) : (
+                    <span style={{ flex: 1, color: 'var(--muted)' }}>Selecione uma categoria…</span>
+                  )}
+                  <Icon name="chevron-down" size={14} style={{ color: 'var(--muted)', transform: catOpen ? 'rotate(180deg)' : 'none', flexShrink: 0 }} />
+                </button>
+
+                {catOpen && (
+                  <div style={{
+                    position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0,
+                    background: 'var(--surface)', border: '1px solid var(--line)',
+                    borderRadius: 10, zIndex: 30, overflow: 'hidden',
+                    boxShadow: '0 10px 30px rgba(0,0,0,.14), 0 2px 6px rgba(0,0,0,.06)',
+                    maxHeight: 280, overflowY: 'auto',
+                  }}>
+                    {CATEGORIES.map(c => {
+                      const isActive = c.id === cat;
+                      return (
+                        <button
+                          key={c.id}
+                          type="button"
+                          onClick={() => {
+                            if (c.id !== cat) { setCat(c.id); resetForm(); }
+                            setCatOpen(false);
+                          }}
+                          style={{
+                            width: '100%', display: 'flex', alignItems: 'center', gap: 10,
+                            padding: '9px 12px', border: 'none', background: isActive ? 'var(--brand-tint)' : 'transparent',
+                            cursor: 'pointer', textAlign: 'left', fontSize: 13,
+                            color: isActive ? 'var(--brand)' : 'var(--ink)',
+                            fontWeight: isActive ? 600 : 500,
+                          }}
+                          onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = 'var(--hover)'; }}
+                          onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'transparent'; }}
+                        >
+                          <div style={{ width: 26, height: 26, borderRadius: 6, background: c.color + '1f', color: c.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            <Icon name={c.icon} size={13} />
+                          </div>
+                          <span style={{ flex: 1 }}>{c.name}</span>
+                          {isActive && <Icon name="check" size={13} style={{ color: 'var(--brand)', flexShrink: 0 }} />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {!cat && (
+                <div style={{ padding: '20px 14px', borderRadius: 10, background: 'var(--surface-2)', border: '1px dashed var(--line)', textAlign: 'center', fontSize: 12.5, color: 'var(--muted)' }}>
+                  Selecione uma categoria acima para preencher os campos.
+                </div>
+              )}
+
+              {cat && (
+                <>
 
               {/* Funcionário / Empresa */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
@@ -344,31 +399,30 @@ function AddDocModal({ onClose, onSaved, employees = [], companyId = null }) {
                   </button>
                 )}
               </div>
+                </>
+              )}
             </div>
-          )}
         </div>
 
-        {step === 'form' && (
-          <div style={{ padding: '14px 20px', borderTop: '1px solid var(--line)', display: 'flex', gap: 8 }}>
-            <button className="btn ghost" onClick={onClose}>Cancelar</button>
-            <span style={{ flex: 1 }} />
-            <button
-              className="btn"
-              onClick={handleSaveAndContinue}
-              disabled={saving || !form.name.trim()}
-              title="Salva e abre um novo documento"
-            >
-              <Icon name="plus" size={13} /> Adicionar e continuar
-            </button>
-            <button
-              className="btn primary"
-              onClick={handleSave}
-              disabled={saving || !form.name.trim()}
-            >
-              {saving ? 'Salvando…' : 'Salvar'}
-            </button>
-          </div>
-        )}
+        <div style={{ padding: '14px 20px', borderTop: '1px solid var(--line)', display: 'flex', gap: 8 }}>
+          <button className="btn ghost" onClick={onClose}>Cancelar</button>
+          <span style={{ flex: 1 }} />
+          <button
+            className="btn"
+            onClick={handleSaveAndContinue}
+            disabled={saving || !cat || !form.name.trim()}
+            title="Salva e abre um novo documento"
+          >
+            <Icon name="plus" size={13} /> Adicionar e continuar
+          </button>
+          <button
+            className="btn primary"
+            onClick={handleSave}
+            disabled={saving || !cat || !form.name.trim()}
+          >
+            {saving ? 'Salvando…' : 'Salvar'}
+          </button>
+        </div>
       </div>
     </div>
   );
