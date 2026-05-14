@@ -254,7 +254,7 @@ export default function LandingPage() {
 
       <div className="lp-nav-outer">
         <nav className="lp-nav">
-          <img src={logoLanding} alt="SR Gestão de Documentos" style={{ height: 140, objectFit: 'contain', objectPosition: 'left center', margin: '-36px 0 -36px -8px' }} />
+          <img src={logoLanding} alt="SR Gestão de Documentos" style={{ height: 140, objectFit: 'contain', objectPosition: 'left center', marginTop: -36, marginBottom: -36, marginLeft: -4, alignSelf: 'center', display: 'block' }} />
           <span style={{ flex: 1 }} />
           <button
             onClick={openLogin}
