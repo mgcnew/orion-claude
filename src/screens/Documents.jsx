@@ -113,7 +113,9 @@ function FileIcon({ type, color, size = 32 }) {
 function AddDocModal({ onClose, onSaved, employees = [], companyId = null }) {
   const [cat, setCat]       = useState(null);
   const [catOpen, setCatOpen] = useState(false);
+  const [catRect, setCatRect] = useState(null);
   const catRef = useRef(null);
+  const catTriggerRef = useRef(null);
   const [form, setForm]     = useState({ name: '', doc_date: '', employee_id: '', file: null });
   const [extras, setExtras] = useState({});
   const [saving, setSaving] = useState(false);
@@ -131,10 +133,21 @@ function AddDocModal({ onClose, onSaved, employees = [], companyId = null }) {
 
   useEffect(() => {
     if (!catOpen) return;
-    const handler = (e) => { if (catRef.current && !catRef.current.contains(e.target)) setCatOpen(false); };
+    const handler = (e) => {
+      const insideTrigger = catTriggerRef.current && catTriggerRef.current.contains(e.target);
+      const insidePanel = e.target.closest?.('[data-cat-panel]');
+      if (!insideTrigger && !insidePanel) setCatOpen(false);
+    };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [catOpen]);
+
+  const toggleCat = () => {
+    if (!catOpen && catTriggerRef.current) {
+      setCatRect(catTriggerRef.current.getBoundingClientRect());
+    }
+    setCatOpen(o => !o);
+  };
 
   const catMeta    = CATEGORIES.find(c => c.id === cat);
   const extraFields = DOC_EXTRA_FIELDS[cat] ?? [];
@@ -232,7 +245,8 @@ function AddDocModal({ onClose, onSaved, employees = [], companyId = null }) {
                 <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.6 }}>Categoria *</label>
                 <button
                   type="button"
-                  onClick={() => setCatOpen(o => !o)}
+                  ref={catTriggerRef}
+                  onClick={toggleCat}
                   style={{
                     width: '100%', display: 'flex', alignItems: 'center', gap: 10,
                     padding: '10px 12px', borderRadius: 8,
@@ -255,14 +269,20 @@ function AddDocModal({ onClose, onSaved, employees = [], companyId = null }) {
                   <Icon name="chevron-down" size={14} style={{ color: 'var(--muted)', transform: catOpen ? 'rotate(180deg)' : 'none', flexShrink: 0 }} />
                 </button>
 
-                {catOpen && (
-                  <div style={{
-                    position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0,
-                    background: 'var(--surface)', border: '1px solid var(--line)',
-                    borderRadius: 10, zIndex: 30, overflow: 'hidden',
-                    boxShadow: '0 10px 30px rgba(0,0,0,.14), 0 2px 6px rgba(0,0,0,.06)',
-                    maxHeight: 280, overflowY: 'auto',
-                  }}>
+                {catOpen && catRect && createPortal(
+                  <div
+                    data-cat-panel
+                    style={{
+                      position: 'fixed',
+                      top: catRect.bottom + 4,
+                      left: catRect.left,
+                      width: catRect.width,
+                      background: 'var(--surface)', border: '1px solid var(--line)',
+                      borderRadius: 10, zIndex: 500, overflow: 'hidden',
+                      boxShadow: '0 10px 30px rgba(0,0,0,.14), 0 2px 6px rgba(0,0,0,.06)',
+                      maxHeight: Math.min(320, window.innerHeight - catRect.bottom - 16),
+                      overflowY: 'auto',
+                    }}>
                     {CATEGORIES.map(c => {
                       const isActive = c.id === cat;
                       return (
@@ -291,7 +311,8 @@ function AddDocModal({ onClose, onSaved, employees = [], companyId = null }) {
                         </button>
                       );
                     })}
-                  </div>
+                  </div>,
+                  document.body
                 )}
               </div>
 
