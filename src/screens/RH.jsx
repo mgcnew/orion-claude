@@ -774,29 +774,19 @@ function BeneficiosTab({ addToast, companyId, activeEmployees, can, benefits, lo
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      {/* Header */}
-      <div className="row" style={{ gap: 12, flexWrap: 'wrap' }}>
-        <div style={{ flex: 1, minWidth: 0 }}>
+      {/* Header — linha 1: busca + CTA */}
+      <div className="row" style={{ gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+        <div style={{ position: 'relative', flex: '1 1 200px', minWidth: 160, maxWidth: 300 }}>
+          <Icon name="search" size={13} style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: 'var(--muted)', pointerEvents: 'none' }} />
           <input
-            className="input"
+            className="field"
             placeholder="Buscar funcionário ou tipo…"
             value={q}
             onChange={e => setQ(e.target.value)}
-            style={{ maxWidth: 280 }}
+            style={{ paddingLeft: 30, width: '100%', height: 34, fontSize: 13 }}
           />
         </div>
-        <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
-          {['todos', ...BENEFIT_TYPES].map(t => (
-            <button
-              key={t}
-              className={`btn sm${filterType === t ? ' primary' : ''}`}
-              onClick={() => setFilterType(t)}
-              style={{ fontSize: 11.5 }}
-            >
-              {t === 'todos' ? 'Todos' : t}
-            </button>
-          ))}
-        </div>
+        <span style={{ flex: 1 }} />
         {can('RH', 'benefícios') && (
           <button className="btn primary" onClick={() => setShowModal(true)}>
             <Icon name="plus" size={14} /> Adicionar benefício
@@ -804,16 +794,30 @@ function BeneficiosTab({ addToast, companyId, activeEmployees, can, benefits, lo
         )}
       </div>
 
+      {/* Filtros por tipo — linha 2: chips com scroll horizontal em mobile */}
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        {['todos', ...BENEFIT_TYPES].map(t => (
+          <button
+            key={t}
+            className={`btn sm${filterType === t ? ' primary' : ''}`}
+            onClick={() => setFilterType(t)}
+            style={{ fontSize: 11.5, whiteSpace: 'nowrap' }}
+          >
+            {t === 'todos' ? 'Todos' : t}
+          </button>
+        ))}
+      </div>
+
       {/* KPI summary */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 10 }}>
         <div className="card" style={{ padding: '12px 16px' }}>
-          <div style={{ fontSize: 10.5, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.6, fontWeight: 600 }}>Benefícios ativos</div>
+          <div style={{ fontSize: 10.5, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.6, fontWeight: 600 }}>Ativos</div>
           <div className="mono" style={{ fontSize: 24, fontWeight: 700, marginTop: 4 }}>{totalAtivos}</div>
         </div>
         <div className="card" style={{ padding: '12px 16px' }}>
           <div style={{ fontSize: 10.5, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.6, fontWeight: 600 }}>Custo mensal</div>
-          <div className="mono" style={{ fontSize: 24, fontWeight: 700, marginTop: 4 }}>
-            {totalValor > 0 ? `R$${totalValor.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}` : '—'}
+          <div className="mono" style={{ fontSize: 22, fontWeight: 700, marginTop: 4 }}>
+            {totalValor > 0 ? `R$ ${totalValor.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}` : '—'}
           </div>
         </div>
         {kpis.slice(0, 4).map(k => (
@@ -831,73 +835,78 @@ function BeneficiosTab({ addToast, companyId, activeEmployees, can, benefits, lo
           <span style={{ fontSize: 13.5, fontWeight: 600 }}>Benefícios por funcionário</span>
           <span className="pill" style={{ background: 'var(--surface-2)' }}>{filtered.length}</span>
         </div>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-          <thead>
-            <tr style={{ background: 'var(--surface-2)', color: 'var(--muted)', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.6 }}>
-              <th style={{ textAlign: 'left', padding: '9px 16px', fontWeight: 600 }}>Funcionário</th>
-              <th style={{ textAlign: 'left', padding: '9px 16px', fontWeight: 600 }}>Tipo</th>
-              <th style={{ textAlign: 'left', padding: '9px 16px', fontWeight: 600 }}>Valor/mês</th>
-              <th style={{ textAlign: 'left', padding: '9px 16px', fontWeight: 600 }}>Início</th>
-              <th style={{ textAlign: 'left', padding: '9px 16px', fontWeight: 600 }}>Status</th>
-              <th style={{ padding: '9px 16px' }} />
-            </tr>
-          </thead>
-          <tbody>
-            {loading && (
-              <tr><td colSpan={6} style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--muted)' }}>Carregando…</td></tr>
-            )}
-            {!loading && filtered.length === 0 && (
-              <tr>
-                <td colSpan={6} style={{ padding: '40px 16px', textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>
-                  <Icon name="gift" size={28} style={{ opacity: 0.2, display: 'block', margin: '0 auto 10px' }} />
-                  Nenhum benefício cadastrado ainda.
-                </td>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 480 }}>
+            <thead>
+              <tr style={{ background: 'var(--surface-2)', color: 'var(--muted)', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.6 }}>
+                <th style={{ textAlign: 'left', padding: '9px 16px', fontWeight: 600 }}>Funcionário</th>
+                <th style={{ textAlign: 'left', padding: '9px 16px', fontWeight: 600 }}>Tipo</th>
+                <th className="rh-ben-col-value" style={{ textAlign: 'left', padding: '9px 16px', fontWeight: 600 }}>Valor/mês</th>
+                <th className="rh-ben-col-start" style={{ textAlign: 'left', padding: '9px 16px', fontWeight: 600 }}>Início</th>
+                <th style={{ textAlign: 'left', padding: '9px 16px', fontWeight: 600 }}>Status</th>
+                <th style={{ padding: '9px 16px' }} />
               </tr>
-            )}
-            {paged.map(b => (
-              <tr key={b.id} style={{ borderTop: '1px solid var(--line)' }}>
-                <td style={{ padding: '10px 16px' }}>
-                  <div className="row gap-2">
-                    <Avatar name={b.employees?.name || '?'} size={28} hue={b.employees?.hue ?? 215} />
-                    <span style={{ fontWeight: 500 }}>{b.employees?.name || '—'}</span>
-                  </div>
-                </td>
-                <td style={{ padding: '10px 16px' }}>{b.type}</td>
-                <td style={{ padding: '10px 16px' }} className="mono">
-                  {b.value != null ? `R$ ${Number(b.value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : '—'}
-                </td>
-                <td style={{ padding: '10px 16px' }}>
-                  {b.start_date ? new Date(b.start_date + 'T00:00:00').toLocaleDateString('pt-BR') : '—'}
-                </td>
-                <td style={{ padding: '10px 16px' }}>
-                  <span className={`pill ${STATUS_CLASS[b.status] ?? ''}`}>{STATUS_LABELS[b.status] ?? b.status}</span>
-                </td>
-                <td style={{ padding: '10px 16px', textAlign: 'right' }}>
-                  <div className="row gap-1" style={{ justifyContent: 'flex-end' }}>
-                    {b.status === 'ativo' && (
-                      <button className="btn ghost icon sm" title="Suspender" onClick={() => handleStatus(b.id, 'suspenso')}>
-                        <Icon name="minus" size={14} />
+            </thead>
+            <tbody>
+              {loading && (
+                <tr><td colSpan={6} style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--muted)' }}>Carregando…</td></tr>
+              )}
+              {!loading && filtered.length === 0 && (
+                <tr>
+                  <td colSpan={6} style={{ padding: '40px 16px', textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>
+                    <Icon name="gift" size={28} style={{ opacity: 0.2, display: 'block', margin: '0 auto 10px' }} />
+                    Nenhum benefício cadastrado ainda.
+                  </td>
+                </tr>
+              )}
+              {paged.map(b => (
+                <tr key={b.id} style={{ borderTop: '1px solid var(--line)' }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'var(--hover)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                >
+                  <td style={{ padding: '10px 16px' }}>
+                    <div className="row gap-2">
+                      <Avatar name={b.employees?.name || '?'} size={28} hue={b.employees?.hue ?? 215} />
+                      <span style={{ fontWeight: 500, whiteSpace: 'nowrap' }}>{b.employees?.name || '—'}</span>
+                    </div>
+                  </td>
+                  <td style={{ padding: '10px 16px', whiteSpace: 'nowrap' }}>{b.type}</td>
+                  <td className="rh-ben-col-value mono" style={{ padding: '10px 16px' }}>
+                    {b.value != null ? `R$ ${Number(b.value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : '—'}
+                  </td>
+                  <td className="rh-ben-col-start" style={{ padding: '10px 16px', whiteSpace: 'nowrap' }}>
+                    {b.start_date ? new Date(b.start_date + 'T00:00:00').toLocaleDateString('pt-BR') : '—'}
+                  </td>
+                  <td style={{ padding: '10px 16px' }}>
+                    <span className={`pill ${STATUS_CLASS[b.status] ?? ''}`}>{STATUS_LABELS[b.status] ?? b.status}</span>
+                  </td>
+                  <td style={{ padding: '10px 16px', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                    <div className="row gap-1" style={{ justifyContent: 'flex-end' }}>
+                      {b.status === 'ativo' && (
+                        <button className="btn ghost icon sm" title="Suspender" onClick={() => handleStatus(b.id, 'suspenso')}>
+                          <Icon name="minus" size={14} />
+                        </button>
+                      )}
+                      {b.status === 'suspenso' && (
+                        <button className="btn ghost icon sm" title="Reativar" onClick={() => handleStatus(b.id, 'ativo')}>
+                          <Icon name="check" size={14} />
+                        </button>
+                      )}
+                      {b.status !== 'encerrado' && (
+                        <button className="btn ghost icon sm" title="Encerrar" onClick={() => handleStatus(b.id, 'encerrado')}>
+                          <Icon name="x" size={14} />
+                        </button>
+                      )}
+                      <button className="btn ghost icon sm" title="Remover" onClick={() => handleDelete(b.id)}>
+                        <Icon name="trash" size={14} />
                       </button>
-                    )}
-                    {b.status === 'suspenso' && (
-                      <button className="btn ghost icon sm" title="Reativar" onClick={() => handleStatus(b.id, 'ativo')}>
-                        <Icon name="check" size={14} />
-                      </button>
-                    )}
-                    {b.status !== 'encerrado' && (
-                      <button className="btn ghost icon sm" title="Encerrar" onClick={() => handleStatus(b.id, 'encerrado')}>
-                        <Icon name="x" size={14} />
-                      </button>
-                    )}
-                    <button className="btn ghost icon sm" title="Remover" onClick={() => handleDelete(b.id)}>
-                      <Icon name="trash" size={14} />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
         <Pagination total={filtered.length} page={page} perPage={perPage} onPage={setPage} onPerPage={setPerPage} />
       </div>
 

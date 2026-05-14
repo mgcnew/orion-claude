@@ -478,6 +478,14 @@ select {
   .rh-pay-col-size  { display: none; }
 }
 
+/* Benefícios */
+@media (max-width: 900px) {
+  .rh-ben-col-start { display: none; }
+}
+@media (max-width: 680px) {
+  .rh-ben-col-value { display: none; }
+}
+
 /* === Mobile sidebar drawer === */
 @media (max-width: 767px) {
   .orion-sidebar {
