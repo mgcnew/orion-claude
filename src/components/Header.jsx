@@ -82,13 +82,18 @@ export default function Header({
         height: 60,
         padding: '0 16px 0 12px',
         borderBottom: '1px solid var(--line)',
-        background: 'var(--surface)',
+        background: 'var(--header-glass, rgba(255,255,255,0.72))',
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
         display: 'grid',
         gridTemplateColumns: '1fr auto 1fr',
         alignItems: 'center',
         gap: 12,
         flexShrink: 0,
         minWidth: 0,
+        position: 'sticky',
+        top: 0,
+        zIndex: 10,
       }}
     >
       {/* Esquerda: menu + breadcrumbs */}

@@ -30,6 +30,7 @@
   --bad-bg: #fee2e2;
   --info-bg: #dbeafe;
 
+  --header-glass: rgba(255, 255, 255, 0.75);
   --nav-ink: #3f4550;
   --nav-ink-active: var(--brand);
   --app-h: 100vh;
@@ -64,6 +65,7 @@ html.dark {
   --bad-bg: rgba(248, 113, 113, 0.14);
   --info-bg: rgba(96, 165, 250, 0.14);
 
+  --header-glass: rgba(15, 18, 23, 0.75);
   --brand-tint: rgba(42, 91, 255, 0.18);
   --shadow-card: 0 1px 0 rgba(0, 0, 0, 0.2), 0 1px 2px rgba(0, 0, 0, 0.3);
   --shadow-pop: 0 14px 38px rgba(0, 0, 0, 0.55), 0 2px 6px rgba(0, 0, 0, 0.4);
