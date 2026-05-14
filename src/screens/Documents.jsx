@@ -118,6 +118,8 @@ function AddDocModal({ onClose, onSaved, employees = [], companyId = null }) {
   const [saving, setSaving] = useState(false);
   const [userId, setUserId] = useState(null);
   const fileRef = useRef();
+  const cameraRef = useRef();
+  const isMobile = typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches;
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => setUserId(user?.id ?? null));
@@ -297,16 +299,50 @@ function AddDocModal({ onClose, onSaved, employees = [], companyId = null }) {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
                 <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.6 }}>Arquivo</label>
                 <input ref={fileRef} type="file" style={{ display: 'none' }} onChange={e => setForm(f => ({ ...f, file: e.target.files?.[0] ?? null }))} />
+                {isMobile && (
+                  <input
+                    ref={cameraRef}
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    style={{ display: 'none' }}
+                    onChange={e => setForm(f => ({ ...f, file: e.target.files?.[0] ?? null }))}
+                  />
+                )}
                 <div
                   style={{ border: '1.5px dashed var(--line)', borderRadius: 8, padding: '14px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, background: form.file ? 'var(--brand-tint)' : 'transparent' }}
                   onClick={() => fileRef.current?.click()}
                 >
                   <Icon name={form.file ? 'check' : 'upload'} size={16} style={{ color: form.file ? 'var(--brand)' : 'var(--muted)', flexShrink: 0 }} />
                   <span style={{ fontSize: 13, color: form.file ? 'var(--ink)' : 'var(--muted)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {form.file ? form.file.name : 'Clique para selecionar um arquivo'}
+                    {form.file ? form.file.name : isMobile ? 'Selecionar do dispositivo' : 'Clique para selecionar um arquivo'}
                   </span>
                   {form.file && <span style={{ fontSize: 11, color: 'var(--muted)', flexShrink: 0 }}>{(form.file.size / 1024).toFixed(0)} KB</span>}
                 </div>
+                {isMobile && (
+                  <button
+                    type="button"
+                    onClick={() => cameraRef.current?.click()}
+                    style={{
+                      marginTop: 6,
+                      border: '1.5px solid var(--brand)',
+                      borderRadius: 8,
+                      padding: '12px 16px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 8,
+                      background: 'var(--brand-tint)',
+                      color: 'var(--brand)',
+                      fontSize: 13,
+                      fontWeight: 600,
+                    }}
+                  >
+                    <Icon name="camera" size={16} />
+                    Tirar foto do documento
+                  </button>
+                )}
               </div>
             </div>
           )}
