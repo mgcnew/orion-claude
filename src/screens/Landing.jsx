@@ -211,7 +211,7 @@ export default function LandingPage() {
           50%      { transform: translateY(-14px); }
         }
         .lp-nav-outer { position: sticky; top: 0; z-index: 100; display: flex; justify-content: center; padding: 16px 24px; pointer-events: none; }
-        .lp-nav       { pointer-events: all; display: inline-flex; align-items: center; gap: 24px; height: 52px; padding: 0 10px 0 20px; border-radius: 999px; background: rgba(255,255,255,.82); backdrop-filter: blur(20px) saturate(180%); -webkit-backdrop-filter: blur(20px) saturate(180%); border: 1px solid rgba(255,255,255,.6); box-shadow: 0 2px 16px rgba(0,0,0,.08), 0 1px 0 rgba(255,255,255,.5) inset; }
+        .lp-nav       { pointer-events: all; display: inline-flex; align-items: center; gap: 32px; height: 52px; padding: 0 12px 0 28px; min-width: 420px; border-radius: 999px; background: rgba(232,239,255,.45); backdrop-filter: blur(16px) saturate(160%); -webkit-backdrop-filter: blur(16px) saturate(160%); border: 1px solid rgba(255,255,255,.55); box-shadow: 0 2px 20px rgba(42,91,255,.08), 0 1px 0 rgba(255,255,255,.6) inset; }
         .lp-hero-wrap { background: linear-gradient(160deg, #e8efff 0%, #f2f6ff 40%, #f8faff 70%, #fff 100%); }
         .lp-hero      { padding: 80px 48px 64px; display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: center; max-width: 1200px; margin: 0 auto; }
         .lp-hero-h1   { font-size: 52px; }
