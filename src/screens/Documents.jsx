@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import Icon from '../components/Icon.jsx';
 import { useAllDocuments, useEmployees, logAudit } from '../hooks/useEmployees.js';
@@ -339,9 +339,41 @@ function AddDocModal({ onClose, onSaved, employees = [], companyId = null }) {
 }
 
 // ============================================================
-// PAINEL DE FILTROS
+// TABS DE CATEGORIA
 // ============================================================
-function DocFilterPanel({ filters, onChange, onClear, anchorRect, onClose, docCounts }) {
+function CategoryTabs({ categories, activeCat, docCounts, totalCount, onSelect }) {
+  return (
+    <div style={{ display: 'flex', overflowX: 'auto', borderBottom: '1px solid var(--line)', flexShrink: 0, scrollbarWidth: 'none' }}>
+      <button
+        onClick={() => onSelect(null)}
+        style={{ flexShrink: 0, border: 'none', borderBottom: activeCat == null ? '2px solid var(--brand)' : '2px solid transparent', background: 'transparent', padding: '8px 14px', fontSize: 12.5, fontWeight: activeCat == null ? 700 : 500, color: activeCat == null ? 'var(--brand)' : 'var(--muted)', cursor: 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 6 }}
+      >
+        Todos
+        <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 5px', borderRadius: 10, background: activeCat == null ? 'var(--brand-tint)' : 'var(--surface-2)', color: activeCat == null ? 'var(--brand)' : 'var(--muted)' }}>
+          {totalCount}
+        </span>
+      </button>
+      {categories.filter(c => docCounts[c.id] > 0).map(c => (
+        <button
+          key={c.id}
+          onClick={() => onSelect(activeCat === c.id ? null : c.id)}
+          style={{ flexShrink: 0, border: 'none', borderBottom: activeCat === c.id ? `2px solid ${c.color}` : '2px solid transparent', background: 'transparent', padding: '8px 14px', fontSize: 12.5, fontWeight: activeCat === c.id ? 700 : 500, color: activeCat === c.id ? c.color : 'var(--muted)', cursor: 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 6 }}
+        >
+          <Icon name={c.icon} size={12} />
+          {c.name}
+          <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 5px', borderRadius: 10, background: activeCat === c.id ? c.color + '20' : 'var(--surface-2)', color: activeCat === c.id ? c.color : 'var(--muted)' }}>
+            {docCounts[c.id]}
+          </span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ============================================================
+// PAINEL DE FILTROS (apenas período)
+// ============================================================
+function DocFilterPanel({ filters, onChange, onClear, anchorRect, onClose }) {
   const ref = useRef();
 
   useEffect(() => {
@@ -352,58 +384,26 @@ function DocFilterPanel({ filters, onChange, onClear, anchorRect, onClose, docCo
 
   if (!anchorRect) return null;
   const top  = anchorRect.bottom + 6;
-  const left = Math.max(8, anchorRect.right - 320);
+  const left = Math.max(8, anchorRect.right - 256);
 
   return createPortal(
     <div ref={ref} style={{
-      position: 'fixed', top, left, width: 320,
+      position: 'fixed', top, left, width: 256,
       background: 'var(--surface)', border: '1px solid var(--line)',
       borderRadius: 10, boxShadow: '0 8px 32px rgba(0,0,0,.15)',
-      zIndex: 500, padding: 16, display: 'flex', flexDirection: 'column', gap: 16,
+      zIndex: 500, padding: 16, display: 'flex', flexDirection: 'column', gap: 12,
     }}>
-      {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.6, color: 'var(--muted)' }}>Filtros</span>
+        <span style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.6, color: 'var(--muted)' }}>Período</span>
         <button className="btn ghost sm" style={{ fontSize: 11, padding: '2px 8px' }} onClick={onClear}>Limpar</button>
       </div>
-
-      {/* Categorias */}
       <div>
-        <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--muted)', marginBottom: 8 }}>Categoria</div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-          {CATEGORIES.map(c => (
-            <button
-              key={c.id}
-              onClick={() => onChange('cat', filters.cat === c.id ? null : c.id)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 5,
-                border: `1px solid ${filters.cat === c.id ? c.color : 'var(--line)'}`,
-                background: filters.cat === c.id ? c.color + '18' : 'transparent',
-                color: filters.cat === c.id ? c.color : 'var(--ink)',
-                borderRadius: 20, padding: '4px 10px', fontSize: 11.5, fontWeight: 500, cursor: 'pointer',
-              }}
-            >
-              <Icon name={c.icon} size={11} />
-              {c.name}
-              {docCounts[c.id] > 0 && <span style={{ color: 'var(--muted)', fontSize: 10 }}>{docCounts[c.id]}</span>}
-            </button>
-          ))}
-        </div>
+        <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>De</label>
+        <DateInput value={filters.dateFrom} onChange={e => onChange('dateFrom', e.target.value)} />
       </div>
-
-      {/* Data */}
       <div>
-        <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--muted)', marginBottom: 8 }}>Data do documento</div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <div>
-            <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>De</label>
-            <DateInput value={filters.dateFrom} onChange={e => onChange('dateFrom', e.target.value)} />
-          </div>
-          <div>
-            <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Até</label>
-            <DateInput value={filters.dateTo} onChange={e => onChange('dateTo', e.target.value)} />
-          </div>
-        </div>
+        <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Até</label>
+        <DateInput value={filters.dateTo} onChange={e => onChange('dateTo', e.target.value)} />
       </div>
     </div>,
     document.body
@@ -539,18 +539,15 @@ export default function DocumentsScreen({ addToast, activeCompany, openModal }) 
     return true;
   });
 
-  const activeFilterCount = [
-    !!filters.cat,
-    !!filters.dateFrom,
-    !!filters.dateTo,
-  ].filter(Boolean).length;
+  const activeFilterCount = [!!filters.dateFrom, !!filters.dateTo].filter(Boolean).length;
 
   const toggleFilter = () => {
     if (!filterOpen) setFilterRect(filterBtnRef.current?.getBoundingClientRect() ?? null);
     setFilterOpen(v => !v);
   };
   const handleFilterChange = (key, val) => setFilters(f => ({ ...f, [key]: val }));
-  const clearFilters = () => setFilters({ cat: null, dateFrom: '', dateTo: '' });
+  const clearFilters       = () => setFilters({ cat: null, dateFrom: '', dateTo: '' });
+  const clearDateFilters   = () => setFilters(f => ({ ...f, dateFrom: '', dateTo: '' }));
 
   const handleDelete = useCallback(async () => {
     if (!selected.size) return;
@@ -625,14 +622,14 @@ export default function DocumentsScreen({ addToast, activeCompany, openModal }) 
           </span>
           <span className="grow" />
 
-          {/* Filtros */}
+          {/* Filtro de período */}
           <button
             ref={filterBtnRef}
             className="btn sm"
             onClick={toggleFilter}
             style={{ background: activeFilterCount > 0 ? 'var(--brand-tint)' : undefined, color: activeFilterCount > 0 ? 'var(--brand)' : undefined, borderColor: activeFilterCount > 0 ? 'var(--brand)' : undefined }}
           >
-            <Icon name="filter" size={13} /> Filtros
+            <Icon name="filter" size={13} /> Período
             {activeFilterCount > 0 && (
               <span style={{ background: 'var(--brand)', color: 'var(--brand-ink)', borderRadius: 20, fontSize: 10, fontWeight: 700, padding: '1px 6px', marginLeft: 4 }}>
                 {activeFilterCount}
@@ -650,21 +647,14 @@ export default function DocumentsScreen({ addToast, activeCompany, openModal }) 
           </div>
         </div>
 
-        {/* Active category chip */}
-        {filters.cat && (() => {
-          const cm = CATEGORIES.find(c => c.id === filters.cat);
-          return (
-            <div style={{ padding: '6px 16px', borderBottom: '1px solid var(--line)', display: 'flex', alignItems: 'center', gap: 8, background: cm.color + '0c', flexShrink: 0 }}>
-              <span style={{ fontSize: 12, color: 'var(--muted)' }}>Filtrando por:</span>
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: cm.color + '18', color: cm.color, borderRadius: 20, padding: '3px 10px', fontSize: 12, fontWeight: 600 }}>
-                <Icon name={cm.icon} size={11} /> {cm.name}
-              </span>
-              <button className="btn ghost icon sm" style={{ width: 20, height: 20, padding: 0 }} onClick={() => handleFilterChange('cat', null)}>
-                <Icon name="x" size={11} />
-              </button>
-            </div>
-          );
-        })()}
+        {/* Category tabs */}
+        <CategoryTabs
+          categories={CATEGORIES}
+          activeCat={filters.cat}
+          docCounts={docCounts}
+          totalCount={docs.length}
+          onSelect={cat => handleFilterChange('cat', cat)}
+        />
 
         {/* Selection bar */}
         {selected.size > 0 && (
@@ -697,18 +687,15 @@ export default function DocumentsScreen({ addToast, activeCompany, openModal }) 
               <div style={{ fontSize: 12 }}>{search || activeFilterCount > 0 ? 'Tente ajustar os filtros' : 'Clique em "Novo documento" para começar'}</div>
             </div>
           ) : view === 'list' ? (
-            <ListView
+            <GroupedListView
               docs={filtered}
               categories={CATEGORIES}
               selected={selected}
               onToggle={toggleSelect}
-              onSelectAll={toggleSelectAll}
-              allSelected={allSelected}
-              someSelected={someSelected}
               onPreview={setPreviewDoc}
             />
           ) : (
-            <GridView docs={filtered} categories={CATEGORIES} />
+            <GridView docs={filtered} categories={CATEGORIES} onPreview={setPreviewDoc} />
           )}
         </div>
       </div>
@@ -717,10 +704,9 @@ export default function DocumentsScreen({ addToast, activeCompany, openModal }) 
         <DocFilterPanel
           filters={filters}
           onChange={handleFilterChange}
-          onClear={clearFilters}
+          onClear={clearDateFilters}
           anchorRect={filterRect}
           onClose={() => setFilterOpen(false)}
-          docCounts={docCounts}
         />
       )}
 
@@ -740,120 +726,104 @@ export default function DocumentsScreen({ addToast, activeCompany, openModal }) 
   );
 }
 
-function ListView({ docs, categories, selected, onToggle, onSelectAll, allSelected, someSelected, onPreview }) {
-  const [hoveredRow, setHoveredRow] = useState(null);
-  const allCheckRef = useRef();
-
-  useEffect(() => {
-    if (allCheckRef.current) allCheckRef.current.indeterminate = someSelected;
-  }, [someSelected]);
-
+// ============================================================
+// DOC ROW (linha individual dentro de um grupo)
+// ============================================================
+function DocRow({ doc: f, cm, checked, onToggle, onPreview }) {
+  const [hovered, setHovered] = useState(false);
   return (
-    <div style={{ overflowX: 'auto' }}>
-      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 480 }}>
-        <thead>
-          <tr style={{ background: 'var(--surface-2)', color: 'var(--muted)', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-            <th style={{ padding: '9px 16px', width: 36 }}>
-              <input
-                ref={allCheckRef}
-                type="checkbox"
-                checked={allSelected}
-                onChange={onSelectAll}
-                style={{ accentColor: 'var(--brand)', cursor: 'pointer' }}
-              />
-            </th>
-            <th style={{ padding: '9px 16px', textAlign: 'left', fontWeight: 600 }}>Nome</th>
-            <th className="doc-col-cat"    style={{ padding: '9px 16px', textAlign: 'left', fontWeight: 600 }}>Categoria</th>
-            <th className="doc-col-who"    style={{ padding: '9px 16px', textAlign: 'left', fontWeight: 600 }}>Funcionário</th>
-            <th className="doc-col-date"   style={{ padding: '9px 16px', textAlign: 'left', fontWeight: 600 }}>Data</th>
-            <th className="doc-col-size"   style={{ padding: '9px 16px', textAlign: 'left', fontWeight: 600 }}>Tamanho</th>
-            <th className="doc-col-status" style={{ padding: '9px 16px', textAlign: 'left', fontWeight: 600 }}>Status</th>
-            <th style={{ width: 80 }} />
-          </tr>
-        </thead>
-        <tbody>
-          {docs.map(f => {
-            const cm      = categories.find(c => c.id === f.cat);
-            const st      = STATUS_MAP[f.status] || STATUS_MAP.ok;
-            const hovered = hoveredRow === f.id;
-            const checked = selected.has(f.id);
-            return (
-              <tr
-                key={f.id}
-                style={{ borderTop: '1px solid var(--line-soft)', cursor: 'pointer', background: hovered || checked ? 'var(--hover)' : 'transparent', transition: 'background .1s' }}
-                onMouseEnter={() => setHoveredRow(f.id)}
-                onMouseLeave={() => setHoveredRow(null)}
-              >
-                <td style={{ padding: '10px 16px' }} onClick={e => { e.stopPropagation(); onToggle(f.id); }}>
-                  <input type="checkbox" checked={checked} onChange={() => onToggle(f.id)} style={{ accentColor: 'var(--brand)', cursor: 'pointer' }} />
-                </td>
+    <div
+      style={{ display: 'flex', alignItems: 'center', borderTop: '1px solid var(--line-soft)', background: hovered || checked ? 'var(--hover)' : 'transparent', transition: 'background .1s' }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      <div style={{ padding: '9px 16px', width: 36, flexShrink: 0 }} onClick={e => { e.stopPropagation(); onToggle(f.id); }}>
+        <input type="checkbox" checked={checked} onChange={() => onToggle(f.id)} style={{ accentColor: 'var(--brand)', cursor: 'pointer' }} />
+      </div>
 
-                <td style={{ padding: '10px 16px', minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
-                    <FileIcon type={f.type} color={cm?.color} size={30} />
-                    <div style={{ minWidth: 0, flex: 1 }}>
-                      <div style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</div>
-                      <div className="doc-name-sub" style={{ display: 'none', alignItems: 'center', gap: 6, marginTop: 2, flexWrap: 'wrap' }}>
-                        {cm && <span className="doc-name-sub-cat" style={{ display: 'none', fontSize: 11, color: cm.color, fontWeight: 600 }}>{cm.name}</span>}
-                        <span style={{ fontSize: 11, color: 'var(--muted)' }}>{f.who}</span>
-                        <span style={{ fontSize: 11, color: 'var(--muted-2)' }}>·</span>
-                        <span style={{ fontSize: 11, color: 'var(--muted)' }}>{f.date}</span>
-                      </div>
-                    </div>
-                  </div>
-                </td>
+      <div style={{ flex: 1, padding: '9px 16px 9px 0', minWidth: 0, display: 'flex', alignItems: 'center', gap: 10 }}>
+        <FileIcon type={f.type} color={cm?.color} size={28} />
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <div style={{ fontWeight: 500, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</div>
+          {cm && (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10.5, fontWeight: 600, color: cm.color, marginTop: 1 }}>
+              <span style={{ width: 4, height: 4, borderRadius: '50%', background: cm.color, flexShrink: 0 }} />
+              {cm.name}
+            </span>
+          )}
+        </div>
+      </div>
 
-                <td className="doc-col-cat" style={{ padding: '10px 16px' }}>
-                  {cm && (
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 500, color: cm.color, background: cm.color + '14', padding: '2px 8px', borderRadius: 20, whiteSpace: 'nowrap' }}>
-                      <span style={{ width: 5, height: 5, borderRadius: '50%', background: cm.color, flexShrink: 0 }} />
-                      {cm.name}
-                    </span>
-                  )}
-                </td>
-                <td className="doc-col-who"    style={{ padding: '10px 16px', color: 'var(--muted)', fontSize: 12.5, whiteSpace: 'nowrap' }}>{f.who}</td>
-                <td className="doc-col-date"   style={{ padding: '10px 16px', color: 'var(--muted)', fontSize: 12.5, whiteSpace: 'nowrap' }}>{f.date}</td>
-                <td className="doc-col-size"   style={{ padding: '10px 16px', color: 'var(--muted)', fontSize: 12.5, whiteSpace: 'nowrap' }}>{f.size ?? '—'}</td>
-                <td className="doc-col-status" style={{ padding: '10px 16px' }}>
-                  <span className={`pill ${st.cls}`} style={{ fontSize: 11 }}>{st.label}</span>
-                </td>
-                <td style={{ padding: '10px 12px' }}>
-                  <div style={{
-                    display: 'flex', gap: 2, justifyContent: 'flex-end',
-                    opacity: hovered || checked ? 1 : 0,
-                    pointerEvents: hovered || checked ? 'auto' : 'none',
-                    transition: 'opacity .12s',
-                  }}>
-                    {f.file_url && (
-                      <button
-                        className="btn ghost icon sm"
-                        title="Visualizar"
-                        onClick={e => { e.stopPropagation(); onPreview(f); }}
-                      >
-                        <Icon name="eye" size={13} />
-                      </button>
-                    )}
-                    {f.file_url && (
-                      <button
-                        className="btn ghost icon sm"
-                        title="Baixar"
-                        onClick={e => { e.stopPropagation(); window.open(f.file_url, '_blank'); }}
-                      >
-                        <Icon name="download" size={13} />
-                      </button>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+      <div style={{ padding: '9px 16px', color: 'var(--muted)', fontSize: 12, whiteSpace: 'nowrap', flexShrink: 0 }}>
+        {f.date}
+      </div>
+
+      <div style={{ padding: '9px 12px', flexShrink: 0, display: 'flex', gap: 2, justifyContent: 'flex-end', width: 76, opacity: hovered || checked ? 1 : 0, pointerEvents: hovered || checked ? 'auto' : 'none', transition: 'opacity .12s' }}>
+        {f.file_url && <>
+          <button className="btn ghost icon sm" title="Visualizar" onClick={e => { e.stopPropagation(); onPreview(f); }}><Icon name="eye" size={13} /></button>
+          <button className="btn ghost icon sm" title="Baixar" onClick={e => { e.stopPropagation(); window.open(f.file_url, '_blank'); }}><Icon name="download" size={13} /></button>
+        </>}
+      </div>
     </div>
   );
 }
 
-function GridView({ docs, categories }) {
+// ============================================================
+// GROUPED LIST VIEW — agrupa por funcionário
+// ============================================================
+function GroupedListView({ docs, categories, selected, onToggle, onPreview }) {
+  const [collapsed, setCollapsed] = useState(new Set());
+
+  const groups = useMemo(() => {
+    const map = new Map();
+    docs.forEach(d => {
+      if (!map.has(d.who)) map.set(d.who, []);
+      map.get(d.who).push(d);
+    });
+    return [...map.entries()].sort(([a], [b]) => {
+      if (a === 'Empresa') return 1;
+      if (b === 'Empresa') return -1;
+      return a.localeCompare(b, 'pt-BR');
+    });
+  }, [docs]);
+
+  const toggle = (key) => setCollapsed(s => {
+    const n = new Set(s);
+    n.has(key) ? n.delete(key) : n.add(key);
+    return n;
+  });
+
+  return (
+    <div>
+      {groups.map(([name, groupDocs]) => {
+        const isOpen = !collapsed.has(name);
+        return (
+          <div key={name}>
+            <div
+              onClick={() => toggle(name)}
+              style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 16px', cursor: 'pointer', background: 'var(--surface-2)', borderTop: '1px solid var(--line)', position: 'sticky', top: 0, zIndex: 2, userSelect: 'none' }}
+            >
+              <Icon name={isOpen ? 'chevron-down' : 'chevron-right'} size={11} style={{ color: 'var(--muted)', flexShrink: 0 }} />
+              <span style={{ fontSize: 12.5, fontWeight: 700 }}>{name}</span>
+              <span style={{ fontSize: 10.5, color: 'var(--muted)', background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 10, padding: '0 6px', fontWeight: 600 }}>
+                {groupDocs.length}
+              </span>
+            </div>
+            {isOpen && groupDocs.map(f => {
+              const cm = categories.find(c => c.id === f.cat);
+              return <DocRow key={f.id} doc={f} cm={cm} checked={selected.has(f.id)} onToggle={onToggle} onPreview={onPreview} />;
+            })}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ============================================================
+// GRID VIEW
+// ============================================================
+function GridView({ docs, categories, onPreview }) {
   return (
     <div style={{ padding: 20, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 12, alignContent: 'start' }}>
       {docs.map(f => {
@@ -861,26 +831,26 @@ function GridView({ docs, categories }) {
         return (
           <div
             key={f.id}
-            style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 10, padding: 14, cursor: 'pointer', transition: 'box-shadow .15s' }}
-            onMouseEnter={e => e.currentTarget.style.boxShadow = '0 2px 12px rgba(0,0,0,.08)'}
-            onMouseLeave={e => e.currentTarget.style.boxShadow = 'none'}
+            onClick={() => f.file_url && onPreview(f)}
+            style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 10, padding: 14, cursor: f.file_url ? 'pointer' : 'default', transition: 'box-shadow .15s, border-color .15s' }}
+            onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 2px 12px rgba(0,0,0,.08)'; e.currentTarget.style.borderColor = cm?.color || 'var(--line)'; }}
+            onMouseLeave={e => { e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.borderColor = 'var(--line)'; }}
           >
-            <div style={{ height: 80, borderRadius: 7, marginBottom: 10, background: (cm?.color || '#888') + '10', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', border: '1px solid ' + (cm?.color || 'var(--line)') + '22' }}>
+            <div style={{ height: 76, borderRadius: 7, marginBottom: 10, background: (cm?.color || '#888') + '10', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', border: '1px solid ' + (cm?.color || 'var(--line)') + '22' }}>
               {f.file_url && f.type === 'image' ? (
                 <img src={f.file_url} alt={f.name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 7 }} />
               ) : (
-                <Icon name={f.type === 'image' ? 'image' : 'pdf'} size={30} style={{ color: cm?.color || 'var(--muted-2)' }} />
+                <Icon name={f.type === 'image' ? 'image' : 'pdf'} size={28} style={{ color: cm?.color || 'var(--muted-2)' }} />
               )}
-              <span style={{ position: 'absolute', top: 5, right: 5, fontSize: 9, fontWeight: 700, letterSpacing: 0.3, padding: '1px 5px', borderRadius: 4, background: 'var(--surface)', border: '1px solid var(--line)', color: 'var(--muted)' }}>
-                {f.type.toUpperCase()}
-              </span>
+              {cm && (
+                <span style={{ position: 'absolute', bottom: 5, left: 5, fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 4, background: cm.color + '22', color: cm.color, border: `1px solid ${cm.color}33` }}>
+                  {cm.name}
+                </span>
+              )}
             </div>
             <div style={{ fontSize: 12.5, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 2 }}>{f.name}</div>
             <div style={{ fontSize: 11, color: 'var(--muted)' }}>{f.who}</div>
-            <div style={{ fontSize: 11, color: 'var(--muted)', display: 'flex', justifyContent: 'space-between', marginTop: 2 }}>
-              <span>{f.size ?? '—'}</span>
-              <span>{f.date}</span>
-            </div>
+            <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>{f.date}</div>
           </div>
         );
       })}
