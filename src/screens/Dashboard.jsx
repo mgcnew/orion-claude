@@ -42,15 +42,15 @@ function StatCard({ icon, label, value, delta, deltaKind = 'ok', series, accent 
       <div className="row gap-2">
         <div
           style={{
-            width: 34,
-            height: 34,
-            borderRadius: 8,
-            background: 'var(--surface-2)',
-            border: '1px solid var(--line)',
+            width: 36,
+            height: 36,
+            borderRadius: 9,
+            background: accent,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            color: accent,
+            color: '#fff',
+            opacity: 0.92,
           }}
         >
           <Icon name={icon} size={17} />
