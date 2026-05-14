@@ -12,7 +12,8 @@ import TweaksPanel from './components/TweaksPanel.jsx';
 import ProfilePanel from './components/ProfilePanel.jsx';
 import Icon from './components/Icon.jsx';
 
-import { LoginScreen, SendInviteModal, CompleteRegistrationScreen } from './screens/Auth.jsx';
+import { SendInviteModal, CompleteRegistrationScreen } from './screens/Auth.jsx';
+import LandingPage from './screens/Landing.jsx';
 import Dashboard from './screens/Dashboard.jsx';
 import { EmployeesList, EmployeeProfile } from './screens/Employees.jsx';
 import DocumentsScreen from './screens/Documents.jsx';
@@ -200,11 +201,11 @@ export default function App() {
     );
   }
 
-  // ===== AUTH SCREENS =====
+  // ===== LANDING / AUTH =====
   if (!session) {
     return (
       <>
-        <LoginScreen onLogin={() => {}} />
+        <LandingPage />
         <TweaksPanel tweaks={tweaks} setTweak={setTweak} />
       </>
     );
