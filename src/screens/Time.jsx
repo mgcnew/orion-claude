@@ -1,7 +1,154 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import Icon from '../components/Icon.jsx';
 import Avatar from '../components/Avatar.jsx';
 import { useEmployees, useMonthEntries, createTimeEntry } from '../hooks/useEmployees.js';
+
+// ── QuickEntry ───────────────────────────────────────────────
+const QUICK_TYPES = [
+  { id: 'presente',   label: 'Presença',   icon: 'check'    },
+  { id: 'falta',      label: 'Falta',      icon: 'x'        },
+  { id: 'hora_extra', label: 'H. Extra',   icon: 'sparkle'  },
+  { id: 'atestado',   label: 'Atestado',   icon: 'file'     },
+];
+
+function QuickEntry({ employees, defaultEmpId, onSaved }) {
+  const today = new Date().toISOString().slice(0, 10);
+  const [empId,  setEmpId]  = useState(defaultEmpId || '');
+  const [date,   setDate]   = useState(today);
+  const [type,   setType]   = useState('presente');
+  const [timeIn, setTimeIn] = useState('08:00');
+  const [timeOut,setTimeOut]= useState('17:00');
+  const [extra,  setExtra]  = useState('');
+  const [notes,  setNotes]  = useState('');
+  const [saving, setSaving] = useState(false);
+  const [ok,     setOk]     = useState(false);
+
+  useEffect(() => { if (defaultEmpId) setEmpId(defaultEmpId); }, [defaultEmpId]);
+
+  const canSave = empId && date && (
+    type === 'presente'   ? (timeIn && timeOut) :
+    type === 'hora_extra' ? extra :
+    true
+  );
+
+  const handleSave = async () => {
+    if (!canSave) return;
+    setSaving(true);
+    const base = { employee_id: empId, date, notes: notes || null };
+    const payload =
+      type === 'presente'   ? { ...base, status: 'presente',   time_in: timeIn, time_out: timeOut } :
+      type === 'falta'      ? { ...base, status: 'falta',      tipo: 'injustificada' } :
+      type === 'hora_extra' ? { ...base, status: 'hora_extra', extra_hours: extra } :
+                              { ...base, status: 'atestado',   tipo: 'atestado' };
+    await createTimeEntry(payload);
+    setSaving(false);
+    setOk(true);
+    setTimeout(() => setOk(false), 1800);
+    setTimeIn('08:00'); setTimeOut('17:00'); setExtra(''); setNotes('');
+    onSaved?.();
+  };
+
+  const field = {
+    height: 34, padding: '0 10px', borderRadius: 7,
+    border: '1px solid var(--line)', background: 'var(--surface-2)',
+    color: 'var(--ink)', fontSize: 13, fontFamily: 'inherit', outline: 'none',
+  };
+
+  return (
+    <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 10, padding: '12px 14px' }}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 10 }}>
+        Lançamento rápido
+      </div>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+
+        {/* Funcionário */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: '1 1 180px', minWidth: 150 }}>
+          <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600 }}>Funcionário</span>
+          <select value={empId} onChange={e => setEmpId(e.target.value)} style={{ ...field, paddingRight: 28 }}>
+            <option value="">Selecionar…</option>
+            {employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+          </select>
+        </div>
+
+        {/* Data */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600 }}>Data</span>
+          <input type="date" value={date} onChange={e => setDate(e.target.value)} style={{ ...field, width: 140 }} />
+        </div>
+
+        {/* Tipo */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600 }}>Tipo</span>
+          <div style={{ display: 'flex', gap: 4 }}>
+            {QUICK_TYPES.map(t => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => setType(t.id)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 5, padding: '0 10px', height: 34,
+                  borderRadius: 7, border: `1px solid ${type === t.id ? 'var(--brand)' : 'var(--line)'}`,
+                  background: type === t.id ? 'var(--brand-tint)' : 'var(--surface-2)',
+                  color: type === t.id ? 'var(--brand)' : 'var(--muted)',
+                  fontSize: 12.5, fontWeight: type === t.id ? 700 : 500, cursor: 'pointer',
+                  transition: 'all .12s',
+                }}
+              >
+                <Icon name={t.icon} size={12} />{t.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Campos condicionais */}
+        {type === 'presente' && (
+          <>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600 }}>Entrada</span>
+              <input type="time" value={timeIn}  onChange={e => setTimeIn(e.target.value)}  style={{ ...field, width: 100 }} />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600 }}>Saída</span>
+              <input type="time" value={timeOut} onChange={e => setTimeOut(e.target.value)} style={{ ...field, width: 100 }} />
+            </div>
+          </>
+        )}
+        {type === 'hora_extra' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600 }}>Horas extras</span>
+            <input type="text" placeholder="ex: 2h30" value={extra} onChange={e => setExtra(e.target.value)} style={{ ...field, width: 100 }} />
+          </div>
+        )}
+        {(type === 'falta' || type === 'atestado') && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: '1 1 160px' }}>
+            <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600 }}>Observação</span>
+            <input type="text" placeholder="Motivo (opcional)" value={notes} onChange={e => setNotes(e.target.value)} style={{ ...field, width: '100%' }} />
+          </div>
+        )}
+
+        {/* Botão */}
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={!canSave || saving}
+          style={{
+            height: 34, padding: '0 18px', borderRadius: 7, border: 'none',
+            background: ok ? 'var(--ok, #16a34a)' : 'var(--brand)',
+            color: '#fff', fontSize: 13, fontWeight: 700, cursor: canSave ? 'pointer' : 'not-allowed',
+            opacity: canSave ? 1 : 0.5,
+            display: 'flex', alignItems: 'center', gap: 7,
+            transition: 'background .2s',
+            alignSelf: 'flex-end',
+          }}
+        >
+          <Icon name={ok ? 'check' : saving ? 'loader' : 'save'} size={14} />
+          {ok ? 'Salvo!' : saving ? 'Salvando…' : 'Salvar'}
+        </button>
+      </div>
+    </div>
+  );
+}
 
 // ── helpers ──────────────────────────────────────────────────
 const MONTHS_PT = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
@@ -190,23 +337,140 @@ function buildDayStatuses(entries, ym) {
     const date = new Date(y, mo - 1, d);
     const dow  = date.getDay();
     if (dow === 0 || dow === 6) { result[d] = { status: 'weekend', entry: null }; continue; }
-    if (date > today) continue;
     const e = byDay[d];
+    // Dias futuros só aparecem se tiverem compromisso marcado
+    if (date > today) {
+      if (e?.status === 'compromisso') result[d] = { status: 'compromisso', entry: e };
+      continue;
+    }
     result[d] = e ? { status: e.status || 'presente', entry: e } : { status: 'sem_registro', entry: null };
   }
   return result;
 }
 
 const STATUS_COLOR = {
-  presente:     { bg: 'var(--ok-bg,#dcfce7)', color: 'var(--ok)',      label: 'Presente' },
-  ok:           { bg: 'var(--ok-bg,#dcfce7)', color: 'var(--ok)',      label: 'Presente' },
-  ajuste:       { bg: '#dbeafe',              color: '#2563eb',         label: 'Ajuste'   },
-  falta:        { bg: '#fee2e2',              color: '#dc2626',         label: 'Falta'    },
-  atraso:       { bg: '#fef9c3',              color: '#ca8a04',         label: 'Atraso'   },
-  hora_extra:   { bg: '#ede9fe',              color: '#7c3aed',         label: 'Extra'    },
-  sem_registro: { bg: 'var(--surface-2)',     color: 'var(--muted-2)',  label: ''         },
-  weekend:      { bg: 'var(--surface-2)',     color: 'var(--muted-2)',  label: ''         },
+  presente:      { bg: 'var(--ok-bg,#dcfce7)', color: 'var(--ok)',      label: 'Presente'     },
+  ok:            { bg: 'var(--ok-bg,#dcfce7)', color: 'var(--ok)',      label: 'Presente'     },
+  ajuste:        { bg: '#dbeafe',              color: '#2563eb',         label: 'Ajuste'       },
+  falta:         { bg: '#fee2e2',              color: '#dc2626',         label: 'Falta'        },
+  atraso:        { bg: '#fef9c3',              color: '#ca8a04',         label: 'Atraso'       },
+  hora_extra:    { bg: '#ede9fe',              color: '#7c3aed',         label: 'Extra'        },
+  compromisso:   { bg: '#fff7ed',              color: '#ea580c',         label: 'Compromisso'  },
+  sem_registro:  { bg: 'var(--surface-2)',     color: 'var(--muted-2)',  label: ''             },
+  weekend:       { bg: 'var(--surface-2)',     color: 'var(--muted-2)',  label: ''             },
 };
+
+const COMPROMISSO_TIPOS = [
+  { id: 'consulta',   label: 'Consulta médica',    icon: 'health'    },
+  { id: 'viagem',     label: 'Viagem',             icon: 'map-pin'   },
+  { id: 'juridico',   label: 'Compromisso jurídico',icon: 'gavel'    },
+  { id: 'pessoal',    label: 'Compromisso pessoal', icon: 'user'     },
+  { id: 'outro',      label: 'Outro',              icon: 'calendar'  },
+];
+
+function ComprometimentoModal({ date, empId, employees, onClose, onSave }) {
+  const [selEmpId, setSelEmpId] = useState(empId || '');
+  const [tipo,     setTipo]     = useState('consulta');
+  const [hora,     setHora]     = useState('');
+  const [notes,    setNotes]    = useState('');
+  const [saving,   setSaving]   = useState(false);
+
+  useEffect(() => {
+    const esc = (e) => e.key === 'Escape' && onClose();
+    window.addEventListener('keydown', esc);
+    return () => window.removeEventListener('keydown', esc);
+  }, [onClose]);
+
+  const handleSave = async () => {
+    if (!selEmpId) return;
+    setSaving(true);
+    const tipoLabel = COMPROMISSO_TIPOS.find(t => t.id === tipo)?.label || tipo;
+    await createTimeEntry({
+      employee_id: selEmpId,
+      date,
+      status: 'compromisso',
+      tipo,
+      notes: [tipoLabel, hora ? `às ${hora}` : '', notes].filter(Boolean).join(' — '),
+      time_in: hora || null,
+    });
+    setSaving(false);
+    onSave();
+    onClose();
+  };
+
+  const [y, m, d] = date.split('-').map(Number);
+  const dateLabel = new Date(y, m - 1, d).toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,.45)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }} onClick={onClose}>
+      <div style={{ width: '100%', maxWidth: 420, background: 'var(--surface)', borderRadius: 14, boxShadow: '0 24px 64px rgba(0,0,0,.22)', overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
+
+        {/* Header */}
+        <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--line)', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ width: 30, height: 30, borderRadius: 8, background: '#fff7ed', color: '#ea580c', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <Icon name="calendar" size={15} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 14, fontWeight: 700 }}>Marcar compromisso</div>
+            <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 1, textTransform: 'capitalize' }}>{dateLabel}</div>
+          </div>
+          <button className="btn ghost icon sm" onClick={onClose}><Icon name="x" size={14} /></button>
+        </div>
+
+        <div style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {/* Funcionário */}
+          {!empId && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+              <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.6 }}>Funcionário *</label>
+              <select className="field" value={selEmpId} onChange={e => setSelEmpId(e.target.value)}>
+                <option value="">Selecione…</option>
+                {employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+              </select>
+            </div>
+          )}
+
+          {/* Tipo */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.6 }}>Tipo de compromisso</label>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {COMPROMISSO_TIPOS.map(t => (
+                <button key={t.id} type="button" onClick={() => setTipo(t.id)} style={{
+                  display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 7,
+                  border: `1px solid ${tipo === t.id ? '#ea580c' : 'var(--line)'}`,
+                  background: tipo === t.id ? '#fff7ed' : 'var(--surface-2)',
+                  color: tipo === t.id ? '#ea580c' : 'var(--muted)',
+                  fontSize: 12.5, fontWeight: tipo === t.id ? 700 : 500, cursor: 'pointer',
+                }}>
+                  <Icon name={t.icon} size={12} />{t.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Hora estimada + Descrição */}
+          <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: 10 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+              <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.6 }}>Hora estimada</label>
+              <input type="time" className="field" value={hora} onChange={e => setHora(e.target.value)} />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+              <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.6 }}>Descrição</label>
+              <input type="text" className="field" placeholder="Detalhes opcionais…" value={notes} onChange={e => setNotes(e.target.value)} />
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div style={{ padding: '12px 18px', borderTop: '1px solid var(--line)', display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+          <button className="btn ghost" onClick={onClose}>Cancelar</button>
+          <button onClick={handleSave} disabled={saving || !selEmpId} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '0 16px', height: 36, borderRadius: 8, border: 'none', background: '#ea580c', color: '#fff', fontSize: 13, fontWeight: 700, cursor: selEmpId ? 'pointer' : 'not-allowed', opacity: selEmpId ? 1 : 0.5 }}>
+            <Icon name="calendar" size={13} /> {saving ? 'Salvando…' : 'Marcar compromisso'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // ── Modal Cartão de Ponto ─────────────────────────────────────
 const DEFAULT_PERIODS = [
@@ -214,11 +478,19 @@ const DEFAULT_PERIODS = [
   { in: '', out: '' },
 ];
 
+function nextWorkday(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00');
+  do { d.setDate(d.getDate() + 1); } while (d.getDay() === 0 || d.getDay() === 6);
+  return d.toISOString().slice(0, 10);
+}
+
 function CartaoModal({ employees, onClose, onSave }) {
-  const [empId,   setEmpId]   = useState('');
-  const [date,    setDate]    = useState(new Date().toISOString().slice(0,10));
-  const [periods, setPeriods] = useState(DEFAULT_PERIODS.map(p => ({ ...p })));
-  const [saving,  setSaving]  = useState(false);
+  const [empId,      setEmpId]      = useState('');
+  const [date,       setDate]       = useState(new Date().toISOString().slice(0,10));
+  const [periods,    setPeriods]    = useState(DEFAULT_PERIODS.map(p => ({ ...p })));
+  const [saving,     setSaving]     = useState(false);
+  const [savedCount, setSavedCount] = useState(0);
+  const [flash,      setFlash]      = useState(false);
 
   const updatePeriod = (i, field, val) =>
     setPeriods(ps => ps.map((p, idx) => idx === i ? { ...p, [field]: val } : p));
@@ -231,24 +503,39 @@ function CartaoModal({ employees, onClose, onSave }) {
   const extraMins    = Math.max(0, totalMins - STANDARD_MINS);
   const hasRequired  = empId && date && validPeriods.length > 0;
 
+  const doSave = async () => {
+    const firstIn = validPeriods[0]?.in || null;
+    const lastOut = validPeriods[validPeriods.length - 1]?.out || null;
+    const { error } = await createTimeEntry({
+      employee_id: empId, date,
+      time_in: firstIn, time_out: lastOut,
+      status: 'presente', periods: validPeriods,
+      extra_hours: extraMins > 0 ? minutesToHM(extraMins) : null,
+    });
+    if (error) { alert('Erro: ' + error.message); return false; }
+    onSave();
+    return true;
+  };
+
   const handleSave = async () => {
     if (!hasRequired) return;
     setSaving(true);
-    const firstIn  = validPeriods[0]?.in  || null;
-    const lastOut  = validPeriods[validPeriods.length - 1]?.out || null;
-    const { error } = await createTimeEntry({
-      employee_id: empId,
-      date,
-      time_in:  firstIn,
-      time_out: lastOut,
-      status:   'presente',
-      periods:  validPeriods,
-      extra_hours: extraMins > 0 ? minutesToHM(extraMins) : null,
-    });
+    const ok = await doSave();
     setSaving(false);
-    if (error) { alert('Erro: ' + error.message); return; }
-    onSave();
-    onClose();
+    if (ok) onClose();
+  };
+
+  const handleSaveAndContinue = async () => {
+    if (!hasRequired) return;
+    setSaving(true);
+    const ok = await doSave();
+    setSaving(false);
+    if (!ok) return;
+    setSavedCount(c => c + 1);
+    setFlash(true);
+    setTimeout(() => setFlash(false), 900);
+    setDate(nextWorkday(date));
+    setPeriods(DEFAULT_PERIODS.map(p => ({ ...p })));
   };
 
   return (
@@ -261,7 +548,14 @@ function CartaoModal({ employees, onClose, onSave }) {
             <Icon name="clock" size={16} />
           </div>
           <div style={{ flex:1 }}>
-            <div style={{ fontSize:15, fontWeight:700 }}>Lançar cartão de ponto</div>
+            <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+              <span style={{ fontSize:15, fontWeight:700 }}>Lançar cartão de ponto</span>
+              {savedCount > 0 && (
+                <span style={{ fontSize:11, fontWeight:700, background:'var(--ok,#16a34a)', color:'#fff', borderRadius:20, padding:'1px 8px' }}>
+                  {savedCount} salvo{savedCount > 1 ? 's' : ''}
+                </span>
+              )}
+            </div>
             <div style={{ fontSize:12, color:'var(--muted)', marginTop:1 }}>Registre os períodos trabalhados do dia</div>
           </div>
           <button className="btn ghost icon sm" onClick={onClose}><Icon name="x" size={15} /></button>
@@ -368,10 +662,18 @@ function CartaoModal({ employees, onClose, onSave }) {
         </div>
 
         {/* Footer */}
-        <div style={{ padding:'14px 20px', borderTop:'1px solid var(--line)', display:'flex', gap:8, justifyContent:'flex-end' }}>
-          <button className="btn ghost" onClick={onClose}>Cancelar</button>
+        <div style={{ padding:'14px 20px', borderTop:'1px solid var(--line)', display:'flex', gap:8, justifyContent:'flex-end', alignItems:'center' }}>
+          {flash && (
+            <span style={{ fontSize:12, color:'var(--ok,#16a34a)', fontWeight:600, marginRight:'auto', display:'flex', alignItems:'center', gap:5 }}>
+              <Icon name="check" size={13} /> Salvo! Próximo dia carregado.
+            </span>
+          )}
+          <button className="btn ghost" onClick={onClose}>{savedCount > 0 ? 'Fechar' : 'Cancelar'}</button>
+          <button className="btn" onClick={handleSaveAndContinue} disabled={saving || !hasRequired} title="Salva e avança para o próximo dia útil">
+            <Icon name="save" size={13} /> Salvar e continuar
+          </button>
           <button className="btn primary" onClick={handleSave} disabled={saving || !hasRequired}>
-            {saving ? 'Salvando…' : 'Lançar cartão'}
+            <Icon name="check" size={13} /> {saving ? 'Salvando…' : 'Lançar e fechar'}
           </button>
         </div>
       </div>
@@ -521,10 +823,13 @@ function AjusteModal({ employees, onClose, onSave }) {
 }
 
 // ── Calendário ────────────────────────────────────────────────
-function MonthCalendar({ ym, dayStatuses }) {
+function MonthCalendar({ ym, dayStatuses, onDayClick }) {
   const total  = daysInMonth(ym);
   const offset = firstDayOfWeek(ym);
   const cells  = Array.from({ length: Math.ceil((offset + total) / 7) * 7 });
+  const [y, mo] = ym.split('-').map(Number);
+  const todayDate = new Date(); todayDate.setHours(0,0,0,0);
+  const [tooltip, setTooltip] = useState(null); // { lines:[], x, y }
 
   const counts = Object.values(dayStatuses).reduce((a, ds) => {
     const s = ds.status;
@@ -532,43 +837,126 @@ function MonthCalendar({ ym, dayStatuses }) {
     return a;
   }, {});
 
+  const buildTooltip = (ds, day) => {
+    if (!ds || ds.status === 'weekend' || ds.status === 'sem_registro') return null;
+    const sc = STATUS_COLOR[ds.status] || {};
+    const e  = ds.entry;
+    const lines = [];
+    lines.push({ text: sc.label || ds.status, bold: true, color: sc.color });
+    if (e?.time_in)     lines.push({ text: `Entrada: ${e.time_in.slice(0,5)}` });
+    if (e?.time_out)    lines.push({ text: `Saída: ${e.time_out.slice(0,5)}` });
+    if (e?.extra_hours) lines.push({ text: `H. extra: ${e.extra_hours}`, color: '#7c3aed' });
+    if (e?.notes)       lines.push({ text: e.notes });
+    return lines;
+  };
+
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
       <div style={{ display:'flex', gap:16, flexWrap:'wrap' }}>
-        {[['presente','Normal','var(--ok)'],['atraso','Atraso','#ca8a04'],['falta','Falta','#dc2626'],['hora_extra','Extra','#7c3aed'],['ajuste','Ajuste','#2563eb']].map(([k,l,c]) => (
+        {[['presente','Normal','var(--ok)'],['atraso','Atraso','#ca8a04'],['falta','Falta','#dc2626'],['hora_extra','Extra','#7c3aed'],['ajuste','Ajuste','#2563eb'],['compromisso','Compromisso','#ea580c']].map(([k,l,c]) => (
           <div key={k} style={{ display:'flex', alignItems:'center', gap:6, fontSize:12, color:'var(--muted)' }}>
-            <span style={{ width:10, height:10, borderRadius:3, background:c, opacity:.7 }} />
+            <span style={{ width:8, height:8, borderRadius:'50%', background:c, flexShrink:0 }} />
             {l} <strong style={{ color:'var(--ink)', marginLeft:2 }}>{counts[k]||0}</strong>
           </div>
         ))}
       </div>
+
       <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:4 }}>
         {DAYS_PT.map(d => (
           <div key={d} style={{ textAlign:'center', fontSize:11, fontWeight:700, color:'var(--muted)', padding:'4px 0', textTransform:'uppercase', letterSpacing:0.5 }}>{d}</div>
         ))}
+
         {cells.map((_, i) => {
           const day = i - offset + 1;
           if (day < 1 || day > total) return <div key={i} />;
-          const ds = dayStatuses[day];
-          const sc = ds ? (STATUS_COLOR[ds.status] || {}) : {};
-          const isToday = (() => { const n=new Date(); const [y,m]=ym.split('-').map(Number); return n.getFullYear()===y && n.getMonth()+1===m && n.getDate()===day; })();
-          const e = ds?.entry;
-          const w = e ? entryWorkedMins(e) : 0;
-          const extraThisDay = w > STANDARD_MINS ? w - STANDARD_MINS : 0;
-          const timeLabel = e?.time_in ? e.time_in.slice(0,5)
-            : ds?.status==='falta' ? 'Falta'
-            : ds?.status==='atraso' ? 'Atraso'
-            : ds?.status==='hora_extra' ? (e?.extra_hours||'Extra')
-            : '';
+
+          const ds        = dayStatuses[day];
+          const sc        = ds ? (STATUS_COLOR[ds.status] || {}) : {};
+          const cellDate  = new Date(y, mo - 1, day); cellDate.setHours(0,0,0,0);
+          const isToday   = cellDate.getTime() === todayDate.getTime();
+          const isFuture  = cellDate > todayDate;
+          const isWeekend = cellDate.getDay() === 0 || cellDate.getDay() === 6;
+          const hasEvent  = ds && ds.status !== 'weekend' && ds.status !== 'sem_registro';
+          const dotColor  = sc.color || null;
+          const dateStr   = `${y}-${String(mo).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+
           return (
-            <div key={i} title={e?.notes || undefined} style={{ borderRadius:8, padding:'8px 4px', textAlign:'center', background:isToday?'var(--brand)':(sc.bg||'var(--surface-2)'), color:isToday?'var(--brand-ink,#fff)':(sc.color||'var(--muted-2)'), border:isToday?'none':'1px solid var(--line)', cursor:ds&&ds.status!=='weekend'&&ds.status!=='sem_registro'?'pointer':'default' }}>
-              <div style={{ fontSize:13, fontWeight:isToday?700:500 }}>{day}</div>
-              {timeLabel && !isToday && <div style={{ fontSize:9, marginTop:2, fontWeight:600, opacity:.8 }}>{timeLabel}</div>}
-              {extraThisDay > 0 && !isToday && <div style={{ fontSize:8, marginTop:1, color:'#7c3aed', fontWeight:700 }}>+{minutesToHM(extraThisDay)}</div>}
+            <div
+              key={i}
+              onClick={() => !isWeekend && onDayClick?.(dateStr)}
+              onMouseEnter={(ev) => {
+                if (isWeekend) return;
+                if (!isToday) ev.currentTarget.style.background = 'var(--hover)';
+                const lines = buildTooltip(ds, day);
+                if (!lines) return;
+                setTooltip({ lines, x: ev.clientX, y: ev.clientY });
+              }}
+              onMouseMove={(ev) => {
+                if (tooltip) setTooltip(t => t ? { ...t, x: ev.clientX, y: ev.clientY } : null);
+              }}
+              onMouseLeave={(ev) => {
+                if (!isToday) ev.currentTarget.style.background = sc.bg || 'var(--surface-2)';
+                setTooltip(null);
+              }}
+              style={{
+                borderRadius: 8,
+                padding: '8px 4px 6px',
+                textAlign: 'center',
+                position: 'relative',
+                background: isToday ? 'var(--brand)' : (sc.bg || 'var(--surface-2)'),
+                color: isToday ? 'var(--brand-ink,#fff)' : (sc.color || 'var(--muted-2)'),
+                border: isToday ? 'none' : '1px solid var(--line)',
+                cursor: isWeekend ? 'default' : 'pointer',
+                transition: 'background .12s',
+                minHeight: 48,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <span style={{ fontSize: 13, fontWeight: isToday ? 700 : 500 }}>{day}</span>
+              {/* Dot */}
+              {hasEvent && !isToday && (
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: dotColor, display: 'block', flexShrink: 0 }} />
+              )}
+              {/* Espaço vazio para dias sem evento (mantém altura consistente) */}
+              {!hasEvent && !isToday && <span style={{ width: 6, height: 6 }} />}
             </div>
           );
         })}
       </div>
+
+      {/* Tooltip — portal direto no body para evitar interferência de transform/zoom */}
+      {tooltip && createPortal(
+        <div style={{
+          position: 'fixed',
+          left: tooltip.x,
+          top: tooltip.y - 14,
+          transform: 'translate(-50%, -100%)',
+          background: 'var(--surface)',
+          color: 'var(--ink)',
+          fontSize: 12,
+          borderRadius: 8,
+          padding: '8px 12px',
+          pointerEvents: 'none',
+          zIndex: 9999,
+          whiteSpace: 'nowrap',
+          boxShadow: 'var(--shadow-pop, 0 4px 24px rgba(0,0,0,.18))',
+          border: '1px solid var(--line)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 3,
+          minWidth: 120,
+        }}>
+          {tooltip.lines.map((l, i) => (
+            <span key={i} style={{ fontWeight: l.bold ? 700 : 400, color: l.color || 'var(--ink)', fontSize: l.bold ? 12.5 : 11.5 }}>
+              {l.text}
+            </span>
+          ))}
+        </div>,
+        document.body
+      )}
     </div>
   );
 }
@@ -643,7 +1031,8 @@ export function TimeScreen({ addToast, activeCompany }) {
   const [tab,     setTab]     = useState('jornada');
   const [empId,   setEmpId]   = useState('');
   const [month,   setMonth]   = useState(new Date().toISOString().slice(0,7));
-  const [modal,   setModal]   = useState(null);
+  const [modal,        setModal]        = useState(null);
+  const [comprDate,    setComprDate]    = useState(null);
   const [menuOpen,setMenuOpen]= useState(false);
   const menuRef = useRef();
 
@@ -760,6 +1149,9 @@ export function TimeScreen({ addToast, activeCompany }) {
         ))}
       </div>
 
+      {/* ── Lançamento rápido ── */}
+      <QuickEntry employees={employees} defaultEmpId={empId} onSaved={refetch} />
+
       {/* ── Tabs ── */}
       <div style={{ display:'flex', borderBottom:'1px solid var(--line)' }}>
         {TABS.map(t => (
@@ -779,7 +1171,7 @@ export function TimeScreen({ addToast, activeCompany }) {
                   <h3 style={{ margin:0, fontSize:14, fontWeight:700 }}>{fmtMonth(month)}</h3>
                   {entLoading && <span style={{ fontSize:12, color:'var(--muted)' }} className="pulse">Carregando…</span>}
                 </div>
-                <MonthCalendar ym={month} dayStatuses={dayStatuses} />
+                <MonthCalendar ym={month} dayStatuses={dayStatuses} onDayClick={d => setComprDate(d)} />
               </div>
               <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
                 <div style={{ background:'var(--surface)', border:'1px solid var(--line)', borderRadius:10, padding:16 }}>
@@ -1012,6 +1404,15 @@ export function TimeScreen({ addToast, activeCompany }) {
     {modal==='falta'  && <FaltaModal     employees={employees} onClose={() => setModal(null)} onSave={handleSaved} />}
     {modal==='extra'  && <HoraExtraModal employees={employees} onClose={() => setModal(null)} onSave={handleSaved} />}
     {modal==='ajuste' && <AjusteModal    employees={employees} onClose={() => setModal(null)} onSave={handleSaved} />}
+    {comprDate && (
+      <ComprometimentoModal
+        date={comprDate}
+        empId={empId}
+        employees={employees}
+        onClose={() => setComprDate(null)}
+        onSave={handleSaved}
+      />
+    )}
     </>
   );
 }
