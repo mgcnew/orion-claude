@@ -229,7 +229,7 @@ export default function App() {
     if (route === 'settings')
       return <SettingsScreen addToast={addToast} setRoute={setRoute} activeCompany={activeCompany} tweaks={tweaks} setTweak={setTweak} />;
     if (route === 'rh' || route.startsWith('rh-'))
-      return <RHScreen addToast={addToast} activeCompany={activeCompany} route={route} openModal={routeIntent === 'new-warn'} />;
+      return <RHScreen addToast={addToast} activeCompany={activeCompany} route={route} openModal={routeIntent === 'new-warn'} userName={userName} />;
     if (route === 'clt') return <CLTScreen />;
     return <Dashboard setRoute={setRoute} addToast={addToast} />;
   };

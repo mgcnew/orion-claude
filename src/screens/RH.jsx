@@ -31,7 +31,7 @@ const ROUTE_TO_TAB = {
 // ============================================================
 // MAIN SCREEN
 // ============================================================
-export default function RHScreen({ addToast, activeCompany, route, openModal }) {
+export default function RHScreen({ addToast, activeCompany, route, openModal, userName }) {
   const [tab, setTab] = useState(() => ROUTE_TO_TAB[route] ?? 'resumo');
   const { can } = usePermissions();
 
@@ -50,7 +50,7 @@ export default function RHScreen({ addToast, activeCompany, route, openModal }) 
   const activeEmployees = employees.filter(e => e.status === 'ativo');
   const payslips = allDocs.filter(d => d.category === 'holerites');
 
-  const shared = { addToast, activeCompany, companyId, employees, activeEmployees, can };
+  const shared = { addToast, activeCompany, companyId, employees, activeEmployees, can, userName };
 
   return (
     <div
@@ -244,7 +244,7 @@ function ResumoTab({ warnings, vacations, payslips, setTab }) {
 // ============================================================
 // ABA — ADVERTÊNCIAS
 // ============================================================
-function AdvertenciasTab({ addToast, companyId, activeEmployees, can, warnings, loading, refetch, openModal }) {
+function AdvertenciasTab({ addToast, companyId, activeEmployees, can, warnings, loading, refetch, openModal, userName }) {
   const [filter, setFilter] = useState('todas');
   const [q, setQ] = useState('');
   const [showModal, setShowModal] = useState(!!openModal);
@@ -271,7 +271,7 @@ function AdvertenciasTab({ addToast, companyId, activeEmployees, can, warnings, 
       severity:     newWarn.severity,
       description:  newWarn.description,
       date:         new Date().toISOString().slice(0, 10),
-      applied_by:   'Usuário atual',
+      applied_by:   userName || 'Sistema',
     });
     setSaving(false);
     if (error) { addToast({ kind: 'warn', msg: 'Erro: ' + error.message }); return; }

@@ -367,6 +367,97 @@ export function useAllBenefits(companyId) {
   return { benefits, loading, refetch: fetch };
 }
 
+// ============================================================
+// NOTIFICAÇÕES — advertências + férias pendentes + audit
+// ============================================================
+function relTime(ts) {
+  const diff = Date.now() - new Date(ts).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'agora';
+  if (mins < 60) return `há ${mins} min`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `há ${hrs} h`;
+  const days = Math.floor(hrs / 24);
+  if (days === 1) return 'ontem';
+  return new Date(ts).toLocaleDateString('pt-BR');
+}
+
+const AUDIT_ICON  = { UPLOAD: 'upload', CRIOU: 'plus', EDITOU: 'edit', EXCLUIU: 'trash' };
+const AUDIT_CLASS = { UPLOAD: 'ok',     CRIOU: 'ok',   EDITOU: 'info', EXCLUIU: 'bad'  };
+
+export function useNotifications() {
+  const [items, setItems]     = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetch = useCallback(async () => {
+    setLoading(true);
+
+    const [warnRes, vacRes, auditRes] = await Promise.all([
+      supabase
+        .from('employee_warnings')
+        .select('id, severity, description, created_at, employees(name)')
+        .order('created_at', { ascending: false })
+        .limit(5),
+      supabase
+        .from('employee_vacations')
+        .select('id, days, created_at, employees(name)')
+        .eq('status', 'pendente')
+        .order('created_at', { ascending: false })
+        .limit(5),
+      supabase
+        .from('audit_log')
+        .select('id, who, action, target, created_at')
+        .in('action', ['UPLOAD', 'CRIOU', 'EDITOU', 'EXCLUIU'])
+        .order('created_at', { ascending: false })
+        .limit(8),
+    ]);
+
+    const list = [];
+
+    (warnRes.data || []).forEach(w => {
+      const sevLabel = w.severity === 'verbal' ? 'verbal' : w.severity === 'escrita' ? 'escrita' : 'suspensão';
+      list.push({
+        id: 'w-' + w.id,
+        icon: 'alert',
+        iconClass: w.severity === 'verbal' ? 'warn' : 'bad',
+        title: `Advertência ${sevLabel}: ${w.employees?.name || '—'}`,
+        sub: w.description || '',
+        ts: w.created_at,
+      });
+    });
+
+    (vacRes.data || []).forEach(v => {
+      list.push({
+        id: 'v-' + v.id,
+        icon: 'umbrella',
+        iconClass: 'info',
+        title: `${v.employees?.name || '—'} solicitou férias`,
+        sub: v.days ? `${v.days} dias · aguardando aprovação` : 'aguardando aprovação',
+        ts: v.created_at,
+      });
+    });
+
+    (auditRes.data || []).forEach(a => {
+      const actionMap = { UPLOAD: 'fez upload de', CRIOU: 'criou', EDITOU: 'editou', EXCLUIU: 'excluiu' };
+      list.push({
+        id: 'a-' + a.id,
+        icon: AUDIT_ICON[a.action] || 'history',
+        iconClass: AUDIT_CLASS[a.action] || 'info',
+        title: `${a.who} ${actionMap[a.action] || a.action} ${a.target || ''}`.trim(),
+        sub: '',
+        ts: a.created_at,
+      });
+    });
+
+    list.sort((a, b) => new Date(b.ts) - new Date(a.ts));
+    setItems(list.slice(0, 12).map(it => ({ ...it, timeLabel: relTime(it.ts) })));
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { fetch(); }, [fetch]);
+  return { items, loading, refetch: fetch };
+}
+
 export async function createBenefit(data) {
   const { data: created, error } = await supabase
     .from('employee_benefits')

@@ -1,15 +1,11 @@
 import Icon from './Icon.jsx';
-
-const ITEMS = [
-  { icon: 'alert',    iconClass: 'bad',  title: '4 documentos vencendo nos próximos 7 dias',  time: 'agora'  },
-  { icon: 'umbrella', iconClass: 'info', title: 'Beatriz Almeida solicitou férias',           time: 'há 2 h' },
-  { icon: 'upload',   iconClass: 'ok',   title: 'Holerites de outubro gerados (248)',         time: 'há 1 h' },
-  { icon: 'alert',    iconClass: 'warn', title: 'Diego Pacheco enviou atestado de 22 dias',   time: 'há 5 h' },
-  { icon: 'user',     iconClass: 'info', title: 'Convite aceito por Felipe Coutinho',         time: 'ontem'  },
-];
+import { useNotifications } from '../hooks/useEmployees.js';
 
 export default function NotificationsPanel({ open, onClose }) {
+  const { items, loading, refetch } = useNotifications();
+
   if (!open) return null;
+
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 80 }}>
       <div
@@ -27,43 +23,74 @@ export default function NotificationsPanel({ open, onClose }) {
       >
         <div className="row" style={{ padding: '12px 14px', borderBottom: '1px solid var(--line)' }}>
           <div style={{ fontWeight: 700, fontSize: 14 }}>Notificações</div>
-          <span className="grow" />
-          <button className="btn ghost sm">Marcar todas</button>
-        </div>
-        <div style={{ maxHeight: 420, overflowY: 'auto' }}>
-          {ITEMS.map((it, i) => (
-            <div
-              key={i}
-              className="row gap-3"
-              style={{
-                padding: '12px 14px',
-                borderBottom: '1px solid var(--line-soft)',
-                alignItems: 'flex-start',
-              }}
+          {items.length > 0 && (
+            <span
+              className="pill bad"
+              style={{ fontSize: 10.5, padding: '1px 7px', marginLeft: 8 }}
             >
-              <div
-                className={`pill ${it.iconClass}`}
-                style={{
-                  width: 32,
-                  height: 32,
-                  padding: 0,
-                  borderRadius: 8,
-                  justifyContent: 'center',
-                }}
-              >
-                <Icon name={it.icon} size={16} />
-              </div>
-              <div className="grow">
-                <div style={{ fontSize: 13.5, fontWeight: 500, lineHeight: 1.4 }}>
-                  {it.title}
-                </div>
-                <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 4 }}>
-                  {it.time}
-                </div>
-              </div>
-            </div>
-          ))}
+              {items.length}
+            </span>
+          )}
+          <span className="grow" />
+          <button
+            className="btn ghost sm"
+            onClick={refetch}
+            title="Atualizar"
+            style={{ padding: '0 8px' }}
+          >
+            <Icon name="history" size={13} />
+          </button>
         </div>
+
+        <div style={{ maxHeight: 440, overflowY: 'auto' }}>
+          {loading ? (
+            <div style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>
+              <div className="pulse">Carregando…</div>
+            </div>
+          ) : items.length === 0 ? (
+            <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--muted)' }}>
+              <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'var(--ok-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
+                <Icon name="check" size={20} style={{ color: 'var(--ok)' }} />
+              </div>
+              <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--ink)', marginBottom: 4 }}>Tudo em ordem</div>
+              <div style={{ fontSize: 12 }}>Nenhuma notificação recente.</div>
+            </div>
+          ) : (
+            items.map((it) => (
+              <div
+                key={it.id}
+                className="row gap-3"
+                style={{
+                  padding: '11px 14px',
+                  borderBottom: '1px solid var(--line-soft)',
+                  alignItems: 'flex-start',
+                  cursor: 'default',
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = 'var(--hover)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+              >
+                <div
+                  className={`pill ${it.iconClass}`}
+                  style={{ width: 32, height: 32, padding: 0, borderRadius: 8, justifyContent: 'center', flexShrink: 0 }}
+                >
+                  <Icon name={it.icon} size={15} />
+                </div>
+                <div className="grow" style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 500, lineHeight: 1.4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {it.title}
+                  </div>
+                  {it.sub && (
+                    <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {it.sub}
+                    </div>
+                  )}
+                  <div style={{ fontSize: 11, color: 'var(--muted-2)', marginTop: 3 }}>{it.timeLabel}</div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
         <button
           className="row gap-2"
           style={{
@@ -78,8 +105,9 @@ export default function NotificationsPanel({ open, onClose }) {
             cursor: 'pointer',
             borderTop: '1px solid var(--line)',
           }}
+          onClick={onClose}
         >
-          Ver todas <Icon name="chevron-right" size={14} />
+          Fechar <Icon name="x" size={13} />
         </button>
       </div>
     </div>

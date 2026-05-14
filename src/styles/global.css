@@ -31,7 +31,7 @@
   --info-bg: #e5edfb;
 
   --nav-ink: #3f4550;
-  --nav-ink-active: #1a1d24;
+  --nav-ink-active: var(--brand);
   --app-h: 100vh;
   --radius: 10px;
   --radius-lg: 14px;
