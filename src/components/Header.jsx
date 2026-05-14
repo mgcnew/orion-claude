@@ -81,10 +81,11 @@ export default function Header({
       style={{
         height: 60,
         padding: '0 16px 0 12px',
+        borderBottom: '1px solid var(--line)',
         background: 'var(--header-glass)',
         backdropFilter: 'blur(16px) saturate(1.4)',
         WebkitBackdropFilter: 'blur(16px) saturate(1.4)',
-        boxShadow: '0 1px 0 var(--line), 0 2px 12px rgba(0,0,0,0.04)',
+        boxShadow: '0 2px 12px rgba(0,0,0,0.04)',
         display: 'grid',
         gridTemplateColumns: '1fr auto 1fr',
         alignItems: 'center',
