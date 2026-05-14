@@ -210,7 +210,8 @@ export default function LandingPage() {
           0%,100% { transform: translateY(0px); }
           50%      { transform: translateY(-14px); }
         }
-        .lp-nav       { padding: 0 48px; }
+        .lp-nav-outer { position: sticky; top: 0; z-index: 100; display: flex; justify-content: center; padding: 16px 24px; pointer-events: none; }
+        .lp-nav       { pointer-events: all; display: inline-flex; align-items: center; gap: 24px; height: 52px; padding: 0 10px 0 20px; border-radius: 999px; background: rgba(255,255,255,.82); backdrop-filter: blur(20px) saturate(180%); -webkit-backdrop-filter: blur(20px) saturate(180%); border: 1px solid rgba(255,255,255,.6); box-shadow: 0 2px 16px rgba(0,0,0,.08), 0 1px 0 rgba(255,255,255,.5) inset; }
         .lp-hero-wrap { background: linear-gradient(160deg, #eef3ff 0%, #f5f8ff 45%, #fff 100%); }
         .lp-hero      { padding: 80px 48px 64px; display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: center; max-width: 1200px; margin: 0 auto; }
         .lp-hero-h1   { font-size: 52px; }
@@ -231,7 +232,7 @@ export default function LandingPage() {
         }
 
         @media (max-width: 680px) {
-          .lp-nav       { padding: 0 20px; }
+          .lp-nav-outer { padding: 12px 16px; }
           .lp-hero      { padding: 48px 20px 40px; grid-template-columns: 1fr; gap: 40px; }
           .lp-hero-h1   { font-size: 36px; letter-spacing: -1px; }
           .lp-hero-img  { order: -1; }
@@ -248,18 +249,20 @@ export default function LandingPage() {
       `}</style>
 
       {/* ── NAVBAR ────────────────────────────────────────────── */}
-      <nav className="lp-nav" style={{ position: 'sticky', top: 0, zIndex: 100, background: 'rgba(255,255,255,.65)', backdropFilter: 'blur(24px) saturate(180%)', WebkitBackdropFilter: 'blur(24px) saturate(180%)', borderBottom: '1px solid rgba(255,255,255,.5)', boxShadow: '0 1px 0 rgba(0,0,0,.06), 0 4px 24px rgba(0,0,0,.04)', height: 64, display: 'flex', alignItems: 'center', gap: 24 }}>
-        <img src={logoFullLight} alt="Orion Gestão" style={{ height: 34, objectFit: 'contain' }} />
-        <span style={{ flex: 1 }} />
-        <button
-          onClick={openLogin}
-          style={{ height: 38, padding: '0 20px', borderRadius: 9, background: '#2A5BFF', color: '#fff', border: 'none', fontSize: 13.5, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7, transition: 'opacity .15s', whiteSpace: 'nowrap' }}
-          onMouseEnter={e => e.currentTarget.style.opacity = '.88'}
-          onMouseLeave={e => e.currentTarget.style.opacity = '1'}
-        >
-          <Icon name="user" size={14} /> Entrar
-        </button>
-      </nav>
+      <div className="lp-nav-outer">
+        <nav className="lp-nav">
+          <img src={logoFullLight} alt="Orion Gestão" style={{ height: 30, objectFit: 'contain' }} />
+          <div style={{ width: 1, height: 20, background: 'rgba(0,0,0,.1)' }} />
+          <button
+            onClick={openLogin}
+            style={{ height: 34, padding: '0 16px', borderRadius: 999, background: '#2A5BFF', color: '#fff', border: 'none', fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, transition: 'opacity .15s', whiteSpace: 'nowrap' }}
+            onMouseEnter={e => e.currentTarget.style.opacity = '.85'}
+            onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+          >
+            <Icon name="user" size={13} /> Entrar
+          </button>
+        </nav>
+      </div>
 
       {/* ── HERO ──────────────────────────────────────────────── */}
       <div className="lp-hero-wrap">
