@@ -125,7 +125,8 @@ export function useDashboardData(companyId) {
     activities: [],
     admissionsSeries: new Array(12).fill(0),
     absencesSeries: new Array(12).fill(0),
-    upcoming: [],
+    birthdays: [],
+    vacations: [],
     alerts: []
   });
   const [loading, setLoading] = useState(true);
@@ -250,7 +251,8 @@ export function useDashboardData(companyId) {
         activities: activities || [],
         admissionsSeries,
         absencesSeries,
-        upcoming: [...upcomingBirthdays, ...upcomingVacations].slice(0, 5),
+        birthdays: upcomingBirthdays,
+        vacations: upcomingVacations.slice(0, 5),
         alerts
       });
       setLoading(false);
@@ -539,48 +541,76 @@ export default function Dashboard({ setRoute, navigate, addToast, activeCompany,
           </div>
         </div>
 
-        {/* Birthdays / vacations */}
-        <div className="card" style={{ padding: 20 }}>
-          <div className="row" style={{ marginBottom: 16 }}>
-            <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>Aniversariantes & férias</h3>
-          </div>
-          <div
-            style={{
-              fontSize: 11,
-              color: 'var(--muted)',
-              textTransform: 'uppercase',
-              letterSpacing: 0.6,
-              fontWeight: 700,
-              marginBottom: 8,
-            }}
-          >
-            Próximos 30 dias
-          </div>
-          <div className="col gap-2" style={{ marginBottom: 16 }}>
-            {data.upcoming.length === 0 && <div style={{ fontSize: 12.5, color: 'var(--muted)' }}>Sem registros próximos.</div>}
-            {data.upcoming.map((it, i) => (
-              <div
-                key={i}
-                className="row gap-3"
-                style={{ padding: '8px 10px', borderRadius: 8, background: 'var(--surface-2)' }}
-              >
-                <Avatar name={it.who} size={30} hue={(i + 1) * 80} />
-                <div className="grow" style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600 }}>{it.who}</div>
-                  <div style={{ fontSize: 11, color: 'var(--muted)' }}>{it.sub}</div>
-                </div>
+        {/* Birthdays + Vacations (stacked) */}
+        <div className="col gap-4">
+          {/* Aniversariantes */}
+          <div className="card" style={{ padding: 20 }}>
+            <div className="row" style={{ marginBottom: 14 }}>
+              <Icon name="gift" size={16} style={{ color: 'var(--brand)', marginRight: 6 }} />
+              <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>Aniversariantes do mês</h3>
+              {data.birthdays.length > 0 && (
+                <span className="pill brand" style={{ marginLeft: 'auto', fontSize: 11 }}>{data.birthdays.length}</span>
+              )}
+            </div>
+            <div className="col gap-2">
+              {data.birthdays.length === 0 && (
+                <div style={{ fontSize: 12.5, color: 'var(--muted)' }}>Nenhum aniversariante nos próximos 30 dias.</div>
+              )}
+              {data.birthdays.map((it, i) => (
                 <div
-                  className="pill"
-                  style={{ background: 'var(--surface)', border: '1px solid var(--line)' }}
+                  key={i}
+                  className="row gap-3"
+                  style={{ padding: '8px 10px', borderRadius: 8, background: 'var(--surface-2)' }}
                 >
-                  <Icon name={it.kind} size={11} /> {it.date}
+                  <Avatar name={it.who} size={30} hue={(i + 2) * 67} />
+                  <div className="grow" style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600 }}>{it.who}</div>
+                    <div style={{ fontSize: 11, color: 'var(--muted)' }}>{it.sub}</div>
+                  </div>
+                  <div className="pill" style={{ background: 'var(--surface)', border: '1px solid var(--line)' }}>
+                    <Icon name="gift" size={11} /> {it.date}
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-          <button className="btn" style={{ width: '100%', justifyContent: 'center' }} onClick={() => setRoute('rh-vacation')}>
-            Ver calendário completo
-          </button>
+
+          {/* Férias próximas */}
+          <div className="card" style={{ padding: 20 }}>
+            <div className="row" style={{ marginBottom: 14 }}>
+              <Icon name="umbrella" size={16} style={{ color: 'var(--info)', marginRight: 6 }} />
+              <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>Férias próximas</h3>
+              {data.vacations.length > 0 && (
+                <span className="pill" style={{ marginLeft: 'auto', fontSize: 11, background: 'var(--info-tint, #eff6ff)', color: 'var(--info)' }}>{data.vacations.length}</span>
+              )}
+            </div>
+            <div className="col gap-2" style={{ marginBottom: data.vacations.length > 0 ? 14 : 0 }}>
+              {data.vacations.length === 0 && (
+                <div style={{ fontSize: 12.5, color: 'var(--muted)' }}>Nenhuma férias nos próximos 30 dias.</div>
+              )}
+              {data.vacations.map((it, i) => (
+                <div
+                  key={i}
+                  className="row gap-3"
+                  style={{ padding: '8px 10px', borderRadius: 8, background: 'var(--surface-2)' }}
+                >
+                  <Avatar name={it.who} size={30} hue={(i + 1) * 110} />
+                  <div className="grow" style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600 }}>{it.who}</div>
+                    <div style={{ fontSize: 11, color: 'var(--muted)' }}>Férias programadas</div>
+                  </div>
+                  <div className="pill" style={{ background: 'var(--surface)', border: '1px solid var(--line)' }}>
+                    <Icon name="umbrella" size={11} /> {it.date}
+                  </div>
+                </div>
+              ))}
+            </div>
+            {data.vacations.length > 0 && (
+              <button className="btn ghost sm" style={{ width: '100%', justifyContent: 'center' }} onClick={() => setRoute('rh-vacation')}>
+                Ver calendário de férias
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Pending alerts */}
