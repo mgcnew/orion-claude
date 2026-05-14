@@ -71,10 +71,10 @@ function LoginModal({ onClose }) {
           <Icon name="x" size={14} />
         </button>
 
-        <img src={logoLanding} alt="SR Gestão de Documentos" style={{ height: 130, objectFit: 'contain', objectPosition: 'left', marginBottom: 16, marginTop: -16, display: 'block' }} />
+        <img src={logoLanding} alt="SR Gestão de Documentos" style={{ height: 160, objectFit: 'contain', objectPosition: 'center', marginBottom: 16, marginTop: -20, display: 'block', width: '100%' }} />
 
-        <h2 style={{ fontSize: 22, fontWeight: 800, letterSpacing: -0.5, margin: '0 0 4px', color: '#0f172a' }}>Acesse sua conta</h2>
-        <p style={{ color: '#64748b', fontSize: 14, margin: '0 0 28px', lineHeight: 1.5 }}>Gestão de pessoas centralizada e segura.</p>
+        <h2 style={{ fontSize: 22, fontWeight: 800, letterSpacing: -0.5, margin: '0 0 4px', color: '#0f172a', textAlign: 'center' }}>Acesse sua conta</h2>
+        <p style={{ color: '#64748b', fontSize: 14, margin: '0 0 28px', lineHeight: 1.5, textAlign: 'center' }}>Gestão de documentos centralizada e segura.</p>
 
         <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div>
