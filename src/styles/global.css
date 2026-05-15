@@ -45,10 +45,10 @@ html.dark {
   --surface: #14171d;
   --surface-2: #11141a;
   --sidebar: #0f1217;
-  --ink: #e6e8ec;
-  --ink-soft: #bfc3cb;
-  --nav-ink: #e6e8ec;
-  --nav-ink-active: #ffffff;
+  --ink: #d4d7dd;
+  --ink-soft: #b0b5be;
+  --nav-ink: #d4d7dd;
+  --nav-ink-active: #eef0f4;
   --muted: #8a8f99;
   --muted-2: #6e7480;
   --line: #1f242c;
@@ -99,6 +99,7 @@ body {
   font-size: var(--font-size-base, 14px);
   font-feature-settings: 'ss01', 'cv11';
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
 }
 .mono {
