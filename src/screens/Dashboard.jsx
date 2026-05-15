@@ -128,6 +128,7 @@ export function useDashboardData(companyId) {
     totalEmployees: 0,
     pendingDocsCount: 0,
     warningsCount: 0,
+    extraHoursLabel: '--',
     activities: [],
     admissionsSeries: new Array(12).fill(0),
     absencesSeries: new Array(12).fill(0),
@@ -148,20 +149,25 @@ export function useDashboardData(companyId) {
       let empQuery = supabase.from('employees').select('*');
       if (companyId) empQuery = empQuery.eq('company_id', companyId);
 
+      const monthStart = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-01`;
+      const monthEnd   = new Date(currentYear, currentMonth + 1, 0).toISOString().slice(0, 10);
+
       const [
         { data: employees },
         { data: documents },
         { data: warnings },
         { data: vacations },
         { data: activities },
-        { data: onboardingPending }
+        { data: onboardingPending },
+        { data: timecards }
       ] = await Promise.all([
         empQuery,
         supabase.from('documents').select('*'),
         supabase.from('employee_warnings').select('*, employees(name)'),
         supabase.from('employee_vacations').select('*, employees(name)'),
         supabase.from('activities').select('*').order('created_at', { ascending: false }).limit(10),
-        supabase.from('onboarding_docs').select('id, employee_id').eq('status', 'pending')
+        supabase.from('onboarding_docs').select('id, employee_id').eq('status', 'pending'),
+        supabase.from('time_entries').select('employee_id, status, extra_hours, time_in, time_out, periods').gte('date', monthStart).lte('date', monthEnd),
       ]);
 
       const employeeIds = new Set((employees ?? []).map(e => e.id));
@@ -234,6 +240,50 @@ export function useDashboardData(companyId) {
         return diff >= 0 && diff <= 30; // 30 days for better visibility
       }).map(v => ({ who: v.employees?.name, date: `${new Date(v.period_start).getDate()} ${['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'][new Date(v.period_start).getMonth()]}`, kind: 'umbrella', sub: 'Férias programadas' })) || [];
 
+      // Extra hours this month
+      const STANDARD_MINS = 480;
+      const parseExtra = (str) => {
+        if (!str) return 0;
+        const s = str.trim().toLowerCase();
+        const mh = s.match(/^(\d+)h(\d+)?/);
+        if (mh) return parseInt(mh[1]) * 60 + (parseInt(mh[2]) || 0);
+        const mm = s.match(/^(\d+)m$/);
+        if (mm) return parseInt(mm[1]);
+        const mf = parseFloat(s);
+        return isNaN(mf) ? 0 : Math.round(mf * 60);
+      };
+      const entryMins = (e) => {
+        if (e.periods && Array.isArray(e.periods) && e.periods.length > 0) {
+          return e.periods.reduce((sum, p) => {
+            const [ih, im] = (p.in  || '').split(':').map(Number);
+            const [oh, om] = (p.out || '').split(':').map(Number);
+            if (isNaN(ih) || isNaN(oh)) return sum;
+            return sum + (oh * 60 + om) - (ih * 60 + im);
+          }, 0);
+        }
+        if (e.time_in && e.time_out) {
+          const [ih, im] = e.time_in.split(':').map(Number);
+          const [oh, om] = e.time_out.split(':').map(Number);
+          return (oh * 60 + om) - (ih * 60 + im);
+        }
+        return 0;
+      };
+      let totalExtraMins = 0;
+      (timecards ?? []).forEach(e => {
+        if (companyId && !employeeIds.has(e.employee_id)) return;
+        if (e.status === 'hora_extra') {
+          totalExtraMins += parseExtra(e.extra_hours);
+          const w = entryMins(e);
+          if (w > 0) totalExtraMins += Math.max(0, w - STANDARD_MINS);
+        } else if (e.status === 'presente') {
+          const w = entryMins(e);
+          if (w > STANDARD_MINS) totalExtraMins += w - STANDARD_MINS;
+        }
+      });
+      const extraH = Math.floor(totalExtraMins / 60);
+      const extraM = totalExtraMins % 60;
+      const extraHoursLabel = totalExtraMins === 0 ? '0h' : extraM === 0 ? `${extraH}h` : `${extraH}h${String(extraM).padStart(2,'0')}`;
+
       // Alerts
       const alerts = [];
       if (pendingDocsCount > 0) {
@@ -254,6 +304,7 @@ export function useDashboardData(companyId) {
         totalEmployees,
         pendingDocsCount,
         warningsCount,
+        extraHoursLabel,
         activities: activities || [],
         admissionsSeries,
         absencesSeries,
@@ -503,7 +554,7 @@ export default function Dashboard({ setRoute, navigate, addToast, activeCompany,
         <StatCard
           icon="clock"
           label="Horas extras (mês)"
-          value={"--"}
+          value={data.extraHoursLabel}
           delta={``}
           deltaKind="info"
           accent="var(--info)"

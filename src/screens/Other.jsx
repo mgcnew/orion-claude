@@ -5,6 +5,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import Icon from '../components/Icon.jsx';
 import Avatar from '../components/Avatar.jsx';
+import Pagination from '../components/Pagination.jsx';
 import * as D from '../data/mock.js';
 import { supabase } from '../lib/supabase.js';
 import {
@@ -1398,6 +1399,13 @@ export function ReportsScreen({ addToast, activeCompany }) {
     }
   }, [selected, rows, addToast]);
 
+  const [page, setPage]       = useState(1);
+  const [perPage, setPerPage] = useState(10);
+
+  useEffect(() => { setPage(1); }, [rows]);
+
+  const paged = rows.slice((page - 1) * perPage, page * perPage);
+
   const selectReport = (id) => { setSelectedId(id); setFilters({}); };
   const activeFiltersCount = Object.values(filters).filter(v => v).length;
 
@@ -1519,12 +1527,12 @@ export function ReportsScreen({ addToast, activeCompany }) {
                     </tr>
                   </thead>
                   <tbody>
-                    {rows.map((row, i) => (
+                    {paged.map((row, i) => (
                       <tr key={i} style={{ borderTop: '1px solid var(--line-soft)' }}
                         onMouseEnter={e => e.currentTarget.style.background = 'var(--hover)'}
                         onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                       >
-                        <td style={{ padding: '9px 14px', color: 'var(--muted-2)', fontSize: 11, fontFamily: 'monospace' }}>{i + 1}</td>
+                        <td style={{ padding: '9px 14px', color: 'var(--muted-2)', fontSize: 11, fontFamily: 'monospace' }}>{(page - 1) * perPage + i + 1}</td>
                         {row.cells.map((cell, ci) => (
                           <td key={ci} style={{ padding: '9px 14px', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {ci === 0
@@ -1539,6 +1547,15 @@ export function ReportsScreen({ addToast, activeCompany }) {
                 </table>
               )}
             </div>
+            {rows.length > 0 && (
+              <Pagination
+                total={rows.length}
+                page={page}
+                perPage={perPage}
+                onPage={setPage}
+                onPerPage={(n) => { setPerPage(n); setPage(1); }}
+              />
+            )}
           </div>
         </div>
       </div>
