@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import Icon from '../components/Icon.jsx';
 import Pagination from '../components/Pagination.jsx';
@@ -260,15 +260,15 @@ function AdvertenciasTab({ addToast, companyId, activeEmployees, can, warnings, 
   const [page,    setPage]    = useState(1);
   const [perPage, setPerPage] = useState(10);
 
-  const filtered = warnings.filter(w => {
+  const filtered = useMemo(() => warnings.filter(w => {
     if (filter !== 'todas' && (w.severity || 'verbal') !== filter) return false;
     const str = ((w.employees?.name || '') + ' ' + (w.description || '')).toLowerCase();
     return !q || str.includes(q.toLowerCase());
-  });
+  }), [warnings, filter, q]);
 
   useEffect(() => { setPage(1); }, [filter, q]);
 
-  const paged = filtered.slice((page - 1) * perPage, page * perPage);
+  const paged = useMemo(() => filtered.slice((page - 1) * perPage, page * perPage), [filtered, page, perPage]);
   const count = s => warnings.filter(w => (w.severity || 'verbal') === s).length;
 
   const handleSave = async () => {
@@ -1200,7 +1200,7 @@ function HoleritesTab({ addToast, companyId, activeEmployees, can, payslips, ref
   const [form, setForm] = useState({ employee_id: '', mes_ref: '', ano_ref: String(new Date().getFullYear()), file: null });
   const fileRef = useRef();
 
-  const parsed = payslips.map(d => {
+  const parsed = useMemo(() => payslips.map(d => {
     let notes = {};
     try { notes = JSON.parse(d.notes || '{}'); } catch { /* noop */ }
     return {
@@ -1215,19 +1215,19 @@ function HoleritesTab({ addToast, companyId, activeEmployees, can, payslips, ref
       file_url: d.file_url,
       size: d.size,
     };
-  });
+  }), [payslips]);
 
-  const filtered = parsed.filter(d => {
+  const filtered = useMemo(() => parsed.filter(d => {
     if (!q) return true;
     return (d.who + ' ' + d.mes + ' ' + d.ano).toLowerCase().includes(q.toLowerCase());
-  });
+  }), [parsed, q]);
 
   const [page,    setPage]    = useState(1);
   const [perPage, setPerPage] = useState(10);
 
   useEffect(() => { setPage(1); }, [q]);
 
-  const paged = filtered.slice((page - 1) * perPage, page * perPage);
+  const paged = useMemo(() => filtered.slice((page - 1) * perPage, page * perPage), [filtered, page, perPage]);
 
   const handleSave = async () => {
     if (!form.employee_id || !form.mes_ref) return;

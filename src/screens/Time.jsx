@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import Icon from '../components/Icon.jsx';
 import Avatar from '../components/Avatar.jsx';
@@ -1469,14 +1469,16 @@ export function TimeScreen({ addToast, activeCompany }) {
   const extraRows = entries.filter(e => e.status==='hora_extra' || (entryWorkedMins(e) > STANDARD_MINS));
 
   // Banco: agrupa por funcionário
-  const empMap = {};
-  entries.forEach(e => {
-    const key  = e.employee_id;
-    const name = e.employees?.name || key;
-    if (!empMap[key]) empMap[key] = { name, employee_id:key, hue:e.employees?.hue, entries:[] };
-    empMap[key].entries.push(e);
-  });
-  const bancoRows = Object.values(empMap).map(r => ({ ...r, ...computeStats(r.entries) }));
+  const bancoRows = useMemo(() => {
+    const empMap = {};
+    entries.forEach(e => {
+      const key  = e.employee_id;
+      const name = e.employees?.name || key;
+      if (!empMap[key]) empMap[key] = { name, employee_id:key, hue:e.employees?.hue, entries:[] };
+      empMap[key].entries.push(e);
+    });
+    return Object.values(empMap).map(r => ({ ...r, ...computeStats(r.entries) }));
+  }, [entries]);
 
   // Resumo: por funcionário ou por dia se funcionário selecionado
   const resumoIsEmployee = !!empId;
