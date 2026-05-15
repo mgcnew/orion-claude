@@ -26,3 +26,11 @@ yarn-error.log*
 
 # claude code
 .claude/
+
+# mcp local config (project_ref público mas é config local)
+.mcp.json
+
+# logo art originals (não importadas em código — manter local)
+/completo noturno.png
+/completo transparente.png
+/logo completa.png
