@@ -1,8 +1,5 @@
 import { useState, useEffect, Fragment, useMemo, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import * as XLSX from 'xlsx';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
 import Icon from '../components/Icon.jsx';
 import Avatar from '../components/Avatar.jsx';
 import Pagination from '../components/Pagination.jsx';
@@ -1339,7 +1336,7 @@ export function ReportsScreen({ addToast, activeCompany }) {
   const companies = useMemo(() => [...new Set(employees.map(e => e.company).filter(Boolean))].sort(), [employees]);
   const rows      = useReportData(selectedId, filters, employees, warnings, vacations, documents, timecards);
 
-  const handleExport = useCallback((format) => {
+  const handleExport = useCallback(async (format) => {
     if (!selected || rows.length === 0) return;
     const headers = selected.columns;
     const data    = rows.map(r => r.cells);
@@ -1364,6 +1361,7 @@ export function ReportsScreen({ addToast, activeCompany }) {
       }
 
       if (format === 'XLSX') {
+        const XLSX = await import('xlsx');
         const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, selected.label.slice(0, 31));
@@ -1371,6 +1369,10 @@ export function ReportsScreen({ addToast, activeCompany }) {
       }
 
       if (format === 'PDF') {
+        const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([
+          import('jspdf'),
+          import('jspdf-autotable'),
+        ]);
         const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
         doc.setFontSize(13);
         doc.text(selected.label, 14, 14);

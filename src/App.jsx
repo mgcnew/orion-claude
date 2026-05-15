@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
 import { supabase } from './lib/supabase.js';
 import { useCompanies, logAudit, useNotifications } from './hooks/useEmployees.js';
 import { PermissionsProvider } from './lib/permissions.jsx';
@@ -12,25 +12,37 @@ import TweaksPanel from './components/TweaksPanel.jsx';
 import ProfilePanel from './components/ProfilePanel.jsx';
 import Icon from './components/Icon.jsx';
 
+// Eager: auth/landing/dashboard (entry points)
 import { SendInviteModal, CompleteRegistrationScreen } from './screens/Auth.jsx';
 import LandingPage from './screens/Landing.jsx';
 import Dashboard from './screens/Dashboard.jsx';
-import { EmployeesList, EmployeeProfile } from './screens/Employees.jsx';
-import DocumentsScreen from './screens/Documents.jsx';
-import JusticeScreen from './screens/Justice.jsx';
-import { TimeScreen } from './screens/Time.jsx';
-import {
-  PermissionsScreen, // eslint-disable-line no-unused-vars
-  AuditScreen,
-  ReportsScreen,
-  SettingsScreen,
-  Placeholder,
-} from './screens/Other.jsx';
-import RHScreen from './screens/RH.jsx';
-import CLTScreen from './screens/CLT.jsx';
+
+// Lazy: heavy screens loaded on-demand
+const EmployeesList     = lazy(() => import('./screens/Employees.jsx').then(m => ({ default: m.EmployeesList })));
+const EmployeeProfile   = lazy(() => import('./screens/Employees.jsx').then(m => ({ default: m.EmployeeProfile })));
+const DocumentsScreen   = lazy(() => import('./screens/Documents.jsx'));
+const JusticeScreen     = lazy(() => import('./screens/Justice.jsx'));
+const TimeScreen        = lazy(() => import('./screens/Time.jsx').then(m => ({ default: m.TimeScreen })));
+const AuditScreen       = lazy(() => import('./screens/Other.jsx').then(m => ({ default: m.AuditScreen })));
+const ReportsScreen     = lazy(() => import('./screens/Other.jsx').then(m => ({ default: m.ReportsScreen })));
+const SettingsScreen    = lazy(() => import('./screens/Other.jsx').then(m => ({ default: m.SettingsScreen })));
+const RHScreen          = lazy(() => import('./screens/RH.jsx'));
+const CLTScreen         = lazy(() => import('./screens/CLT.jsx'));
 
 import { useTweaks } from './hooks/useTweaks.js';
 import { darken, hexToRgba, isLight } from './lib/color.js';
+
+function ScreenFallback() {
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      height: '100%', width: '100%',
+      color: 'var(--muted)', fontSize: 13,
+    }}>
+      <div className="pulse">Carregando…</div>
+    </div>
+  );
+}
 
 const TWEAK_DEFAULTS = {
   primary:   '#2A5BFF',
@@ -305,7 +317,9 @@ export default function App() {
           onOpenProfile={() => setProfileOpen(true)}
         />
         <div className="scroll-hidden" style={{ flex: 1, overflowY: 'auto' }} key={route.startsWith('settings') ? 'settings' : route}>
-          {renderScreen()}
+          <Suspense fallback={<ScreenFallback />}>
+            {renderScreen()}
+          </Suspense>
         </div>
       </main>
 
