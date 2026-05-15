@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase.js';
+import { useDebounce } from './useDebounce.js';
 
 // ============================================================
 // EMPRESAS
@@ -55,6 +56,8 @@ export function useEmployees({ status, search, companyId, admissionFrom, admissi
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  const debouncedSearch = useDebounce(search, 300);
+
   const fetch = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -80,9 +83,9 @@ export function useEmployees({ status, search, companyId, admissionFrom, admissi
       query = query.lte('admission', admissionTo);
     }
 
-    if (search) {
+    if (debouncedSearch) {
       query = query.or(
-        `name.ilike.%${search}%,role.ilike.%${search}%,dept.ilike.%${search}%`
+        `name.ilike.%${debouncedSearch}%,role.ilike.%${debouncedSearch}%,dept.ilike.%${debouncedSearch}%`
       );
     }
 
@@ -90,7 +93,7 @@ export function useEmployees({ status, search, companyId, admissionFrom, admissi
     if (err) setError(err.message);
     else setEmployees(data ?? []);
     setLoading(false);
-  }, [status, search, companyId]);
+  }, [status, debouncedSearch, companyId, admissionFrom, admissionTo]);
 
   useEffect(() => { fetch(); }, [fetch]);
 
