@@ -25,7 +25,27 @@ const NAV = [
   { id: 'settings', label: 'Configurações',   icon: 'settings', perm: ['Administração', 'config'] },
 ];
 
-function CompanyInitial({ name }) {
+function CompanyAvatar({ company }) {
+  const name = company?.name || '';
+  const logoUrl = company?.logo_url;
+
+  if (logoUrl) {
+    return (
+      <div style={{
+        width: 26, height: 26, borderRadius: 6, flexShrink: 0,
+        overflow: 'hidden',
+        background: 'var(--surface-2)',
+        border: '1px solid var(--line)',
+      }}>
+        <img
+          src={logoUrl}
+          alt={name}
+          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+        />
+      </div>
+    );
+  }
+
   const letters = name
     ? name.split(' ').filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('')
     : '?';
@@ -79,7 +99,7 @@ function CompanyPicker({ companies, activeCompany, setActiveCompany, theme }) {
         }}
       >
         {activeCompany
-          ? <CompanyInitial name={activeCompany.name} />
+          ? <CompanyAvatar company={activeCompany} />
           : <div style={{ width: 26, height: 26, borderRadius: 6, background: 'var(--surface-2)', border: '1px solid var(--line)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Icon name="building" size={13} style={{ color: 'var(--muted)' }} />
             </div>
@@ -116,7 +136,7 @@ function CompanyPicker({ companies, activeCompany, setActiveCompany, theme }) {
                 onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'transparent'; }}
               >
                 {c.id
-                  ? <CompanyInitial name={c.name} />
+                  ? <CompanyAvatar company={c} />
                   : <div style={{ width: 26, height: 26, borderRadius: 6, background: 'var(--surface-2)', border: '1px solid var(--line)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                       <Icon name="building" size={13} style={{ color: 'var(--muted)' }} />
                     </div>
