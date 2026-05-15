@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import Icon from '../components/Icon.jsx';
 import Pagination from '../components/Pagination.jsx';
+import Skeleton from '../components/Skeleton.jsx';
 import {
   useEmployees,
   useAllWarnings,
@@ -725,9 +726,30 @@ export default function ReportsScreen({ addToast, activeCompany }) {
 
             <div style={{ flex: 1, overflowY: 'auto', overflowX: 'auto', minHeight: 0 }}>
               {loading ? (
-                <div style={{ padding: 48, textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>
-                  <div className="pulse">Carregando…</div>
-                </div>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 480 }}>
+                  <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
+                    <tr style={{ background: 'var(--surface-2)', color: 'var(--muted)', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.6 }}>
+                      <th style={{ padding: '9px 14px', textAlign: 'left', fontWeight: 600, width: 36, color: 'var(--muted-2)' }}>#</th>
+                      {selected.columns.map(col => (
+                        <th key={col} style={{ padding: '9px 14px', textAlign: 'left', fontWeight: 600, whiteSpace: 'nowrap' }}>{col}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Array.from({ length: 8 }, (_, i) => (
+                      <tr key={i} style={{ borderTop: '1px solid var(--line-soft)' }}>
+                        <td style={{ padding: '9px 14px' }}>
+                          <Skeleton width={12} height={10} />
+                        </td>
+                        {selected.columns.map((_col, ci) => (
+                          <td key={ci} style={{ padding: '9px 14px', maxWidth: 200 }}>
+                            <Skeleton height={11} style={{ maxWidth: ci === 0 ? '85%' : '70%' }} />
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               ) : rows.length === 0 ? (
                 <div style={{ padding: 64, textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>
                   <Icon name="folder" size={32} style={{ opacity: 0.2, display: 'block', margin: '0 auto 12px' }} />
