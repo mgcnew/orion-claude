@@ -19,7 +19,7 @@ import Dashboard from './screens/Dashboard.jsx';
 
 // Lazy: heavy screens loaded on-demand
 const EmployeesList     = lazy(() => import('./screens/Employees.jsx').then(m => ({ default: m.EmployeesList })));
-const EmployeeProfile   = lazy(() => import('./screens/Employees.jsx').then(m => ({ default: m.EmployeeProfile })));
+const EmployeeProfile   = lazy(() => import('./screens/EmployeeProfile.jsx'));
 const DocumentsScreen   = lazy(() => import('./screens/Documents.jsx'));
 const JusticeScreen     = lazy(() => import('./screens/Justice.jsx'));
 const TimeScreen        = lazy(() => import('./screens/Time.jsx').then(m => ({ default: m.TimeScreen })));
