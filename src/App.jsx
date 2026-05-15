@@ -23,9 +23,9 @@ const EmployeeProfile   = lazy(() => import('./screens/Employees.jsx').then(m =>
 const DocumentsScreen   = lazy(() => import('./screens/Documents.jsx'));
 const JusticeScreen     = lazy(() => import('./screens/Justice.jsx'));
 const TimeScreen        = lazy(() => import('./screens/Time.jsx').then(m => ({ default: m.TimeScreen })));
-const AuditScreen       = lazy(() => import('./screens/Other.jsx').then(m => ({ default: m.AuditScreen })));
-const ReportsScreen     = lazy(() => import('./screens/Other.jsx').then(m => ({ default: m.ReportsScreen })));
-const SettingsScreen    = lazy(() => import('./screens/Other.jsx').then(m => ({ default: m.SettingsScreen })));
+const AuditScreen       = lazy(() => import('./screens/Audit.jsx'));
+const ReportsScreen     = lazy(() => import('./screens/Reports.jsx'));
+const SettingsScreen    = lazy(() => import('./screens/Settings.jsx'));
 const RHScreen          = lazy(() => import('./screens/RH.jsx'));
 const CLTScreen         = lazy(() => import('./screens/CLT.jsx'));
 
