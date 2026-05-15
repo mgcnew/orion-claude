@@ -43,7 +43,7 @@ const normalizeDateForInput = (value) => {
 };
 
 // Campo de data com máscara DD/MM/AAAA que converte de/para ISO internamente
-function DateInput({ value, onChange, className, hasError }) {
+export function DateInput({ value, onChange, className, hasError }) {
   const toDisplay = (iso) => {
     if (!iso) return '';
     const [y, m, d] = iso.split('-');
@@ -1560,7 +1560,7 @@ const EDIT_EMP_STEPS = [
   { id: 'contato',      label: 'Contato & endereço',  icon: 'mail'      },
 ];
 
-function EditEmployeeModal({ employee, onClose, onSaved }) {
+export function EditEmployeeModal({ employee, onClose, onSaved }) {
   const [step, setStep] = useState(0);
   const { companies } = useCompanies();
   const [form, setForm] = useState({

@@ -12,11 +12,87 @@ import {
   useOnboardingDocs,
   markOnboardingDocUploaded,
   createDocuments,
+  updateEmployee,
+  clockIn,
+  clockOut,
   logAudit,
 } from '../hooks/useEmployees.js';
 import { supabase } from '../lib/supabase.js';
+import { DateInput, EditEmployeeModal } from './Employees.jsx';
 
 const fmtDate = (d) => d ? new Date(d + 'T00:00:00').toLocaleDateString('pt-BR') : '—';
+
+// ── Helpers de tabela (duplicados de Employees.jsx) ──────────────
+const th = (w) => ({ textAlign: 'left', padding: '10px 14px', fontWeight: 600, width: w });
+const td = () => ({ padding: '11px 14px', verticalAlign: 'middle' });
+
+// ── Upload de foto do funcionário (duplicado de Employees.jsx) ───
+async function uploadEmployeePhoto(file, key) {
+  const ext = (file.name.split('.').pop() || 'png').toLowerCase();
+  const path = `${key}/avatar.${ext}`;
+  const { error } = await supabase.storage.from('employee-avatars').upload(path, file, { upsert: true });
+  if (error) return { error };
+  const { data: { publicUrl } } = supabase.storage.from('employee-avatars').getPublicUrl(path);
+  return { url: `${publicUrl}?t=${Date.now()}` };
+}
+
+// ── Exportar prontuário em HTML (duplicado de Employees.jsx) ─────
+function exportProntuario(emp) {
+  const fmt = (d) => d ? new Date(d + 'T00:00:00').toLocaleDateString('pt-BR') : '—';
+  const curr = (v) => v ? Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '—';
+  const html = `<!DOCTYPE html><html lang="pt-BR"><head>
+<meta charset="UTF-8"><title>Prontuário — ${emp.name}</title>
+<style>
+*{box-sizing:border-box}body{font-family:Arial,sans-serif;font-size:12px;color:#111;margin:0;padding:24px;line-height:1.5}
+h1{font-size:20px;margin:0 0 2px}h2{font-size:11px;text-transform:uppercase;letter-spacing:.7px;color:#555;margin:20px 0 8px;padding-bottom:4px;border-bottom:1px solid #e5e7eb}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px 24px;margin-bottom:4px}
+.f label{font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:2px}.f span{font-size:12px}
+.header{display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:14px;border-bottom:2px solid #2A5BFF;margin-bottom:14px}
+.badge{display:inline-block;font-size:11px;padding:2px 8px;border-radius:20px;background:#dbeafe;color:#1d4ed8;font-weight:600;margin-top:5px}
+@media print{body{padding:14px}}
+</style></head><body>
+<div class="header">
+  <div>
+    <h1>${emp.name}</h1>
+    <div style="color:#666;font-size:12px;margin-top:3px">${emp.role} &middot; ${emp.dept} &middot; ${emp.company}</div>
+    <span class="badge">${emp.status === 'ativo' ? 'Ativo' : emp.status}</span>
+  </div>
+  <div style="font-size:11px;color:#888;text-align:right">Emitido em ${new Date().toLocaleDateString('pt-BR')}<br/>Orion Gestão</div>
+</div>
+<h2>Dados Pessoais</h2>
+<div class="grid">
+  <div class="f"><label>CPF</label><span>${emp.cpf || '—'}</span></div>
+  <div class="f"><label>Nascimento</label><span>${fmt(emp.birth_date)}</span></div>
+  <div class="f"><label>Estado Civil</label><span>${emp.civil_status || '—'}</span></div>
+  <div class="f"><label>Telefone</label><span>${emp.phone || '—'}</span></div>
+  <div class="f"><label>E-mail</label><span>${emp.email_personal || '—'}</span></div>
+</div>
+<div class="grid">
+  <div class="f" style="grid-column:1/3"><label>Endereço</label><span>${[emp.address, emp.neighborhood].filter(Boolean).join(', ') || '—'}</span></div>
+  <div class="f"><label>CEP</label><span>${emp.zip_code || '—'}</span></div>
+  <div class="f"><label>Cidade / UF</label><span>${emp.city && emp.state ? emp.city + ' / ' + emp.state : '—'}</span></div>
+</div>
+<h2>Vínculo Empregatício</h2>
+<div class="grid">
+  <div class="f"><label>Cargo</label><span>${emp.role || '—'}</span></div>
+  <div class="f"><label>Departamento</label><span>${emp.dept || '—'}</span></div>
+  <div class="f"><label>Empresa</label><span>${emp.company || '—'}</span></div>
+  <div class="f"><label>Tipo de Contrato</label><span>${emp.contract || '—'}</span></div>
+  <div class="f"><label>Data de Admissão</label><span>${fmt(emp.admission)}</span></div>
+  <div class="f"><label>Salário Base</label><span>${curr(emp.salary)}</span></div>
+  <div class="f"><label>Carga Horária</label><span>${emp.workload || '—'}</span></div>
+  <div class="f"><label>Regime</label><span>${emp.regime || '—'}</span></div>
+  <div class="f"><label>Centro de Custo</label><span>${emp.cost_center || '—'}</span></div>
+  <div class="f"><label>Supervisor Direto</label><span>${emp.supervisor || '—'}</span></div>
+</div>
+<div style="margin-top:32px;padding-top:12px;border-top:1px solid #e5e7eb;font-size:10px;color:#999;text-align:center">
+  Documento gerado pelo sistema Orion Gestão &middot; ${new Date().toLocaleString('pt-BR')}
+</div>
+<script>window.onload=()=>{window.print()}</script>
+</body></html>`;
+  const win = window.open('', '_blank');
+  if (win) { win.document.write(html); win.document.close(); }
+}
 
 // ── Modal (duplicado de Employees.jsx para evitar import cruzado) ─
 function Modal({ title, subtitle, onClose, children, width = 560 }) {
@@ -61,6 +137,24 @@ function Modal({ title, subtitle, onClose, children, width = 560 }) {
     </div>
   );
 }
+
+// ── StatusPill (duplicado de Employees.jsx) ───────────────────────
+function StatusPill({ status }) {
+  const map = {
+    ativo: { c: 'ok', l: 'Ativo' },
+    férias: { c: 'info', l: 'Férias' },
+    afastado: { c: 'warn', l: 'Afastado' },
+    desligado: { c: '', l: 'Desligado' },
+  };
+  const m = map[status] || map.ativo;
+  return (
+    <span className={`pill ${m.c}`}>
+      <span className="dot" />
+      {m.l}
+    </span>
+  );
+}
+
 function EmployeeProfile({ setRoute, employeeId }) {
   const [tab, setTab] = useState('dados');
   const [showEdit, setShowEdit] = useState(false);
