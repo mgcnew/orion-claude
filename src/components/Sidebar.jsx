@@ -2,9 +2,6 @@ import { useState, useRef, useEffect } from 'react';
 import Icon from './Icon.jsx';
 import Avatar from './Avatar.jsx';
 import { usePermissions } from '../lib/permissions.jsx';
-import logoLanding  from '../assets/logo-landing-page.png';
-import logoNight    from '../assets/logo noturna.png';
-import logoIcon     from '../assets/icone novo.png';
 
 const NAV = [
   { id: 'dashboard', label: 'Dashboard', icon: 'dashboard' },
@@ -135,31 +132,89 @@ function CompanyPicker({ companies, activeCompany, setActiveCompany, theme }) {
   );
 }
 
-function Logo({ collapsed, theme }) {
+function LogoMark({ size = 40 }) {
+  const sid = `srShade-${size}`;
+  const hid = `srHi-${size}`;
   return (
-    <div style={{ position: 'relative', width: collapsed ? 72 : '100%', height: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'width .18s ease' }}>
-      <img
-        src={logoIcon}
-        alt="SR Central"
+    <svg width={size} height={size} viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg" style={{ display: 'block', flexShrink: 0 }}>
+      <defs>
+        <linearGradient id={sid} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%"   stopColor="#000" stopOpacity="0" />
+          <stop offset="100%" stopColor="#000" stopOpacity="0.32" />
+        </linearGradient>
+        <linearGradient id={hid} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%"   stopColor="#fff" stopOpacity="0.22" />
+          <stop offset="100%" stopColor="#fff" stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <rect width="40" height="40" rx="10" fill="var(--brand)" />
+      <rect width="40" height="40" rx="10" fill={`url(#${sid})`} />
+      <rect width="40" height="40" rx="10" fill={`url(#${hid})`} />
+      <text
+        x="20" y="20" dy="0.34em"
+        textAnchor="middle"
+        fill="#fff"
+        fontSize="16"
+        fontWeight="700"
+        fontFamily="'Space Grotesk', 'Plus Jakarta Sans', system-ui, sans-serif"
+        letterSpacing="-0.5"
+      >SR</text>
+    </svg>
+  );
+}
+
+function Logo({ collapsed }) {
+  return (
+    <div style={{ position: 'relative', width: '100%', height: 60 }}>
+      {/* Ícone — sempre fixo na mesma posição (centro da sidebar fechada) */}
+      <div
         style={{
-          position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)',
-          width: 72, height: 72, objectFit: 'contain', display: 'block',
-          opacity: collapsed ? 1 : 0,
-          transition: 'opacity .18s ease',
-          pointerEvents: 'none',
+          position: 'absolute',
+          left: 14,
+          top: '50%',
+          transform: 'translate3d(0, -50%, 0)',
+          willChange: 'transform',
+          contain: 'layout paint',
+          backfaceVisibility: 'hidden',
         }}
-      />
-      <img
-        src={theme === 'dark' ? logoNight : logoLanding}
-        alt="SR Gestão de Documentos"
+      >
+        <LogoMark size={40} />
+      </div>
+
+      {/* Wordmark — aparece à direita do ícone, só fade de opacity */}
+      <div
         style={{
-          position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)',
-          height: 170, width: '100%', maxWidth: 200, objectFit: 'contain', objectPosition: 'center center',
+          position: 'absolute',
+          left: 64,
+          top: '50%',
+          transform: 'translateY(-50%)',
+          display: 'flex',
+          flexDirection: 'column',
+          lineHeight: 1.05,
+          whiteSpace: 'nowrap',
           opacity: collapsed ? 0 : 1,
-          transition: 'opacity .18s ease',
+          transition: 'opacity .16s ease',
+          willChange: 'opacity',
           pointerEvents: 'none',
         }}
-      />
+      >
+        <span style={{
+          fontFamily: "'Space Grotesk', 'Plus Jakarta Sans', system-ui, sans-serif",
+          fontSize: 15,
+          fontWeight: 700,
+          color: 'var(--ink)',
+          letterSpacing: 0.3,
+        }}>SR Gestão</span>
+        <span style={{
+          fontFamily: "'Space Grotesk', 'Plus Jakarta Sans', system-ui, sans-serif",
+          fontSize: 9.5,
+          fontWeight: 600,
+          color: 'var(--muted)',
+          letterSpacing: 1.4,
+          textTransform: 'uppercase',
+          marginTop: 2,
+        }}>de Documentos</span>
+      </div>
     </div>
   );
 }
@@ -200,13 +255,14 @@ export default function Sidebar({ route, setRoute, collapsed, setCollapsed, mobi
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: col ? 0 : '0 14px',
+          padding: col ? 0 : '0 8px 0 0',
           borderBottom: '1px solid var(--line)',
-          overflow: 'visible',
+          overflow: 'hidden',
+          transition: 'padding .18s ease',
         }}
       >
-        <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', overflow: 'visible' }}>
-          <Logo collapsed={col} theme={theme} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <Logo collapsed={col} />
         </div>
         {!col && !mobileOpen && (
           <button
