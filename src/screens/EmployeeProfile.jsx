@@ -1,6 +1,7 @@
 ﻿import { useState, useEffect, useRef } from 'react';
 import Icon from '../components/Icon.jsx';
 import Avatar from '../components/Avatar.jsx';
+import Skeleton from '../components/Skeleton.jsx';
 import {
   useEmployee,
   useEmployeeWarnings,
@@ -85,8 +86,52 @@ function EmployeeProfile({ setRoute, employeeId }) {
 
   if (loading) {
     return (
-      <div style={{ padding: 48, textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>
-        <div className="pulse">Carregando funcionário…</div>
+      <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
+        {/* Back */}
+        <button className="btn ghost sm" style={{ alignSelf: 'flex-start' }} onClick={() => setRoute('employees')}>
+          <Icon name="chevron-left" size={13} /> Funcionários
+        </button>
+
+        {/* Header card skeleton */}
+        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+          <div style={{ height: 4, background: 'var(--brand)' }} />
+          <div className="row" style={{ padding: '22px 24px', alignItems: 'center', gap: 18, flexWrap: 'wrap' }}>
+            <Skeleton width={86} circle />
+            <div className="grow" style={{ minWidth: 240 }}>
+              <Skeleton width={220} height={22} style={{ marginBottom: 10 }} />
+              <div className="row gap-3" style={{ flexWrap: 'wrap', gap: 14 }}>
+                <Skeleton width={120} height={12} />
+                <Skeleton width={140} height={12} />
+                <Skeleton width={90} height={12} />
+                <Skeleton width={150} height={12} />
+              </div>
+            </div>
+            <div className="row gap-2" style={{ paddingTop: 36 }}>
+              <Skeleton width={130} height={32} radius={8} />
+              <Skeleton width={150} height={32} radius={8} />
+              <Skeleton width={90} height={32} radius={8} />
+            </div>
+          </div>
+        </div>
+
+        {/* Tab bar skeleton */}
+        <div className="row gap-2" style={{ borderBottom: '1px solid var(--line)' }}>
+          {Array.from({ length: 6 }, (_, i) => (
+            <Skeleton key={i} width={100} height={32} radius={6} style={{ marginBottom: -1 }} />
+          ))}
+        </div>
+
+        {/* Tab content skeleton (grid de cards) */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
+          {Array.from({ length: 4 }, (_, i) => (
+            <div key={i} className="card" style={{ padding: 20 }}>
+              <Skeleton width={140} height={14} style={{ marginBottom: 16 }} />
+              <Skeleton height={12} style={{ marginBottom: 8, maxWidth: '85%' }} />
+              <Skeleton height={12} style={{ marginBottom: 8, maxWidth: '70%' }} />
+              <Skeleton height={12} style={{ maxWidth: '90%' }} />
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
