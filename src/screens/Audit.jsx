@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import Icon from '../components/Icon.jsx';
 import Avatar from '../components/Avatar.jsx';
+import Skeleton from '../components/Skeleton.jsx';
 import { useAuditLog } from '../hooks/useEmployees.js';
 
 const ACTION_COLOR = {
@@ -89,8 +90,36 @@ export default function AuditScreen({ activeCompany }) {
 
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
         {loading ? (
-          <div style={{ padding: 40, display: 'flex', justifyContent: 'center' }}>
-            <div className="spinner" />
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <thead>
+                <tr style={{ background: 'var(--surface-2)', color: 'var(--muted)', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.6 }}>
+                  <th style={{ textAlign: 'left', padding: '10px 16px', fontWeight: 600, whiteSpace: 'nowrap' }}>Quando</th>
+                  <th style={{ textAlign: 'left', padding: '10px 16px', fontWeight: 600 }}>Quem</th>
+                  <th style={{ textAlign: 'left', padding: '10px 16px', fontWeight: 600 }}>Ação</th>
+                  <th style={{ textAlign: 'left', padding: '10px 16px', fontWeight: 600 }}>Alvo</th>
+                  <th style={{ textAlign: 'left', padding: '10px 16px', fontWeight: 600 }}>IP</th>
+                  <th style={{ textAlign: 'left', padding: '10px 16px', fontWeight: 600 }}>Dispositivo</th>
+                </tr>
+              </thead>
+              <tbody>
+                {Array.from({ length: 8 }, (_, i) => (
+                  <tr key={i} style={{ borderTop: '1px solid var(--line-soft)' }}>
+                    <td style={{ padding: '10px 16px' }}><Skeleton width={100} height={11} /></td>
+                    <td style={{ padding: '10px 16px' }}>
+                      <div className="row gap-2">
+                        <Skeleton width={26} circle />
+                        <Skeleton height={12} style={{ maxWidth: 100, flex: 1 }} />
+                      </div>
+                    </td>
+                    <td style={{ padding: '10px 16px' }}><Skeleton width={70} height={18} radius={20} /></td>
+                    <td style={{ padding: '10px 16px' }}><Skeleton height={12} style={{ maxWidth: 180 }} /></td>
+                    <td style={{ padding: '10px 16px' }}><Skeleton width={90} height={11} /></td>
+                    <td style={{ padding: '10px 16px' }}><Skeleton width={120} height={11} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         ) : filtered.length === 0 ? (
           <div style={{ padding: '48px 20px', textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>

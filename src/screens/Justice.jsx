@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import Icon from '../components/Icon.jsx';
 import Avatar from '../components/Avatar.jsx';
+import Skeleton from '../components/Skeleton.jsx';
 import OrionGlyph from '../components/OrionGlyph.jsx';
 import {
   useEmployees, useAllWarnings, useAllVacations, useAllDocuments, useAllTimecards,
@@ -620,7 +621,36 @@ export default function JusticeScreen({ addToast, activeCompany }) {
         {/* ── PROCESSOS ── */}
         {tab === 'processos' && (
           casesLoading ? (
-            <div style={{ padding: 40, display: 'flex', justifyContent: 'center' }}><div className="spinner" /></div>
+            <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 640 }}>
+                  <thead>
+                    <tr style={{ background: 'var(--surface-2)', color: 'var(--muted)', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.6 }}>
+                      {['Processo','Reclamante','Vara','Fase','Próxima ação',''].map((h, i) => (
+                        <th key={i} style={{ textAlign: 'left', padding: '10px 16px', fontWeight: 600, whiteSpace: 'nowrap' }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Array.from({ length: 6 }, (_, i) => (
+                      <tr key={i} style={{ borderTop: '1px solid var(--line-soft)' }}>
+                        <td style={{ padding: '12px 16px' }}><Skeleton width={140} height={11} /></td>
+                        <td style={{ padding: '12px 16px' }}>
+                          <div className="row gap-2">
+                            <Skeleton width={26} circle />
+                            <Skeleton height={12} style={{ maxWidth: 140, flex: 1 }} />
+                          </div>
+                        </td>
+                        <td style={{ padding: '12px 16px' }}><Skeleton height={12} style={{ maxWidth: 100 }} /></td>
+                        <td style={{ padding: '12px 16px' }}><Skeleton width={80} height={18} radius={20} /></td>
+                        <td style={{ padding: '12px 16px' }}><Skeleton width={100} height={11} /></td>
+                        <td style={{ padding: '12px 16px' }}><Skeleton width={20} height={20} radius={4} /></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           ) : cases.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '64px 20px', color: 'var(--muted)' }}>
               <Icon name="scale" size={38} style={{ opacity: 0.13, display: 'block', margin: '0 auto 14px' }} />
