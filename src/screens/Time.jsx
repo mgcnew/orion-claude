@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import Icon from '../components/Icon.jsx';
 import Avatar from '../components/Avatar.jsx';
 import Pagination from '../components/Pagination.jsx';
+import Skeleton from '../components/Skeleton.jsx';
 import { useEmployees, useMonthEntries, createTimeEntry } from '../hooks/useEmployees.js';
 
 // ── QuickEntry ───────────────────────────────────────────────
@@ -1688,7 +1689,33 @@ export function TimeScreen({ addToast, activeCompany }) {
 
           {/* Tabela resumo */}
           <div style={{ background:'var(--surface)', border:'1px solid var(--line)', borderRadius:10, overflow:'hidden' }}>
-            {entLoading ? <div style={{ padding:40, textAlign:'center', color:'var(--muted)', fontSize:13 }}><div className="pulse">Carregando…</div></div>
+            {entLoading ? (
+              <div style={{ overflowX:'auto' }}>
+                <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13, minWidth:500 }}>
+                  <thead>
+                    <tr style={{ background:'var(--surface-2)', color:'var(--muted)', fontSize:11, textTransform:'uppercase', letterSpacing:0.5 }}>
+                      {(resumoIsEmployee
+                        ? ['Data','Entrada','Saída','H. Trabalhadas','H. Extras','Status','Obs']
+                        : ['Funcionário','Presentes','Faltas','Atrasos','H. Trabalhadas','H. Extras','Ajustes']
+                      ).map(h => (
+                        <th key={h} style={{ padding:'10px 18px', textAlign:'left', fontWeight:600, whiteSpace:'nowrap' }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Array.from({ length: 6 }, (_, i) => (
+                      <tr key={i} style={{ borderTop:'1px solid var(--line-soft)' }}>
+                        {Array.from({ length: 7 }, (__, j) => (
+                          <td key={j} style={{ padding:'10px 18px' }}>
+                            <Skeleton height={11} style={{ maxWidth: j === 0 ? 110 : 70 }} />
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )
             : resumoRows.length===0 ? <EmptyState icon="dashboard" msg="Nenhum registro encontrado para este período." />
             : resumoIsEmployee ? (
               /* Detalhe dia a dia para funcionário selecionado */
@@ -2365,7 +2392,32 @@ function BancoTable({ rows, loading }) {
   return (
     <div style={{ background:'var(--surface)', border:'1px solid var(--line)', borderRadius:10, overflow:'hidden' }}>
       {loading
-        ? <div style={{ padding:40, textAlign:'center', color:'var(--muted)', fontSize:13 }}><div className="pulse">Carregando…</div></div>
+        ? (
+            <div style={{ overflowX:'auto' }}>
+              <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13, minWidth:500 }}>
+                <thead>
+                  <tr style={{ background:'var(--surface-2)', color:'var(--muted)', fontSize:11, textTransform:'uppercase', letterSpacing:0.5 }}>
+                    {['Funcionário','Presentes','Faltas','Atrasos','H. Trabalhadas','H. Extras (auto)','Ajustes'].map(h => (
+                      <th key={h} style={{ padding:'10px 18px', textAlign:'left', fontWeight:600, whiteSpace:'nowrap' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {Array.from({ length: 5 }, (_, i) => (
+                    <tr key={i} style={{ borderTop:'1px solid var(--line-soft)' }}>
+                      <td style={{ padding:'10px 18px' }}><Skeleton height={12} style={{ maxWidth: 140 }} /></td>
+                      <td style={{ padding:'10px 18px' }}><Skeleton width={36} height={11} /></td>
+                      <td style={{ padding:'10px 18px' }}><Skeleton width={40} height={18} radius={20} /></td>
+                      <td style={{ padding:'10px 18px' }}><Skeleton width={40} height={18} radius={20} /></td>
+                      <td style={{ padding:'10px 18px' }}><Skeleton width={60} height={11} /></td>
+                      <td style={{ padding:'10px 18px' }}><Skeleton width={50} height={11} /></td>
+                      <td style={{ padding:'10px 18px' }}><Skeleton width={20} height={11} /></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )
         : rows.length===0
           ? <EmptyState icon="chart" msg="Nenhum registro neste período." />
           : (
@@ -2432,7 +2484,26 @@ function EntriesTable({ entries, loading, columns, emptyMsg, showEmployee }) {
   return (
     <div style={{ background:'var(--surface)', border:'1px solid var(--line)', borderRadius:10, overflow:'hidden' }}>
       {loading ? (
-        <div style={{ padding:40, textAlign:'center', color:'var(--muted)', fontSize:13 }}><div className="pulse">Carregando…</div></div>
+        <div style={{ overflowX:'auto' }}>
+          <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13, minWidth:400 }}>
+            <thead>
+              <tr style={{ background:'var(--surface-2)', color:'var(--muted)', fontSize:11, textTransform:'uppercase', letterSpacing:0.5 }}>
+                {cols.map(c => <th key={c.key} style={{ padding:'10px 18px', textAlign:'left', fontWeight:600, whiteSpace:'nowrap' }}>{c.label}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {Array.from({ length: 6 }, (_, i) => (
+                <tr key={i} style={{ borderTop:'1px solid var(--line-soft)' }}>
+                  {cols.map(c => (
+                    <td key={c.key} style={{ padding:'10px 18px' }}>
+                      <Skeleton height={11} style={{ maxWidth: c.key === 'emp' || c.key === 'notes' ? '70%' : 80 }} />
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       ) : entries.length===0 ? (
         <EmptyState icon="clock" msg={emptyMsg||'Nenhum registro encontrado.'} />
       ) : (
