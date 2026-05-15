@@ -90,4 +90,4 @@ localStorage.removeItem('orion.tweaks.v1');
 - Vite 5
 - CSS variables + `oklch()` para avatares
 - SVG inline para ícones e gráficos (sem deps)
-- `Plus Jakarta Sans` + `JetBrains Mono` (Google Fonts)
+- `Manrope` + `JetBrains Mono` + `Space Grotesk` (Google Fonts)

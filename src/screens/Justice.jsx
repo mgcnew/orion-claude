@@ -931,7 +931,7 @@ function PrintPreview({ tpl, employee, city, reason, company, onBack, onPrint, a
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'center', padding: '0 0 30px' }}>
-        <div className="orion-print-page" style={{ width: 794, minHeight: 1123, padding: '68px 70px', background: '#ffffff', color: '#0B0D11', fontFamily: '"Plus Jakarta Sans", serif', lineHeight: 1.6, boxShadow: '0 8px 32px rgba(20,25,40,.10)', border: '1px solid var(--line)', borderRadius: 4 }}>
+        <div className="orion-print-page" style={{ width: 794, minHeight: 1123, padding: '68px 70px', background: '#ffffff', color: '#0B0D11', fontFamily: '"Manrope", sans-serif', lineHeight: 1.6, boxShadow: '0 8px 32px rgba(20,25,40,.10)', border: '1px solid var(--line)', borderRadius: 4 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, paddingBottom: 18, borderBottom: '2px solid #0B0D11' }}>
             <div style={{ width: 44, height: 44, borderRadius: 8, background: '#0B0D11', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <OrionGlyph size={22} />

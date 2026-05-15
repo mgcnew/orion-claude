@@ -156,7 +156,7 @@ function LogoMark({ size = 40 }) {
         fill="#fff"
         fontSize="16"
         fontWeight="700"
-        fontFamily="'Space Grotesk', 'Plus Jakarta Sans', system-ui, sans-serif"
+        fontFamily="'Space Grotesk', 'Manrope', system-ui, sans-serif"
         letterSpacing="-0.5"
       >SR</text>
     </svg>
@@ -199,14 +199,14 @@ function Logo({ collapsed }) {
         }}
       >
         <span style={{
-          fontFamily: "'Space Grotesk', 'Plus Jakarta Sans', system-ui, sans-serif",
+          fontFamily: "'Space Grotesk', 'Manrope', system-ui, sans-serif",
           fontSize: 15,
           fontWeight: 700,
           color: 'var(--ink)',
           letterSpacing: 0.3,
         }}>SR Gestão</span>
         <span style={{
-          fontFamily: "'Space Grotesk', 'Plus Jakarta Sans', system-ui, sans-serif",
+          fontFamily: "'Space Grotesk', 'Manrope', system-ui, sans-serif",
           fontSize: 9.5,
           fontWeight: 600,
           color: 'var(--muted)',
