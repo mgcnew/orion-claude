@@ -2,6 +2,7 @@
 import { createPortal } from 'react-dom';
 import Icon from '../components/Icon.jsx';
 import Avatar from '../components/Avatar.jsx';
+import Skeleton from '../components/Skeleton.jsx';
 import { useEmployees, useEmployee, useEmployeeCounts, useEmployeeWarnings, useEmployeeVacations, useEmployeeDocuments, useEmployeeHistory, useEmployeeTimeEntries, clockIn, clockOut, createEmployee, updateEmployee, updateEmployeeStatus, createDocuments, useCompanies, useOnboardingDocs, createOnboardingDocs, markOnboardingDocUploaded, useAllPendingOnboarding, logAudit } from '../hooks/useEmployees.js';
 import { supabase } from '../lib/supabase.js';
 import { usePermissions } from '../lib/permissions.jsx';
@@ -1033,6 +1034,80 @@ function FilterPanel({ filters, onChange, onClear, anchorRect, onClose }) {
   );
 }
 
+// ── Skeleton renderers para EmployeesList ─────────────────────────
+function EmployeesTableSkeleton({ rows = 6 }) {
+  return (
+    <div style={{ overflowX: 'auto' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13.5 }}>
+        <thead>
+          <tr style={{ background: 'var(--surface-2)', color: 'var(--muted)', fontSize: 11.5, textTransform: 'uppercase', letterSpacing: 0.6 }}>
+            <th style={{ padding: '10px 16px', textAlign: 'left', fontWeight: 600, width: 40 }} />
+            <th style={{ padding: '10px 16px', textAlign: 'left', fontWeight: 600 }}>Funcionário</th>
+            <th style={{ padding: '10px 16px', textAlign: 'left', fontWeight: 600 }}>Empresa</th>
+            <th style={{ padding: '10px 16px', textAlign: 'left', fontWeight: 600 }}>Status</th>
+            <th style={{ padding: '10px 16px', textAlign: 'left', fontWeight: 600 }}>Admissão</th>
+            <th style={{ padding: '10px 16px', textAlign: 'left', fontWeight: 600, width: 60 }} />
+          </tr>
+        </thead>
+        <tbody>
+          {Array.from({ length: rows }, (_, i) => (
+            <tr key={i} style={{ borderTop: '1px solid var(--line-soft)' }}>
+              <td style={{ padding: '12px 16px' }}>
+                <Skeleton width={14} height={14} radius={3} />
+              </td>
+              <td style={{ padding: '12px 16px' }}>
+                <div className="row gap-3">
+                  <Skeleton width={34} circle />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <Skeleton height={13} style={{ marginBottom: 6, maxWidth: 180 }} />
+                    <Skeleton height={11} style={{ maxWidth: 120 }} />
+                  </div>
+                </div>
+              </td>
+              <td style={{ padding: '12px 16px' }}>
+                <Skeleton height={12} style={{ maxWidth: 110 }} />
+              </td>
+              <td style={{ padding: '12px 16px' }}>
+                <Skeleton width={68} height={20} radius={20} />
+              </td>
+              <td style={{ padding: '12px 16px' }}>
+                <Skeleton width={80} height={12} />
+              </td>
+              <td style={{ padding: '12px 16px' }}>
+                <Skeleton width={20} height={20} radius={4} />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function EmployeesCardsSkeleton({ count = 9 }) {
+  return (
+    <div style={{ padding: 16, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 12 }}>
+      {Array.from({ length: count }, (_, i) => (
+        <div key={i} className="card" style={{ padding: 16 }}>
+          <div className="row" style={{ marginBottom: 12 }}>
+            <Skeleton width={42} circle />
+            <div style={{ flex: 1, marginLeft: 10 }}>
+              <Skeleton height={14} style={{ marginBottom: 6, maxWidth: 140 }} />
+              <Skeleton height={11} style={{ maxWidth: 100 }} />
+            </div>
+          </div>
+          <Skeleton height={12} style={{ marginBottom: 8, maxWidth: '85%' }} />
+          <Skeleton height={12} style={{ marginBottom: 12, maxWidth: '60%' }} />
+          <div className="row gap-2">
+            <Skeleton width={70} height={20} radius={20} />
+            <Skeleton width={80} height={12} style={{ marginLeft: 'auto' }} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function EmployeesList({ setRoute, setRouteParam, setRouteLabel, companyId, openModal }) {
   const { can } = usePermissions();
   const [view, setView]     = useState('table');
@@ -1211,9 +1286,7 @@ export function EmployeesList({ setRoute, setRouteParam, setRouteLabel, companyI
         )}
 
         {loading ? (
-          <div style={{ padding: 48, textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>
-            <div className="pulse">Carregando funcionários…</div>
-          </div>
+          view === 'table' ? <EmployeesTableSkeleton /> : <EmployeesCardsSkeleton />
         ) : view === 'table' ? (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13.5 }}>
