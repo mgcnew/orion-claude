@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import Icon from '../components/Icon.jsx';
+import Skeleton from '../components/Skeleton.jsx';
 import Pagination from '../components/Pagination.jsx';
 import Avatar from '../components/Avatar.jsx';
 import {
@@ -346,7 +347,35 @@ function AdvertenciasTab({ addToast, companyId, activeEmployees, can, warnings, 
         </div>
 
         {loading ? (
-          <div style={{ padding: 48, textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}><div className="pulse">Carregando…</div></div>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <thead>
+              <tr style={{ background: 'var(--surface-2)', color: 'var(--muted)', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.6 }}>
+                <th style={{ textAlign: 'left', padding: '9px 16px', fontWeight: 600 }}>Funcionário</th>
+                <th style={{ textAlign: 'left', padding: '9px 16px', fontWeight: 600 }}>Motivo</th>
+                <th style={{ textAlign: 'left', padding: '9px 16px', fontWeight: 600 }}>Data</th>
+                <th style={{ textAlign: 'left', padding: '9px 16px', fontWeight: 600 }}>Aplicada por</th>
+                <th style={{ textAlign: 'left', padding: '9px 16px', fontWeight: 600 }}>Severidade</th>
+                <th style={{ width: 40 }} />
+              </tr>
+            </thead>
+            <tbody>
+              {Array.from({ length: 6 }, (_, i) => (
+                <tr key={i} style={{ borderTop: '1px solid var(--line-soft)' }}>
+                  <td style={{ padding: '11px 16px' }}>
+                    <div className="row gap-2">
+                      <Skeleton width={28} circle />
+                      <Skeleton height={12} style={{ maxWidth: 130, flex: 1 }} />
+                    </div>
+                  </td>
+                  <td style={{ padding: '11px 16px' }}><Skeleton height={12} style={{ maxWidth: '70%' }} /></td>
+                  <td style={{ padding: '11px 16px' }}><Skeleton width={80} height={11} /></td>
+                  <td style={{ padding: '11px 16px' }}><Skeleton height={12} style={{ maxWidth: 100 }} /></td>
+                  <td style={{ padding: '11px 16px' }}><Skeleton width={70} height={18} radius={20} /></td>
+                  <td style={{ padding: '11px 16px' }}><Skeleton width={20} height={20} radius={4} /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         ) : filtered.length === 0 ? (
           <div style={{ padding: 48, textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>
             <Icon name="alert" size={28} style={{ opacity: 0.2, marginBottom: 10 }} />
@@ -566,7 +595,37 @@ function FeriasTab({ addToast, companyId, activeEmployees, can, vacations, loadi
         </div>
 
         {loading ? (
-          <div style={{ padding: 48, textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}><div className="pulse">Carregando…</div></div>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <thead>
+              <tr style={{ background: 'var(--surface-2)', color: 'var(--muted)', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.6 }}>
+                <th style={{ textAlign: 'left', padding: '9px 16px', fontWeight: 600 }}>Funcionário</th>
+                <th style={{ textAlign: 'left', padding: '9px 16px', fontWeight: 600 }}>Período</th>
+                <th style={{ textAlign: 'left', padding: '9px 16px', fontWeight: 600 }}>Dias</th>
+                <th style={{ textAlign: 'left', padding: '9px 16px', fontWeight: 600 }}>Solicitado em</th>
+                <th style={{ textAlign: 'left', padding: '9px 16px', fontWeight: 600 }}>Aprovado por</th>
+                <th style={{ textAlign: 'left', padding: '9px 16px', fontWeight: 600 }}>Status</th>
+                <th style={{ width: 120 }} />
+              </tr>
+            </thead>
+            <tbody>
+              {Array.from({ length: 6 }, (_, i) => (
+                <tr key={i} style={{ borderTop: '1px solid var(--line-soft)' }}>
+                  <td style={{ padding: '11px 16px' }}>
+                    <div className="row gap-2">
+                      <Skeleton width={28} circle />
+                      <Skeleton height={12} style={{ maxWidth: 130, flex: 1 }} />
+                    </div>
+                  </td>
+                  <td style={{ padding: '11px 16px' }}><Skeleton height={11} style={{ maxWidth: 150 }} /></td>
+                  <td style={{ padding: '11px 16px' }}><Skeleton width={32} height={18} radius={20} /></td>
+                  <td style={{ padding: '11px 16px' }}><Skeleton width={80} height={11} /></td>
+                  <td style={{ padding: '11px 16px' }}><Skeleton height={12} style={{ maxWidth: 100 }} /></td>
+                  <td style={{ padding: '11px 16px' }}><Skeleton width={80} height={18} radius={20} /></td>
+                  <td style={{ padding: '11px 16px' }}><Skeleton width={90} height={24} radius={6} /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         ) : filtered.length === 0 ? (
           <div style={{ padding: 48, textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>
             <Icon name="umbrella" size={28} style={{ opacity: 0.2, marginBottom: 10 }} />
@@ -953,9 +1012,21 @@ function BeneficiosTab({ addToast, companyId, activeEmployees, can, benefits, lo
               </tr>
             </thead>
             <tbody>
-              {loading && (
-                <tr><td colSpan={6} style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--muted)' }}>Carregando…</td></tr>
-              )}
+              {loading && Array.from({ length: 5 }, (_, i) => (
+                <tr key={`sk-${i}`} style={{ borderTop: '1px solid var(--line)' }}>
+                  <td style={{ padding: '10px 16px' }}>
+                    <div className="row gap-2">
+                      <Skeleton width={28} circle />
+                      <Skeleton height={12} style={{ maxWidth: 130, flex: 1 }} />
+                    </div>
+                  </td>
+                  <td style={{ padding: '10px 16px' }}><Skeleton width={90} height={18} radius={20} /></td>
+                  <td className="rh-ben-col-value" style={{ padding: '10px 16px' }}><Skeleton width={70} height={11} /></td>
+                  <td className="rh-ben-col-start" style={{ padding: '10px 16px' }}><Skeleton width={80} height={11} /></td>
+                  <td style={{ padding: '10px 16px' }}><Skeleton width={60} height={18} radius={20} /></td>
+                  <td style={{ padding: '10px 16px' }}><Skeleton width={20} height={20} radius={4} /></td>
+                </tr>
+              ))}
               {!loading && filtered.length === 0 && (
                 <tr>
                   <td colSpan={6} style={{ padding: '40px 16px', textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>
