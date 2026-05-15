@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import Icon from '../components/Icon.jsx';
 import Avatar from '../components/Avatar.jsx';
+import Skeleton from '../components/Skeleton.jsx';
 import { supabase } from '../lib/supabase.js';
 
 function Sparkline({ data, color, height = 40, width = 120, fill = true }) {
@@ -468,6 +469,82 @@ function AdmissionsChart({ admissions, dismissals, months, year }) {
   );
 }
 
+function DashboardSkeleton() {
+  return (
+    <div className="dash-page" style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 20 }}>
+      {/* Header */}
+      <div style={{ minWidth: 240 }}>
+        <Skeleton width={120} height={12} style={{ marginBottom: 8 }} />
+        <Skeleton width={280} height={24} style={{ marginBottom: 8 }} />
+        <Skeleton width={420} height={14} />
+      </div>
+
+      {/* KPI grid */}
+      <div className="dash-kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>
+        {[0, 1, 2, 3].map(i => (
+          <div key={i} className="card" style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div className="row gap-2">
+              <Skeleton width={36} height={36} radius={9} />
+              <Skeleton height={12} style={{ flex: 1, maxWidth: 140 }} />
+            </div>
+            <div className="row" style={{ alignItems: 'flex-end', gap: 10 }}>
+              <Skeleton width={80} height={28} />
+              <Skeleton width={86} height={28} style={{ marginLeft: 'auto' }} />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Main grid */}
+      <div className="dash-grid-main" style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: 16 }}>
+        {/* Chart placeholder */}
+        <div className="card" style={{ padding: 20 }}>
+          <Skeleton width={180} height={16} style={{ marginBottom: 6 }} />
+          <Skeleton width={120} height={11} style={{ marginBottom: 20 }} />
+          <Skeleton width="100%" height={200} radius={8} />
+        </div>
+        {/* Donut placeholder */}
+        <div className="card" style={{ padding: 20 }}>
+          <Skeleton width={160} height={16} style={{ marginBottom: 6 }} />
+          <Skeleton width={120} height={11} style={{ marginBottom: 20 }} />
+          <div className="row gap-4" style={{ alignItems: 'center' }}>
+            <Skeleton width={130} circle />
+            <div className="col gap-2" style={{ flex: 1 }}>
+              {[0, 1, 2, 3].map(i => (
+                <div key={i} className="row gap-2">
+                  <Skeleton width={8} height={8} radius={2} />
+                  <Skeleton height={11} style={{ flex: 1, maxWidth: 80 }} />
+                  <Skeleton width={40} height={11} />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Lower grid */}
+      <div className="dash-grid-lower" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
+        {[0, 1, 2].map(j => (
+          <div key={j} className="card" style={{ padding: 20 }}>
+            <Skeleton width={140} height={15} style={{ marginBottom: 16 }} />
+            <div className="col gap-3">
+              {[0, 1, 2, 3].map(i => (
+                <div key={i} className="row gap-3" style={{ alignItems: 'flex-start' }}>
+                  <Skeleton width={30} height={30} radius={8} />
+                  <div className="grow">
+                    <Skeleton height={13} style={{ marginBottom: 6, maxWidth: '80%' }} />
+                    <Skeleton width={70} height={10} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function Dashboard({ setRoute, navigate, addToast, activeCompany, userName }) {
   const nav = navigate ?? setRoute;
   const { data, loading } = useDashboardData(activeCompany?.id);
@@ -492,13 +569,7 @@ export default function Dashboard({ setRoute, navigate, addToast, activeCompany,
     other: 'sparkle'
   };
 
-  if (loading) {
-    return (
-      <div style={{ padding: 40, display: 'flex', justifyContent: 'center' }}>
-        <div className="spinner"></div>
-      </div>
-    );
-  }
+  if (loading) return <DashboardSkeleton />;
 
   const actPercent = data.totalEmployees > 0 ? ((data.counts.ativo / data.totalEmployees) * 100).toFixed(1) : '0';
   const ferPercent = data.totalEmployees > 0 ? ((data.counts.férias / data.totalEmployees) * 100).toFixed(1) : '0';
