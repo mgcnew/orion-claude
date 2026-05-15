@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import Icon from '../components/Icon.jsx';
+import Skeleton from '../components/Skeleton.jsx';
 import { useAllDocuments, useEmployees, logAudit } from '../hooks/useEmployees.js';
 import { supabase } from '../lib/supabase.js';
 import { usePermissions } from '../lib/permissions.jsx';
@@ -783,7 +784,43 @@ export default function DocumentsScreen({ addToast, activeCompany, openModal }) 
         {/* Content */}
         <div style={{ flex: 1, overflowY: 'auto' }}>
           {loading ? (
-            <div style={{ padding: 48, textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}><div className="pulse">Carregando documentos…</div></div>
+            view === 'list' ? (
+              <div style={{ padding: 0 }}>
+                {Array.from({ length: 3 }, (_, gi) => (
+                  <div key={gi} style={{ borderBottom: '1px solid var(--line)' }}>
+                    {/* Cabeçalho de grupo */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', background: 'var(--surface-2)' }}>
+                      <Skeleton width={18} height={18} radius={4} />
+                      <Skeleton height={13} style={{ maxWidth: 160, flex: 1 }} />
+                      <Skeleton width={36} height={14} />
+                    </div>
+                    {/* Linhas de docs */}
+                    {Array.from({ length: 3 }, (__, di) => (
+                      <div key={di} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', borderTop: '1px solid var(--line-soft)' }}>
+                        <Skeleton width={14} height={14} radius={3} />
+                        <Skeleton width={28} height={28} radius={6} />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <Skeleton height={13} style={{ marginBottom: 5, maxWidth: '70%' }} />
+                          <Skeleton height={11} style={{ maxWidth: '40%' }} />
+                        </div>
+                        <Skeleton width={70} height={12} />
+                        <Skeleton width={20} height={20} radius={4} />
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div style={{ padding: 16, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12 }}>
+                {Array.from({ length: 10 }, (_, i) => (
+                  <div key={i} className="card" style={{ padding: 14 }}>
+                    <Skeleton height={90} radius={8} style={{ marginBottom: 12 }} />
+                    <Skeleton height={13} style={{ marginBottom: 6, maxWidth: '85%' }} />
+                    <Skeleton height={11} style={{ maxWidth: '55%' }} />
+                  </div>
+                ))}
+              </div>
+            )
           ) : error ? (
             <div style={{ padding: 48, textAlign: 'center', color: 'var(--bad)', fontSize: 13 }}>
               <Icon name="alert" size={28} style={{ opacity: 0.5, marginBottom: 10 }} />
