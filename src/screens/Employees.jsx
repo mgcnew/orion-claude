@@ -296,6 +296,19 @@ export function NewEmployeeModal({ onClose, onCreated }) {
       }}
       onClick={onClose}
     >
+      <style>{`
+        @media (max-width: 520px) {
+          .nm-step-label  { display: none; }
+          .nm-step-circle { width: 24px; height: 24px; font-size: 11px; }
+          .nm-step-connector { margin-top: 11px; }
+          .nm-stepper { padding-bottom: 14px; }
+          .nm-foot    { padding: 12px 14px; gap: 8px; }
+          .nm-foot-counter { display: none; }
+          .nm-body    { padding: 16px 14px 8px; }
+          .nm-head    { padding: 14px 14px 0; }
+          .nm-stepper-pad { padding: 0 14px; }
+        }
+      `}</style>
       {/* ── modal card ── */}
       <div
         style={{
@@ -311,7 +324,7 @@ export function NewEmployeeModal({ onClose, onCreated }) {
         {/* ── HEADER fixo ── */}
         <div style={{ flexShrink: 0, borderBottom: '1px solid var(--line)' }}>
           {/* título */}
-          <div style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div className="nm-head" style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 16, fontWeight: 700 }}>Novo funcionário</div>
               <div style={{ fontSize: 12.5, color: 'var(--muted)', marginTop: 2 }}>Preencha os dados do novo colaborador</div>
@@ -320,11 +333,11 @@ export function NewEmployeeModal({ onClose, onCreated }) {
           </div>
 
           {/* barra de progresso */}
-          <div style={{ padding: '0 20px 16px', display: 'flex', alignItems: 'flex-start' }}>
+          <div className="nm-stepper nm-stepper-pad" style={{ padding: '0 20px 16px', display: 'flex', alignItems: 'flex-start' }}>
             {NEW_EMP_STEPS.map((s, i) => (
               <div key={s.id} style={{ display: 'flex', alignItems: 'flex-start', flex: i < NEW_EMP_STEPS.length - 1 ? 1 : 0 }}>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5 }}>
-                  <div style={{
+                  <div className="nm-step-circle" style={{
                     width: 28, height: 28, borderRadius: '50%',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     background: i < step ? 'var(--ok)' : i === step ? 'var(--brand)' : 'var(--surface-2)',
@@ -334,7 +347,7 @@ export function NewEmployeeModal({ onClose, onCreated }) {
                   }}>
                     {i < step ? <Icon name="check" size={12} /> : i + 1}
                   </div>
-                  <span style={{
+                  <span className="nm-step-label" style={{
                     fontSize: 10, fontWeight: i === step ? 700 : 400,
                     color: i === step ? 'var(--ink)' : 'var(--muted)',
                     textAlign: 'center', lineHeight: 1.25,
@@ -344,7 +357,7 @@ export function NewEmployeeModal({ onClose, onCreated }) {
                   </span>
                 </div>
                 {i < NEW_EMP_STEPS.length - 1 && (
-                  <div style={{
+                  <div className="nm-step-connector" style={{
                     flex: 1, height: 2, margin: '13px 6px 0',
                     background: i < step ? 'var(--ok)' : 'var(--line)',
                     transition: 'background .3s', minWidth: 8,
@@ -356,7 +369,7 @@ export function NewEmployeeModal({ onClose, onCreated }) {
         </div>
 
         {/* ── BODY rolável ── */}
-        <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, padding: '20px 20px 8px' }}>
+        <div className="nm-body" style={{ flex: 1, overflowY: 'auto', minHeight: 0, padding: '20px 20px 8px' }}>
           {step === 0 && (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14 }}>
               <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'center', marginBottom: 4 }}>
@@ -628,7 +641,7 @@ export function NewEmployeeModal({ onClose, onCreated }) {
         </div>
 
         {/* ── FOOTER fixo ── */}
-        <div style={{
+        <div className="nm-foot" style={{
           flexShrink: 0, padding: '14px 20px',
           borderTop: '1px solid var(--line)',
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
@@ -637,14 +650,14 @@ export function NewEmployeeModal({ onClose, onCreated }) {
           <button className="btn" onClick={step === 0 ? onClose : prev}>
             {step === 0 ? 'Cancelar' : <><Icon name="chevron-left" size={13} /> Voltar</>}
           </button>
-          <span style={{ fontSize: 12, color: 'var(--muted)' }}>Etapa {step + 1} de {NEW_EMP_STEPS.length}</span>
+          <span className="nm-foot-counter" style={{ fontSize: 12, color: 'var(--muted)' }}>Etapa {step + 1} de {NEW_EMP_STEPS.length}</span>
           {step < 3 ? (
             <button className="btn primary" onClick={next}>
               Próximo <Icon name="chevron-right" size={13} />
             </button>
           ) : (
             <button className="btn primary" onClick={handleSave} disabled={saving}>
-              {saving ? 'Salvando…' : <><Icon name="check" size={13} /> Cadastrar funcionário</>}
+              {saving ? 'Salvando…' : <><Icon name="check" size={13} /> Cadastrar</>}
             </button>
           )}
         </div>
@@ -940,6 +953,14 @@ const STATUS_OPTIONS = [
 
 function FilterPanel({ filters, onChange, onClear, anchorRect, onClose }) {
   const ref = useRef();
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 520px)').matches);
+
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 520px)');
+    const onChangeMq = (e) => setIsMobile(e.matches);
+    mq.addEventListener('change', onChangeMq);
+    return () => mq.removeEventListener('change', onChangeMq);
+  }, []);
 
   useEffect(() => {
     const handler = (e) => {
@@ -949,28 +970,44 @@ function FilterPanel({ filters, onChange, onClear, anchorRect, onClose }) {
     return () => document.removeEventListener('mousedown', handler);
   }, [onClose]);
 
-  if (!anchorRect) return null;
+  if (!anchorRect && !isMobile) return null;
 
-  const top = anchorRect.bottom + 6;
-  const left = anchorRect.right - 280;
+  const desktopStyle = anchorRect ? {
+    position: 'fixed',
+    top: anchorRect.bottom + 6,
+    left: Math.max(8, anchorRect.right - 280),
+    width: 280,
+  } : {};
+
+  const mobileStyle = {
+    position: 'fixed',
+    left: 12, right: 12, bottom: 12,
+    width: 'auto',
+  };
 
   return createPortal(
+    <>
+      {isMobile && (
+        <div
+          onClick={onClose}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', zIndex: 499, backdropFilter: 'blur(2px)' }}
+        />
+      )}
     <div
       ref={ref}
       style={{
-        position: 'fixed',
-        top,
-        left: Math.max(8, left),
-        width: 280,
+        ...(isMobile ? mobileStyle : desktopStyle),
         background: 'var(--surface)',
         border: '1px solid var(--line)',
-        borderRadius: 10,
-        boxShadow: '0 8px 32px rgba(0,0,0,.15)',
+        borderRadius: 12,
+        boxShadow: '0 12px 40px rgba(0,0,0,.18)',
         zIndex: 500,
         padding: 16,
         display: 'flex',
         flexDirection: 'column',
         gap: 14,
+        maxHeight: 'calc(100vh - 24px)',
+        overflowY: 'auto',
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -1029,7 +1066,8 @@ function FilterPanel({ filters, onChange, onClear, anchorRect, onClose }) {
           </div>
         </div>
       </div>
-    </div>,
+    </div>
+    </>,
     document.body
   );
 }
@@ -1111,6 +1149,14 @@ function EmployeesCardsSkeleton({ count = 9 }) {
 export function EmployeesList({ setRoute, setRouteParam, setRouteLabel, companyId, openModal }) {
   const { can } = usePermissions();
   const [view, setView]     = useState('table');
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches);
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 768px)');
+    const onChange = (e) => setIsMobile(e.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+  const effectiveView = isMobile ? 'cards' : view;
   const [filters, setFilters] = useState({ status: 'todos', admissionFrom: '', admissionTo: '' });
   const [q, setQ]           = useState('');
   const [selected, setSelected] = useState(new Set());
@@ -1163,17 +1209,98 @@ export function EmployeesList({ setRoute, setRouteParam, setRouteLabel, companyI
 
   return (
     <>
-    <div className="fade-up" style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <div className="row" style={{ gap: 12, flexWrap: 'wrap' }}>
-        <div className="grow">
-          <h1 style={{ margin: '0 0 4px', fontSize: 22, fontWeight: 700, letterSpacing: -0.4 }}>
-            Funcionários
-          </h1>
-          <p style={{ margin: 0, fontSize: 13, color: 'var(--muted)' }}>
-            Gerencie cadastros, status e documentação de toda a equipe.
-          </p>
+    <style>{`
+      .emp-page         { padding: 24px; display: flex; flex-direction: column; gap: 16px; }
+      .emp-header       { display: flex; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+      .emp-header-title { flex: 1; min-width: 0; }
+      .emp-h1           { margin: 0 0 4px; font-size: 22px; font-weight: 700; letter-spacing: -0.4px; }
+      .emp-subtitle     { margin: 0; font-size: 13px; color: var(--muted); }
+      .emp-header-actions { display: flex; gap: 8px; flex-shrink: 0; }
+
+      .emp-toolbar      { padding: 8px 16px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 8px; }
+      .emp-search-wrap  { position: relative; flex-shrink: 0; }
+      .emp-search       { width: 260px; padding-left: 32px; height: 34px; }
+      .emp-toolbar-spacer { flex: 1; }
+      .emp-view-toggle  { display: flex; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; }
+
+      .emp-cards-grid   { padding: 16px; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+      .emp-card         { padding: 14px 16px; cursor: pointer; display: flex; flex-direction: column; gap: 12px; transition: border-color .15s, box-shadow .15s; }
+      .emp-card:hover   { border-color: var(--brand); box-shadow: 0 4px 14px rgba(42,91,255,.08); }
+      .emp-card-top     { display: flex; align-items: flex-start; gap: 12px; }
+      .emp-card-id      { flex: 1; min-width: 0; }
+      .emp-card-name    { font-weight: 600; font-size: 14.5px; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .emp-card-role    { font-size: 12px; color: var(--muted); margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .emp-card-meta    { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+      .emp-card-chip    { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 500; color: var(--muted); background: var(--surface-2); border: 1px solid var(--line); padding: 3px 8px; border-radius: 999px; }
+      .emp-card-chip-soft { background: transparent; }
+
+      .emp-selbar       { padding: 10px 16px; background: var(--brand-tint); border-bottom: 1px solid var(--line); font-size: 13px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+      .emp-foot         { padding: 10px 16px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; display: flex; align-items: center; gap: 12px; }
+      .emp-foot-count   { flex-shrink: 0; }
+      .emp-foot-pager   { display: flex; gap: 8px; align-items: center; flex-shrink: 0; }
+
+      .emp-fab          { display: none; }
+
+      @media (max-width: 768px) {
+        .emp-page         { padding: 16px; gap: 12px; }
+        .emp-h1           { font-size: 20px; }
+        .emp-subtitle     { font-size: 12.5px; }
+
+        /* esconde "Exportar CSV" e "Novo funcionário" do header — Novo vira FAB */
+        .emp-header-actions { display: none; }
+
+        .emp-toolbar      { padding: 8px 12px; gap: 6px; flex-wrap: nowrap; }
+        .emp-search-wrap  { flex: 1; min-width: 0; }
+        .emp-search       { width: 100%; }
+        .emp-toolbar-spacer { display: none; }
+        .emp-view-toggle  { display: none; }
+
+        /* FAB de criar */
+        .emp-fab {
+          display: flex;
+          position: fixed;
+          right: 18px;
+          bottom: 18px;
+          width: 56px; height: 56px;
+          border-radius: 50%;
+          background: var(--brand);
+          color: var(--brand-ink, #fff);
+          border: none;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          box-shadow: 0 8px 24px rgba(42,91,255,.35), 0 2px 6px rgba(0,0,0,.12);
+          z-index: 90;
+          transition: transform .15s, box-shadow .15s;
+        }
+        .emp-fab:hover { transform: translateY(-2px); box-shadow: 0 12px 30px rgba(42,91,255,.45); }
+        .emp-fab:active { transform: translateY(0); }
+      }
+
+      @media (max-width: 768px) {
+        .emp-cards-grid { padding: 12px; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+      }
+      @media (max-width: 768px) {
+        .emp-selbar     { padding: 10px 12px; gap: 6px; }
+        .emp-selbar-label { display: none; }
+        .emp-foot       { padding: 10px 12px; flex-direction: column; align-items: stretch; gap: 8px; }
+        .emp-foot-count { text-align: center; }
+        .emp-foot-pager { justify-content: center; }
+      }
+      @media (max-width: 480px) {
+        .emp-page { padding: 12px; }
+        .emp-filter-btn .emp-filter-label { display: none; }
+        .emp-cards-grid { grid-template-columns: 1fr; padding: 10px; }
+        .emp-card { padding: 14px; }
+      }
+    `}</style>
+    <div className="fade-up emp-page">
+      <div className="emp-header">
+        <div className="emp-header-title">
+          <h1 className="emp-h1">Funcionários</h1>
+          <p className="emp-subtitle">Gerencie cadastros, status e documentação de toda a equipe.</p>
         </div>
-        <div className="row gap-2">
+        <div className="emp-header-actions">
           <button className="btn">
             <Icon name="download" size={15} /> Exportar CSV
           </button>
@@ -1186,30 +1313,26 @@ export function EmployeesList({ setRoute, setRouteParam, setRouteLabel, companyI
       </div>
 
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-        <div
-          className="row"
-          style={{ padding: '8px 16px', borderBottom: '1px solid var(--line)', gap: 8 }}
-        >
-          <div style={{ position: 'relative' }}>
+        <div className="emp-toolbar">
+          <div className="emp-search-wrap">
             <Icon
               name="search"
               size={14}
               style={{ position: 'absolute', left: 10, top: 10, color: 'var(--muted)' }}
             />
             <input
-              className="field"
+              className="field emp-search"
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder="Buscar por nome, cargo, depto…"
-              style={{ width: 260, paddingLeft: 32, height: 34 }}
             />
           </div>
-          <span className="grow" />
+          <span className="emp-toolbar-spacer" />
           <div style={{ position: 'relative' }}>
-            <button ref={filterBtnRef} className="btn sm" onClick={toggleFilter}
+            <button ref={filterBtnRef} className="btn sm emp-filter-btn" onClick={toggleFilter}
               style={{ background: activeFilterCount > 0 ? 'var(--brand-tint)' : undefined, color: activeFilterCount > 0 ? 'var(--brand)' : undefined, borderColor: activeFilterCount > 0 ? 'var(--brand)' : undefined }}
             >
-              <Icon name="filter" size={13} /> Filtros
+              <Icon name="filter" size={13} /> <span className="emp-filter-label">Filtros</span>
               {activeFilterCount > 0 && (
                 <span style={{ background: 'var(--brand)', color: 'var(--brand-ink)', borderRadius: 20, fontSize: 10, fontWeight: 700, padding: '1px 6px', marginLeft: 4 }}>
                   {activeFilterCount}
@@ -1226,58 +1349,47 @@ export function EmployeesList({ setRoute, setRouteParam, setRouteLabel, companyI
               onClose={() => setFilterOpen(false)}
             />
           )}
-            <div
-              className="row"
-              style={{ border: '1px solid var(--line)', borderRadius: 7, overflow: 'hidden' }}
+          <div className="emp-view-toggle">
+            <button
+              onClick={() => setView('table')}
+              style={{
+                border: 'none',
+                background: view === 'table' ? 'var(--hover)' : 'transparent',
+                padding: '6px 9px',
+                cursor: 'pointer',
+                color: 'var(--ink)',
+              }}
             >
-              <button
-                onClick={() => setView('table')}
-                style={{
-                  border: 'none',
-                  background: view === 'table' ? 'var(--hover)' : 'transparent',
-                  padding: '6px 9px',
-                  cursor: 'pointer',
-                  color: 'var(--ink)',
-                }}
-              >
-                <Icon name="dashboard" size={13} />
-              </button>
-              <button
-                onClick={() => setView('cards')}
-                style={{
-                  border: 'none',
-                  background: view === 'cards' ? 'var(--hover)' : 'transparent',
-                  padding: '6px 9px',
-                  cursor: 'pointer',
-                  color: 'var(--ink)',
-                }}
-              >
-                <Icon name="folder" size={13} />
-              </button>
-            </div>
+              <Icon name="dashboard" size={13} />
+            </button>
+            <button
+              onClick={() => setView('cards')}
+              style={{
+                border: 'none',
+                background: view === 'cards' ? 'var(--hover)' : 'transparent',
+                padding: '6px 9px',
+                cursor: 'pointer',
+                color: 'var(--ink)',
+              }}
+            >
+              <Icon name="folder" size={13} />
+            </button>
+          </div>
         </div>
 
         {/* Selection bar */}
         {selected.size > 0 && (
-          <div
-            className="row gap-3"
-            style={{
-              padding: '10px 16px',
-              background: 'var(--brand-tint)',
-              borderBottom: '1px solid var(--line)',
-              fontSize: 13,
-            }}
-          >
+          <div className="emp-selbar">
             <strong>{selected.size} selecionados</strong>
             <span className="grow" />
-            <button className="btn sm">
-              <Icon name="download" size={13} /> Exportar
+            <button className="btn sm emp-selbar-btn">
+              <Icon name="download" size={13} /> <span className="emp-selbar-label">Exportar</span>
             </button>
-            <button className="btn sm">
-              <Icon name="lock" size={13} /> Bloquear acesso
+            <button className="btn sm emp-selbar-btn">
+              <Icon name="lock" size={13} /> <span className="emp-selbar-label">Bloquear acesso</span>
             </button>
-            <button className="btn sm">
-              <Icon name="trash" size={13} /> Arquivar
+            <button className="btn sm emp-selbar-btn">
+              <Icon name="trash" size={13} /> <span className="emp-selbar-label">Arquivar</span>
             </button>
             <button className="btn ghost sm icon" onClick={() => setSelected(new Set())}>
               <Icon name="x" size={13} />
@@ -1286,8 +1398,8 @@ export function EmployeesList({ setRoute, setRouteParam, setRouteLabel, companyI
         )}
 
         {loading ? (
-          view === 'table' ? <EmployeesTableSkeleton /> : <EmployeesCardsSkeleton />
-        ) : view === 'table' ? (
+          effectiveView === 'table' ? <EmployeesTableSkeleton /> : <EmployeesCardsSkeleton />
+        ) : effectiveView === 'table' ? (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13.5 }}>
               <thead>
@@ -1390,24 +1502,16 @@ export function EmployeesList({ setRoute, setRouteParam, setRouteLabel, companyI
             </table>
           </div>
         ) : (
-          <div
-            style={{
-              padding: 16,
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
-              gap: 12,
-            }}
-          >
+          <div className="emp-cards-grid">
             {filtered.map((emp) => (
               <div
                 key={emp.id}
-                className="card"
-                style={{ padding: 16, cursor: 'pointer' }}
+                className="card emp-card"
                 onClick={() => openProfile(emp.id, emp.name)}
               >
-                <div className="row" style={{ marginBottom: 12 }}>
+                <div className="emp-card-top">
                   <div style={{ position: 'relative', flexShrink: 0 }}>
-                    <Avatar name={emp.name} hue={emp.hue} size={42} url={emp.avatar_url} />
+                    <Avatar name={emp.name} hue={emp.hue} size={44} url={emp.avatar_url} />
                     {pendingByEmployee[emp.id] > 0 && (
                       <div style={{
                         position: 'absolute', top: -3, right: -3,
@@ -1420,9 +1524,11 @@ export function EmployeesList({ setRoute, setRouteParam, setRouteLabel, companyI
                       </div>
                     )}
                   </div>
-                  <span className="grow" />
-                  <StatusPill status={emp.status} />
-                  <div onClick={e => e.stopPropagation()}>
+                  <div className="emp-card-id">
+                    <div className="emp-card-name">{emp.name}</div>
+                    <div className="emp-card-role">{emp.role || '—'}{emp.dept ? ` · ${emp.dept}` : ''}</div>
+                  </div>
+                  <div onClick={e => e.stopPropagation()} style={{ flexShrink: 0 }}>
                     <RowMenu
                       emp={emp}
                       onProfile={() => openProfile(emp.id, emp.name)}
@@ -1432,34 +1538,33 @@ export function EmployeesList({ setRoute, setRouteParam, setRouteLabel, companyI
                     />
                   </div>
                 </div>
-                <div style={{ fontWeight: 600, fontSize: 14 }}>{emp.name}</div>
-                <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>{emp.role}</div>
-                <div className="h-line" style={{ margin: '12px 0' }} />
-                <div className="row" style={{ fontSize: 11.5, color: 'var(--muted)' }}>
-                  <span>{emp.company}</span>
-                  <span className="grow" />
-                  <span>{emp.dept}</span>
+                <div className="emp-card-meta">
+                  <StatusPill status={emp.status} />
+                  {emp.company && <span className="emp-card-chip">{emp.company}</span>}
+                  {emp.admission && (
+                    <span className="emp-card-chip emp-card-chip-soft">
+                      <Icon name="calendar" size={11} />
+                      {new Date(emp.admission + 'T00:00:00').toLocaleDateString('pt-BR')}
+                    </span>
+                  )}
                 </div>
               </div>
             ))}
+            {filtered.length === 0 && (
+              <div style={{ gridColumn: '1/-1', padding: '40px 16px', textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>
+                Nenhum funcionário encontrado.
+              </div>
+            )}
           </div>
         )}
 
         {/* Footer */}
-        <div
-          className="row"
-          style={{
-            padding: '10px 16px',
-            borderTop: '1px solid var(--line)',
-            color: 'var(--muted)',
-            fontSize: 12,
-          }}
-        >
-          <span>
+        <div className="emp-foot">
+          <span className="emp-foot-count">
             Mostrando {filtered.length} de {counts.todos}
           </span>
           <span className="grow" />
-          <div className="row gap-2">
+          <div className="emp-foot-pager">
             <button className="btn ghost sm icon">
               <Icon name="chevron-left" size={13} />
             </button>
@@ -1474,6 +1579,16 @@ export function EmployeesList({ setRoute, setRouteParam, setRouteLabel, companyI
       </div>
 
     </div>
+
+      {can('Funcionários', 'criar') && (
+        <button
+          className="emp-fab"
+          aria-label="Novo funcionário"
+          onClick={() => setShowNewModal(true)}
+        >
+          <Icon name="plus" size={22} />
+        </button>
+      )}
 
       {showNewModal && (
         <NewEmployeeModal onClose={() => setShowNewModal(false)} onCreated={onSaved} />
@@ -1632,6 +1747,19 @@ export function EditEmployeeModal({ employee, onClose, onSaved }) {
       }}
       onClick={onClose}
     >
+      <style>{`
+        @media (max-width: 520px) {
+          .nm-step-label  { display: none; }
+          .nm-step-circle { width: 24px; height: 24px; font-size: 11px; }
+          .nm-step-connector { margin-top: 11px; }
+          .nm-stepper { padding-bottom: 14px; }
+          .nm-foot    { padding: 12px 14px; gap: 8px; }
+          .nm-foot-counter { display: none; }
+          .nm-body    { padding: 16px 14px 8px; }
+          .nm-head    { padding: 14px 14px 0; }
+          .nm-stepper-pad { padding: 0 14px; }
+        }
+      `}</style>
       <div
         style={{
           width: '100%', maxWidth: 640,
@@ -1645,7 +1773,7 @@ export function EditEmployeeModal({ employee, onClose, onSaved }) {
       >
         {/* ── HEADER fixo ── */}
         <div style={{ flexShrink: 0, borderBottom: '1px solid var(--line)' }}>
-          <div style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div className="nm-head" style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 16, fontWeight: 700 }}>Editar funcionário</div>
               <div style={{ fontSize: 12.5, color: 'var(--muted)', marginTop: 2 }}>{employee.name} · {employee.role}</div>
@@ -1654,11 +1782,11 @@ export function EditEmployeeModal({ employee, onClose, onSaved }) {
           </div>
 
           {/* barra de progresso — idêntica ao NewEmployeeModal */}
-          <div style={{ padding: '0 20px 16px', display: 'flex', alignItems: 'flex-start' }}>
+          <div className="nm-stepper nm-stepper-pad" style={{ padding: '0 20px 16px', display: 'flex', alignItems: 'flex-start' }}>
             {EDIT_EMP_STEPS.map((s, i) => (
               <div key={s.id} style={{ display: 'flex', alignItems: 'flex-start', flex: i < EDIT_EMP_STEPS.length - 1 ? 1 : 0 }}>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5 }}>
-                  <div style={{
+                  <div className="nm-step-circle" style={{
                     width: 28, height: 28, borderRadius: '50%',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     background: i < step ? 'var(--ok)' : i === step ? 'var(--brand)' : 'var(--surface-2)',
@@ -1668,7 +1796,7 @@ export function EditEmployeeModal({ employee, onClose, onSaved }) {
                   }}>
                     {i < step ? <Icon name="check" size={12} /> : i + 1}
                   </div>
-                  <span style={{
+                  <span className="nm-step-label" style={{
                     fontSize: 10, fontWeight: i === step ? 700 : 400,
                     color: i === step ? 'var(--ink)' : 'var(--muted)',
                     textAlign: 'center', lineHeight: 1.25,
@@ -1678,7 +1806,7 @@ export function EditEmployeeModal({ employee, onClose, onSaved }) {
                   </span>
                 </div>
                 {i < EDIT_EMP_STEPS.length - 1 && (
-                  <div style={{
+                  <div className="nm-step-connector" style={{
                     flex: 1, height: 2, margin: '13px 6px 0',
                     background: i < step ? 'var(--ok)' : 'var(--line)',
                     transition: 'background .3s', minWidth: 8,
@@ -1690,7 +1818,7 @@ export function EditEmployeeModal({ employee, onClose, onSaved }) {
         </div>
 
         {/* ── BODY rolável ── */}
-        <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, padding: '20px 20px 8px' }}>
+        <div className="nm-body" style={{ flex: 1, overflowY: 'auto', minHeight: 0, padding: '20px 20px 8px' }}>
           {step === 0 && (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14 }}>
               <FL label="Nome completo *" span={2}>
@@ -1801,7 +1929,7 @@ export function EditEmployeeModal({ employee, onClose, onSaved }) {
         </div>
 
         {/* ── FOOTER fixo ── */}
-        <div style={{
+        <div className="nm-foot" style={{
           flexShrink: 0, padding: '14px 20px',
           borderTop: '1px solid var(--line)',
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
@@ -1810,7 +1938,7 @@ export function EditEmployeeModal({ employee, onClose, onSaved }) {
           <button className="btn" onClick={step === 0 ? onClose : prev}>
             {step === 0 ? 'Cancelar' : <><Icon name="chevron-left" size={13} /> Voltar</>}
           </button>
-          <span style={{ fontSize: 12, color: 'var(--muted)' }}>Etapa {step + 1} de {EDIT_EMP_STEPS.length}</span>
+          <span className="nm-foot-counter" style={{ fontSize: 12, color: 'var(--muted)' }}>Etapa {step + 1} de {EDIT_EMP_STEPS.length}</span>
           {step < EDIT_EMP_STEPS.length - 1 ? (
             <button className="btn primary" onClick={next}>
               Próximo <Icon name="chevron-right" size={13} />
