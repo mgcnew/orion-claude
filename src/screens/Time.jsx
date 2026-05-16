@@ -14,6 +14,8 @@ const QUICK_TYPES = [
   { id: 'atestado',   label: 'Atestado',   icon: 'file'     },
 ];
 
+const QE_LS_KEY = 'orion.time.quickentry.open';
+
 function QuickEntry({ employees, defaultEmpId, onSaved }) {
   const today = new Date().toISOString().slice(0, 10);
   const [empId,  setEmpId]  = useState(defaultEmpId || '');
@@ -25,6 +27,16 @@ function QuickEntry({ employees, defaultEmpId, onSaved }) {
   const [notes,  setNotes]  = useState('');
   const [saving, setSaving] = useState(false);
   const [ok,     setOk]     = useState(false);
+  const [open,   setOpen]   = useState(() => {
+    try { return localStorage.getItem(QE_LS_KEY) === '1'; } catch { return false; }
+  });
+  const toggleOpen = () => {
+    setOpen(v => {
+      const next = !v;
+      try { localStorage.setItem(QE_LS_KEY, next ? '1' : '0'); } catch (_) { /* ignore */ }
+      return next;
+    });
+  };
 
   useEffect(() => { if (defaultEmpId) setEmpId(defaultEmpId); }, [defaultEmpId]);
 
@@ -58,10 +70,29 @@ function QuickEntry({ employees, defaultEmpId, onSaved }) {
   };
 
   return (
-    <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 10, padding: '12px 14px' }}>
-      <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 10 }}>
-        Lançamento rápido
-      </div>
+    <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 10, padding: open ? '12px 14px' : '0' }}>
+      <button
+        type="button"
+        onClick={toggleOpen}
+        aria-expanded={open}
+        style={{
+          width: '100%', display: 'flex', alignItems: 'center', gap: 8,
+          background: 'transparent', border: 'none', cursor: 'pointer',
+          padding: open ? '0 0 10px' : '10px 14px',
+          fontSize: 11, fontWeight: 700, color: 'var(--muted)',
+          textTransform: 'uppercase', letterSpacing: 0.8, textAlign: 'left',
+        }}
+      >
+        <Icon name="bolt" size={12} style={{ color: 'var(--brand)' }} />
+        <span style={{ flex: 1 }}>Lançamento rápido</span>
+        {!open && (
+          <span style={{ fontSize: 10, fontWeight: 500, color: 'var(--muted)', textTransform: 'none', letterSpacing: 0 }}>
+            clique para expandir
+          </span>
+        )}
+        <Icon name={open ? 'chevron-up' : 'chevron-down'} size={12} />
+      </button>
+      {open && (
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end' }}>
 
         {/* Funcionário */}
@@ -145,6 +176,7 @@ function QuickEntry({ employees, defaultEmpId, onSaved }) {
           {ok ? 'Salvo!' : saving ? 'Salvando…' : 'Salvar'}
         </button>
       </div>
+      )}
     </div>
   );
 }
