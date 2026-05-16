@@ -1537,10 +1537,10 @@ export function TimeScreen({ addToast, activeCompany }) {
       {/* ── KPIs ── */}
       <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:12 }}>
         {[
-          { label:'Horas trabalhadas', value:empId ? minutesToHM(stats.workedMins) : '—', icon:'clock',   color:'var(--brand)'                                      },
-          { label:'Horas extras',      value:empId ? minutesToHM(stats.extraMins)  : '—', icon:'sparkle', color:stats.extraMins>0?'#7c3aed':'var(--muted)'            },
-          { label:'Faltas no mês',     value:empId ? stats.faltaCount              : '—', icon:'alert',   color:stats.faltaCount>0?'#dc2626':'var(--muted)'            },
-          { label:'Atrasos no mês',    value:empId ? stats.atrasoCount             : '—', icon:'history', color:stats.atrasoCount>0?'#ca8a04':'var(--muted)'           },
+          { label:'Horas trabalhadas', value:minutesToHM(stats.workedMins),  icon:'clock',   color:'var(--brand)'                                  },
+          { label:'Horas extras',      value:minutesToHM(stats.extraMins),   icon:'sparkle', color:stats.extraMins>0  ? '#7c3aed' : 'var(--muted)' },
+          { label:'Faltas no mês',     value:stats.faltaCount,               icon:'alert',   color:stats.faltaCount>0 ? '#dc2626' : 'var(--muted)' },
+          { label:'Atrasos no mês',    value:stats.atrasoCount,              icon:'history', color:stats.atrasoCount>0? '#ca8a04' : 'var(--muted)' },
         ].map((k,i) => (
           <div key={i} style={{ background:'var(--surface)', border:'1px solid var(--line)', borderRadius:10, padding:'14px 18px' }}>
             <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:8 }}>
