@@ -453,40 +453,19 @@ function AddDocModal({ onClose, onSaved, employees = [], companyId = null }) {
 // ============================================================
 // TABS DE CATEGORIA
 // ============================================================
-function CategoryTabs({ categories, activeCat, docCounts, totalCount, onSelect }) {
-  return (
-    <div style={{ display: 'flex', overflowX: 'auto', borderBottom: '1px solid var(--line)', flexShrink: 0, scrollbarWidth: 'none' }}>
-      <button
-        onClick={() => onSelect(null)}
-        style={{ flexShrink: 0, border: 'none', borderBottom: activeCat == null ? '2px solid var(--brand)' : '2px solid transparent', background: 'transparent', padding: '8px 14px', fontSize: 12.5, fontWeight: activeCat == null ? 700 : 500, color: activeCat == null ? 'var(--brand)' : 'var(--muted)', cursor: 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 6 }}
-      >
-        Todos
-        <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 5px', borderRadius: 10, background: activeCat == null ? 'var(--brand-tint)' : 'var(--surface-2)', color: activeCat == null ? 'var(--brand)' : 'var(--muted)' }}>
-          {totalCount}
-        </span>
-      </button>
-      {categories.filter(c => docCounts[c.id] > 0).map(c => (
-        <button
-          key={c.id}
-          onClick={() => onSelect(activeCat === c.id ? null : c.id)}
-          style={{ flexShrink: 0, border: 'none', borderBottom: activeCat === c.id ? `2px solid ${c.color}` : '2px solid transparent', background: 'transparent', padding: '8px 14px', fontSize: 12.5, fontWeight: activeCat === c.id ? 700 : 500, color: activeCat === c.id ? c.color : 'var(--muted)', cursor: 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 6 }}
-        >
-          <Icon name={c.icon} size={12} />
-          {c.name}
-          <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 5px', borderRadius: 10, background: activeCat === c.id ? c.color + '20' : 'var(--surface-2)', color: activeCat === c.id ? c.color : 'var(--muted)' }}>
-            {docCounts[c.id]}
-          </span>
-        </button>
-      ))}
-    </div>
-  );
-}
-
 // ============================================================
-// PAINEL DE FILTROS (apenas período)
+// PAINEL DE FILTROS (categoria + período)
 // ============================================================
-function DocFilterPanel({ filters, onChange, onClear, anchorRect, onClose }) {
+function DocFilterPanel({ filters, onChange, onClear, anchorRect, onClose, categories = [], docCounts = {}, totalCount = 0 }) {
   const ref = useRef();
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 520px)').matches);
+
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 520px)');
+    const onChangeMq = (e) => setIsMobile(e.matches);
+    mq.addEventListener('change', onChangeMq);
+    return () => mq.removeEventListener('change', onChangeMq);
+  }, []);
 
   useEffect(() => {
     const h = (e) => { if (ref.current && !ref.current.contains(e.target)) onClose(); };
@@ -494,30 +473,100 @@ function DocFilterPanel({ filters, onChange, onClear, anchorRect, onClose }) {
     return () => document.removeEventListener('mousedown', h);
   }, [onClose]);
 
-  if (!anchorRect) return null;
-  const top  = anchorRect.bottom + 6;
-  const left = Math.max(8, anchorRect.right - 256);
+  if (!anchorRect && !isMobile) return null;
+
+  const desktopStyle = anchorRect ? {
+    position: 'fixed',
+    top: anchorRect.bottom + 6,
+    left: Math.max(8, anchorRect.right - 320),
+    width: 320,
+  } : {};
+  const mobileStyle = { position: 'fixed', left: 12, right: 12, bottom: 12, width: 'auto' };
 
   return createPortal(
-    <div ref={ref} style={{
-      position: 'fixed', top, left, width: 256,
-      background: 'var(--surface)', border: '1px solid var(--line)',
-      borderRadius: 10, boxShadow: '0 8px 32px rgba(0,0,0,.15)',
-      zIndex: 500, padding: 16, display: 'flex', flexDirection: 'column', gap: 12,
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.6, color: 'var(--muted)' }}>Período</span>
-        <button className="btn ghost sm" style={{ fontSize: 11, padding: '2px 8px' }} onClick={onClear}>Limpar</button>
+    <>
+      {isMobile && (
+        <div
+          onClick={onClose}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', zIndex: 499, backdropFilter: 'blur(2px)' }}
+        />
+      )}
+      <div ref={ref} style={{
+        ...(isMobile ? mobileStyle : desktopStyle),
+        background: 'var(--surface)', border: '1px solid var(--line)',
+        borderRadius: 12, boxShadow: '0 12px 40px rgba(0,0,0,.18)',
+        zIndex: 500, padding: 16, display: 'flex', flexDirection: 'column', gap: 16,
+        maxHeight: 'calc(100vh - 24px)', overflowY: 'auto',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.6, color: 'var(--muted)' }}>Filtros</span>
+          <button className="btn ghost sm" style={{ fontSize: 11, padding: '2px 8px' }} onClick={onClear}>Limpar tudo</button>
+        </div>
+
+        {/* Categoria */}
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--muted)', marginBottom: 8 }}>
+            Categoria
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            <button
+              onClick={() => onChange('cat', null)}
+              style={{
+                border: `1px solid ${filters.cat == null ? 'var(--brand)' : 'var(--line)'}`,
+                background: filters.cat == null ? 'var(--brand-tint)' : 'transparent',
+                color: filters.cat == null ? 'var(--brand)' : 'var(--ink)',
+                borderRadius: 20, padding: '4px 11px', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                display: 'inline-flex', alignItems: 'center', gap: 5,
+              }}
+            >
+              Todas
+              <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 5px', borderRadius: 10, background: filters.cat == null ? 'var(--brand)' : 'var(--surface-2)', color: filters.cat == null ? 'var(--brand-ink, #fff)' : 'var(--muted)' }}>
+                {totalCount}
+              </span>
+            </button>
+            {categories.filter(c => docCounts[c.id] > 0).map(c => {
+              const on = filters.cat === c.id;
+              return (
+                <button
+                  key={c.id}
+                  onClick={() => onChange('cat', on ? null : c.id)}
+                  style={{
+                    border: `1px solid ${on ? c.color : 'var(--line)'}`,
+                    background: on ? c.color + '18' : 'transparent',
+                    color: on ? c.color : 'var(--ink)',
+                    borderRadius: 20, padding: '4px 11px', fontSize: 12, fontWeight: on ? 700 : 500, cursor: 'pointer',
+                    display: 'inline-flex', alignItems: 'center', gap: 5,
+                  }}
+                >
+                  <Icon name={c.icon} size={11} />
+                  {c.name}
+                  <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 5px', borderRadius: 10, background: on ? c.color + '30' : 'var(--surface-2)', color: on ? c.color : 'var(--muted)' }}>
+                    {docCounts[c.id]}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Período */}
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--muted)', marginBottom: 8 }}>
+            Período
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div>
+              <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>De</label>
+              <DateInput value={filters.dateFrom} onChange={e => onChange('dateFrom', e.target.value)} />
+            </div>
+            <div>
+              <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Até</label>
+              <DateInput value={filters.dateTo} onChange={e => onChange('dateTo', e.target.value)} />
+            </div>
+          </div>
+        </div>
       </div>
-      <div>
-        <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>De</label>
-        <DateInput value={filters.dateFrom} onChange={e => onChange('dateFrom', e.target.value)} />
-      </div>
-      <div>
-        <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Até</label>
-        <DateInput value={filters.dateTo} onChange={e => onChange('dateTo', e.target.value)} />
-      </div>
-    </div>,
+    </>,
     document.body
   );
 }
@@ -573,10 +622,11 @@ function DocPreviewModal({ doc, onClose }) {
           </div>
           {doc.file_url && (
             <button className="btn sm" onClick={handleDownload}>
-              <Icon name="download" size={13} /> Baixar
+              <Icon name="download" size={13} /> <span className="doc-preview-label">Baixar</span>
             </button>
           )}
           <button className="btn ghost icon sm" onClick={onClose}><Icon name="x" size={15} /></button>
+          <style>{`@media (max-width: 480px) { .doc-preview-label { display: none; } }`}</style>
         </div>
 
         {/* Content */}
@@ -651,7 +701,7 @@ export default function DocumentsScreen({ addToast, activeCompany, openModal }) 
     return true;
   });
 
-  const activeFilterCount = [!!filters.dateFrom, !!filters.dateTo].filter(Boolean).length;
+  const activeFilterCount = [!!filters.cat, !!filters.dateFrom, !!filters.dateTo].filter(Boolean).length;
 
   const toggleFilter = () => {
     if (!filterOpen) setFilterRect(filterBtnRef.current?.getBoundingClientRect() ?? null);
@@ -659,7 +709,6 @@ export default function DocumentsScreen({ addToast, activeCompany, openModal }) 
   };
   const handleFilterChange = (key, val) => setFilters(f => ({ ...f, [key]: val }));
   const clearFilters       = () => setFilters({ cat: null, dateFrom: '', dateTo: '' });
-  const clearDateFilters   = () => setFilters(f => ({ ...f, dateFrom: '', dateTo: '' }));
 
   const handleDelete = useCallback(async () => {
     if (!selected.size) return;
@@ -686,12 +735,81 @@ export default function DocumentsScreen({ addToast, activeCompany, openModal }) 
 
   return (
     <div
-      className="fade-up"
-      style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16, height: '100%', boxSizing: 'border-box', position: 'relative' }}
+      className="fade-up doc-page"
       onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
       onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) setDragOver(false); }}
       onDrop={(e) => { e.preventDefault(); setDragOver(false); setShowAddModal(true); }}
     >
+      <style>{`
+        .doc-page         { padding: 24px; display: flex; flex-direction: column; gap: 16px; height: 100%; box-sizing: border-box; position: relative; }
+        .doc-header       { display: flex; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+        .doc-header-title { flex: 1; min-width: 0; }
+        .doc-h1           { margin: 0 0 4px; font-size: 22px; font-weight: 700; letter-spacing: -0.4px; }
+        .doc-subtitle     { margin: 0; font-size: 13px; color: var(--muted); }
+        .doc-header-cta   { flex-shrink: 0; }
+
+        .doc-toolbar      { padding: 8px 16px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+        .doc-search-wrap  { position: relative; flex-shrink: 0; }
+        .doc-search       { width: 260px; padding-left: 30px; height: 34px; font-size: 13px; }
+        .doc-count        { font-size: 12px; color: var(--muted); align-self: center; margin-left: 4px; white-space: nowrap; }
+        .doc-spacer       { flex: 1; }
+        .doc-view-toggle  { display: flex; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; flex-shrink: 0; }
+
+        .doc-selbar       { padding: 8px 16px; background: var(--brand-tint); border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 10px; font-size: 13px; flex-shrink: 0; flex-wrap: wrap; }
+
+        .doc-fab          { display: none; }
+
+        @media (max-width: 768px) {
+          .doc-page         { padding: 14px; gap: 12px; }
+          .doc-h1           { font-size: 20px; }
+          .doc-subtitle     { font-size: 12.5px; }
+
+          /* botão "Novo documento" do header vira FAB */
+          .doc-header-cta   { display: none; }
+
+          .doc-toolbar      { padding: 8px 12px; gap: 6px; flex-wrap: nowrap; }
+          .doc-search-wrap  { flex: 1; min-width: 0; }
+          .doc-search       { width: 100%; }
+          .doc-count        { display: none; }
+          .doc-spacer       { display: none; }
+          .doc-view-toggle  { display: none; }
+          .doc-filter-label { display: none; }
+
+          .doc-selbar       { padding: 8px 12px; gap: 6px; }
+          .doc-selbar-label { display: none; }
+
+          .doc-fab {
+            display: flex;
+            position: fixed; right: 18px; bottom: 18px;
+            width: 56px; height: 56px; border-radius: 50%;
+            background: var(--brand); color: var(--brand-ink, #fff);
+            border: none; align-items: center; justify-content: center;
+            cursor: pointer; z-index: 90;
+            box-shadow: 0 8px 24px rgba(42,91,255,.35), 0 2px 6px rgba(0,0,0,.12);
+            transition: transform .15s, box-shadow .15s;
+          }
+          .doc-fab:hover { transform: translateY(-2px); box-shadow: 0 12px 30px rgba(42,91,255,.45); }
+        }
+
+        /* ── DocRow responsivo ─────────────────────────── */
+        .doc-row-date    { padding: 9px 16px; color: var(--muted); font-size: 12px; white-space: nowrap; flex-shrink: 0; }
+        .doc-row-actions { padding: 9px 12px; flex-shrink: 0; display: flex; gap: 2px; justify-content: flex-end; width: 76px; }
+
+        @media (max-width: 768px) {
+          .doc-row-date    { display: none; }
+          .doc-row-actions { opacity: 1 !important; pointer-events: auto !important; width: auto; padding: 4px 8px; }
+          .doc-row-meta-line { display: flex; flex-direction: column; gap: 1px; }
+          .doc-row-date-inline { display: inline; font-size: 10.5px; color: var(--muted); margin-top: 2px; }
+        }
+        @media (min-width: 769px) {
+          .doc-row-date-inline { display: none; }
+        }
+
+        /* GridView */
+        @media (max-width: 480px) {
+          .doc-grid { grid-template-columns: repeat(2, 1fr) !important; padding: 12px !important; gap: 10px !important; }
+        }
+      `}</style>
       {/* Drag overlay */}
       {dragOver && (
         <div style={{ position: 'absolute', inset: 0, zIndex: 50, background: 'var(--brand-tint)', border: '2px dashed var(--brand)', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 10, backdropFilter: 'blur(2px)' }}>
@@ -702,13 +820,13 @@ export default function DocumentsScreen({ addToast, activeCompany, openModal }) 
       )}
 
       {/* Page header */}
-      <div className="row" style={{ gap: 12, flexWrap: 'wrap' }}>
-        <div className="grow">
-          <h1 style={{ margin: '0 0 4px', fontSize: 22, fontWeight: 700, letterSpacing: -0.4 }}>Documentos</h1>
-          <p style={{ margin: 0, fontSize: 13, color: 'var(--muted)' }}>Contratos, holerites, atestados e toda a documentação da equipe.</p>
+      <div className="doc-header">
+        <div className="doc-header-title">
+          <h1 className="doc-h1">Documentos</h1>
+          <p className="doc-subtitle">Contratos, holerites, atestados e toda a documentação da equipe.</p>
         </div>
         {can('Documentos', 'upload') && (
-          <button className="btn primary" onClick={() => setShowAddModal(true)}>
+          <button className="btn primary doc-header-cta" onClick={() => setShowAddModal(true)}>
             <Icon name="plus" size={15} /> Novo documento
           </button>
         )}
@@ -718,21 +836,20 @@ export default function DocumentsScreen({ addToast, activeCompany, openModal }) 
       <div className="card" style={{ padding: 0, overflow: 'hidden', flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
 
         {/* Toolbar */}
-        <div className="row" style={{ padding: '8px 16px', borderBottom: '1px solid var(--line)', gap: 8, flexShrink: 0 }}>
-          <div style={{ position: 'relative' }}>
+        <div className="doc-toolbar">
+          <div className="doc-search-wrap">
             <Icon name="search" size={13} style={{ position: 'absolute', left: 9, top: 10, color: 'var(--muted)' }} />
             <input
-              className="field"
+              className="field doc-search"
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="Buscar por nome ou funcionário…"
-              style={{ width: 260, paddingLeft: 30, height: 34, fontSize: 13 }}
             />
           </div>
-          <span style={{ fontSize: 12, color: 'var(--muted)', alignSelf: 'center', marginLeft: 4 }}>
+          <span className="doc-count">
             {filtered.length} {filtered.length === 1 ? 'arquivo' : 'arquivos'}
           </span>
-          <span className="grow" />
+          <span className="doc-spacer" />
 
           {/* Filtro de período */}
           <button
@@ -741,7 +858,7 @@ export default function DocumentsScreen({ addToast, activeCompany, openModal }) 
             onClick={toggleFilter}
             style={{ background: activeFilterCount > 0 ? 'var(--brand-tint)' : undefined, color: activeFilterCount > 0 ? 'var(--brand)' : undefined, borderColor: activeFilterCount > 0 ? 'var(--brand)' : undefined }}
           >
-            <Icon name="filter" size={13} /> Período
+            <Icon name="filter" size={13} /> <span className="doc-filter-label">Filtros</span>
             {activeFilterCount > 0 && (
               <span style={{ background: 'var(--brand)', color: 'var(--brand-ink)', borderRadius: 20, fontSize: 10, fontWeight: 700, padding: '1px 6px', marginLeft: 4 }}>
                 {activeFilterCount}
@@ -750,7 +867,7 @@ export default function DocumentsScreen({ addToast, activeCompany, openModal }) 
           </button>
 
           {/* View toggle */}
-          <div style={{ display: 'flex', border: '1px solid var(--line)', borderRadius: 7, overflow: 'hidden' }}>
+          <div className="doc-view-toggle">
             {[['list','dashboard'],['grid','folder']].map(([v, icon]) => (
               <button key={v} onClick={() => setView(v)} style={{ border: 'none', padding: '6px 9px', cursor: 'pointer', background: view === v ? 'var(--hover)' : 'transparent', color: 'var(--ink)' }}>
                 <Icon name={icon} size={13} />
@@ -759,23 +876,14 @@ export default function DocumentsScreen({ addToast, activeCompany, openModal }) 
           </div>
         </div>
 
-        {/* Category tabs */}
-        <CategoryTabs
-          categories={CATEGORIES}
-          activeCat={filters.cat}
-          docCounts={docCounts}
-          totalCount={docs.length}
-          onSelect={cat => handleFilterChange('cat', cat)}
-        />
-
         {/* Selection bar */}
         {selected.size > 0 && (
-          <div style={{ padding: '8px 16px', background: 'var(--brand-tint)', borderBottom: '1px solid var(--line)', display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, flexShrink: 0 }}>
+          <div className="doc-selbar">
             <strong>{selected.size} selecionados</strong>
             <span className="grow" />
-            <button className="btn sm"><Icon name="download" size={13} /> Baixar</button>
+            <button className="btn sm"><Icon name="download" size={13} /> <span className="doc-selbar-label">Baixar</span></button>
             <button className="btn sm" style={{ color: 'var(--bad)', borderColor: 'var(--bad)' }} onClick={handleDelete} disabled={deleting}>
-              <Icon name="trash" size={13} /> {deleting ? 'Excluindo…' : 'Excluir'}
+              <Icon name="trash" size={13} /> <span className="doc-selbar-label">{deleting ? 'Excluindo…' : 'Excluir'}</span>
             </button>
             <button className="btn ghost sm icon" onClick={() => setSelected(new Set())}><Icon name="x" size={13} /></button>
           </div>
@@ -852,9 +960,12 @@ export default function DocumentsScreen({ addToast, activeCompany, openModal }) 
         <DocFilterPanel
           filters={filters}
           onChange={handleFilterChange}
-          onClear={clearDateFilters}
+          onClear={clearFilters}
           anchorRect={filterRect}
           onClose={() => setFilterOpen(false)}
+          categories={CATEGORIES}
+          docCounts={docCounts}
+          totalCount={docs.length}
         />
       )}
 
@@ -869,6 +980,16 @@ export default function DocumentsScreen({ addToast, activeCompany, openModal }) 
 
       {previewDoc && (
         <DocPreviewModal doc={previewDoc} onClose={() => setPreviewDoc(null)} />
+      )}
+
+      {can('Documentos', 'upload') && (
+        <button
+          className="doc-fab"
+          aria-label="Novo documento"
+          onClick={() => setShowAddModal(true)}
+        >
+          <Icon name="plus" size={22} />
+        </button>
       )}
     </div>
   );
@@ -893,20 +1014,23 @@ function DocRow({ doc: f, cm, checked, onToggle, onPreview }) {
         <FileIcon type={f.type} color={cm?.color} size={28} />
         <div style={{ minWidth: 0, flex: 1 }}>
           <div style={{ fontWeight: 500, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</div>
-          {cm && (
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10.5, fontWeight: 600, color: cm.color, marginTop: 1 }}>
-              <span style={{ width: 4, height: 4, borderRadius: '50%', background: cm.color, flexShrink: 0 }} />
-              {cm.name}
-            </span>
-          )}
+          <div className="doc-row-meta-line">
+            {cm && (
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10.5, fontWeight: 600, color: cm.color, marginTop: 1 }}>
+                <span style={{ width: 4, height: 4, borderRadius: '50%', background: cm.color, flexShrink: 0 }} />
+                {cm.name}
+              </span>
+            )}
+            <span className="doc-row-date-inline">{f.date}</span>
+          </div>
         </div>
       </div>
 
-      <div style={{ padding: '9px 16px', color: 'var(--muted)', fontSize: 12, whiteSpace: 'nowrap', flexShrink: 0 }}>
+      <div className="doc-row-date">
         {f.date}
       </div>
 
-      <div style={{ padding: '9px 12px', flexShrink: 0, display: 'flex', gap: 2, justifyContent: 'flex-end', width: 76, opacity: hovered || checked ? 1 : 0, pointerEvents: hovered || checked ? 'auto' : 'none', transition: 'opacity .12s' }}>
+      <div className="doc-row-actions" style={{ opacity: hovered || checked ? 1 : 0, pointerEvents: hovered || checked ? 'auto' : 'none', transition: 'opacity .12s' }}>
         {f.file_url && <>
           <button className="btn ghost icon sm" title="Visualizar" onClick={e => { e.stopPropagation(); onPreview(f); }}><Icon name="eye" size={13} /></button>
           <button className="btn ghost icon sm" title="Baixar" onClick={e => { e.stopPropagation(); window.open(f.file_url, '_blank'); }}><Icon name="download" size={13} /></button>
@@ -973,7 +1097,7 @@ function GroupedListView({ docs, categories, selected, onToggle, onPreview }) {
 // ============================================================
 function GridView({ docs, categories, onPreview }) {
   return (
-    <div style={{ padding: 20, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 12, alignContent: 'start' }}>
+    <div className="doc-grid" style={{ padding: 20, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 12, alignContent: 'start' }}>
       {docs.map(f => {
         const cm = categories.find(c => c.id === f.cat);
         return (

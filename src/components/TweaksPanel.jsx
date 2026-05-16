@@ -15,13 +15,7 @@ const PRIMARY_OPTIONS = [
 export default function TweaksPanel({ tweaks, setTweak, onLogout }) {
   const [open, setOpen] = useState(false);
 
-  if (!open) {
-    return (
-      <button className="tweaks-fab" onClick={() => setOpen(true)} aria-label="Abrir Tweaks">
-        <Icon name="sparkle" size={14} /> Tweaks
-      </button>
-    );
-  }
+  if (!open) return null;
 
   return (
     <aside className="tweaks-panel" role="dialog" aria-label="Tweaks">
