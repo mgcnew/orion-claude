@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { supabase } from '../lib/supabase.js';
 import Icon from './Icon.jsx';
 
@@ -15,15 +16,31 @@ const ROUTES = [
   { label: 'Configurações',      icon: 'settings',  route: 'settings' },
 ];
 
+function useIsMobile() {
+  const [mobile, setMobile] = useState(() =>
+    typeof window !== 'undefined' && window.innerWidth <= 767
+  );
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 767px)');
+    setMobile(mq.matches);
+    const h = (e) => setMobile(e.matches);
+    mq.addEventListener('change', h);
+    return () => mq.removeEventListener('change', h);
+  }, []);
+  return mobile;
+}
+
 export default function SearchBar({ setRoute, setRouteParam, setRouteLabel }) {
-  const [query, setQuery]       = useState('');
-  const [open, setOpen]         = useState(false);
-  const [employees, setEmps]    = useState([]);
-  const [documents, setDocs]    = useState([]);
-  const [loading, setLoading]   = useState(false);
-  const [cursor, setCursor]     = useState(-1);
-  const inputRef  = useRef(null);
-  const wrapRef   = useRef(null);
+  const [query, setQuery]         = useState('');
+  const [open, setOpen]           = useState(false);
+  const [overlayOpen, setOverlay] = useState(false);
+  const [employees, setEmps]      = useState([]);
+  const [documents, setDocs]      = useState([]);
+  const [loading, setLoading]     = useState(false);
+  const [cursor, setCursor]       = useState(-1);
+  const inputRef   = useRef(null);
+  const wrapRef    = useRef(null);
+  const isMobile   = useIsMobile();
 
   const q = query.trim();
 
@@ -31,7 +48,6 @@ export default function SearchBar({ setRoute, setRouteParam, setRouteLabel }) {
     ? ROUTES.filter(r => r.label.toLowerCase().includes(q.toLowerCase()))
     : [];
 
-  // Live search in Supabase
   useEffect(() => {
     if (!q) { setEmps([]); setDocs([]); return; }
     setLoading(true);
@@ -47,7 +63,7 @@ export default function SearchBar({ setRoute, setRouteParam, setRouteLabel }) {
     return () => clearTimeout(t);
   }, [q]);
 
-  // Close on outside click
+  // Close desktop dropdown on outside click
   useEffect(() => {
     const handler = (e) => {
       if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false);
@@ -56,17 +72,34 @@ export default function SearchBar({ setRoute, setRouteParam, setRouteLabel }) {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  // Reset cursor when results change
+  // Close overlay on ESC
+  useEffect(() => {
+    if (!overlayOpen) return;
+    const handler = (e) => { if (e.key === 'Escape') closeOverlay(); };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [overlayOpen]);
+
+  // Auto-focus when overlay opens
+  useEffect(() => {
+    if (overlayOpen) setTimeout(() => inputRef.current?.focus(), 50);
+  }, [overlayOpen]);
+
   useEffect(() => { setCursor(-1); }, [employees, documents, filteredRoutes]);
 
   const hasResults = filteredRoutes.length > 0 || employees.length > 0 || documents.length > 0;
 
-  // Flat list for keyboard nav
   const flatItems = [
     ...filteredRoutes.map(r => ({ type: 'route', ...r })),
     ...employees.map(e => ({ type: 'employee', ...e })),
     ...documents.map(d => ({ type: 'document', ...d })),
   ];
+
+  const closeOverlay = () => {
+    setOverlay(false);
+    setQuery('');
+    setOpen(false);
+  };
 
   const go = useCallback((item) => {
     if (item.type === 'route') {
@@ -80,6 +113,7 @@ export default function SearchBar({ setRoute, setRouteParam, setRouteLabel }) {
     }
     setQuery('');
     setOpen(false);
+    setOverlay(false);
   }, [setRoute, setRouteParam, setRouteLabel]);
 
   const onKeyDown = (e) => {
@@ -91,9 +125,139 @@ export default function SearchBar({ setRoute, setRouteParam, setRouteLabel }) {
 
   const showDropdown = open && q.length > 0;
 
+  // ── Mobile: icon trigger + full-screen overlay ──────────────────────────
+  if (isMobile) {
+    return (
+      <>
+        <button
+          className="btn ghost icon"
+          onClick={() => setOverlay(true)}
+          title="Buscar"
+        >
+          <Icon name="search" size={17} />
+        </button>
+
+        {overlayOpen && createPortal(
+          <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', flexDirection: 'column' }}>
+            {/* Backdrop */}
+            <div
+              style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(2px)' }}
+              onClick={closeOverlay}
+            />
+
+            {/* Panel */}
+            <div style={{
+              position: 'relative',
+              background: 'var(--surface)',
+              borderRadius: '0 0 16px 16px',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
+              padding: '12px 12px 0',
+              maxHeight: '80vh',
+              display: 'flex',
+              flexDirection: 'column',
+            }}>
+              {/* Input row */}
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: showDropdown ? 8 : 12 }}>
+                <div style={{
+                  flex: 1, display: 'flex', alignItems: 'center', gap: 8,
+                  height: 40, padding: '0 12px',
+                  border: `1px solid ${open ? 'var(--brand)' : 'var(--line)'}`,
+                  borderRadius: 8, background: 'var(--surface-2)',
+                  boxShadow: open ? '0 0 0 3px var(--brand-tint)' : 'none',
+                  transition: 'border-color .12s, box-shadow .12s',
+                }}>
+                  <Icon name="search" size={15} style={{ color: 'var(--muted)', flexShrink: 0 }} />
+                  <input
+                    ref={inputRef}
+                    value={query}
+                    onChange={e => { setQuery(e.target.value); setOpen(true); }}
+                    onFocus={() => setOpen(true)}
+                    onKeyDown={onKeyDown}
+                    placeholder="Buscar funcionários, documentos…"
+                    style={{ flex: 1, border: 'none', background: 'transparent', outline: 'none', fontSize: 14, color: 'var(--ink)', minWidth: 0 }}
+                  />
+                  {query && (
+                    <button
+                      onClick={() => { setQuery(''); inputRef.current?.focus(); }}
+                      style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--muted-2)', display: 'flex', alignItems: 'center' }}
+                    >
+                      <Icon name="x" size={14} />
+                    </button>
+                  )}
+                </div>
+                <button
+                  onClick={closeOverlay}
+                  style={{ background: 'none', border: 'none', padding: '0 4px', cursor: 'pointer', fontSize: 13.5, fontWeight: 500, color: 'var(--brand)', whiteSpace: 'nowrap' }}
+                >
+                  Cancelar
+                </button>
+              </div>
+
+              {/* Dropdown results */}
+              {showDropdown && (
+                <div style={{ overflowY: 'auto', flex: 1 }}>
+                  {loading && (
+                    <div style={{ padding: '12px 14px', fontSize: 12.5, color: 'var(--muted)' }}>Buscando…</div>
+                  )}
+                  {!loading && !hasResults && (
+                    <div style={{ padding: '20px 14px', textAlign: 'center', fontSize: 13, color: 'var(--muted)' }}>
+                      Nenhum resultado para "{q}"
+                    </div>
+                  )}
+                  {filteredRoutes.length > 0 && (
+                    <Section label="Telas">
+                      {filteredRoutes.map((r, i) => (
+                        <ResultRow key={r.route} icon={r.icon} label={r.label} sub={null}
+                          active={cursor === i} onMouseEnter={() => setCursor(i)}
+                          onClick={() => go({ type: 'route', ...r })} />
+                      ))}
+                    </Section>
+                  )}
+                  {employees.length > 0 && (
+                    <Section label="Funcionários">
+                      {employees.map((e, i) => {
+                        const idx = filteredRoutes.length + i;
+                        return (
+                          <ResultRow key={e.id} icon="user" label={e.name} sub={e.role}
+                            active={cursor === idx} onMouseEnter={() => setCursor(idx)}
+                            onClick={() => go({ type: 'employee', ...e })} />
+                        );
+                      })}
+                    </Section>
+                  )}
+                  {documents.length > 0 && (
+                    <Section label="Documentos">
+                      {documents.map((d, i) => {
+                        const idx = filteredRoutes.length + employees.length + i;
+                        return (
+                          <ResultRow key={d.id} icon="doc" label={d.name} sub={d.type}
+                            active={cursor === idx} onMouseEnter={() => setCursor(idx)}
+                            onClick={() => go({ type: 'document', ...d })} />
+                        );
+                      })}
+                    </Section>
+                  )}
+                  {hasResults && (
+                    <div style={{ padding: '8px 14px', borderTop: '1px solid var(--line)', fontSize: 11, color: 'var(--muted-2)', display: 'flex', gap: 12 }}>
+                      <span><span className="kbd">↑↓</span> navegar</span>
+                      <span><span className="kbd">↵</span> abrir</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div style={{ height: 12 }} />
+            </div>
+          </div>,
+          document.body
+        )}
+      </>
+    );
+  }
+
+  // ── Desktop: inline input ────────────────────────────────────────────────
   return (
     <div ref={wrapRef} style={{ position: 'relative', flexShrink: 1, minWidth: 0, width: 'clamp(180px, 30vw, 400px)' }}>
-      {/* Input */}
       <div
         style={{
           display: 'flex', alignItems: 'center', gap: 8,
@@ -129,74 +293,57 @@ export default function SearchBar({ setRoute, setRouteParam, setRouteLabel }) {
         )}
       </div>
 
-      {/* Dropdown */}
       {showDropdown && (
         <div
           style={{
             position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0,
             background: 'var(--surface)', border: '1px solid var(--line)',
             borderRadius: 10, boxShadow: 'var(--shadow-pop)',
-            zIndex: 500, overflow: 'hidden', minWidth: 320,
+            zIndex: 500, overflow: 'hidden',
+            minWidth: 'min(calc(100vw - 24px), 360px)',
           }}
         >
           {loading && (
             <div style={{ padding: '12px 14px', fontSize: 12.5, color: 'var(--muted)' }}>Buscando…</div>
           )}
-
           {!loading && !hasResults && (
             <div style={{ padding: '20px 14px', textAlign: 'center', fontSize: 13, color: 'var(--muted)' }}>
               Nenhum resultado para "{q}"
             </div>
           )}
-
           {filteredRoutes.length > 0 && (
             <Section label="Telas">
-              {filteredRoutes.map((r, i) => {
-                const idx = i;
-                return (
-                  <ResultRow
-                    key={r.route} icon={r.icon} label={r.label} sub={null}
-                    active={cursor === idx}
-                    onMouseEnter={() => setCursor(idx)}
-                    onClick={() => go({ type: 'route', ...r })}
-                  />
-                );
-              })}
+              {filteredRoutes.map((r, i) => (
+                <ResultRow key={r.route} icon={r.icon} label={r.label} sub={null}
+                  active={cursor === i} onMouseEnter={() => setCursor(i)}
+                  onClick={() => go({ type: 'route', ...r })} />
+              ))}
             </Section>
           )}
-
           {employees.length > 0 && (
             <Section label="Funcionários">
               {employees.map((e, i) => {
                 const idx = filteredRoutes.length + i;
                 return (
-                  <ResultRow
-                    key={e.id} icon="user" label={e.name} sub={e.role}
-                    active={cursor === idx}
-                    onMouseEnter={() => setCursor(idx)}
-                    onClick={() => go({ type: 'employee', ...e })}
-                  />
+                  <ResultRow key={e.id} icon="user" label={e.name} sub={e.role}
+                    active={cursor === idx} onMouseEnter={() => setCursor(idx)}
+                    onClick={() => go({ type: 'employee', ...e })} />
                 );
               })}
             </Section>
           )}
-
           {documents.length > 0 && (
             <Section label="Documentos">
               {documents.map((d, i) => {
                 const idx = filteredRoutes.length + employees.length + i;
                 return (
-                  <ResultRow
-                    key={d.id} icon="doc" label={d.name} sub={d.type}
-                    active={cursor === idx}
-                    onMouseEnter={() => setCursor(idx)}
-                    onClick={() => go({ type: 'document', ...d })}
-                  />
+                  <ResultRow key={d.id} icon="doc" label={d.name} sub={d.type}
+                    active={cursor === idx} onMouseEnter={() => setCursor(idx)}
+                    onClick={() => go({ type: 'document', ...d })} />
                 );
               })}
             </Section>
           )}
-
           {hasResults && (
             <div style={{ padding: '8px 14px', borderTop: '1px solid var(--line)', fontSize: 11, color: 'var(--muted-2)', display: 'flex', gap: 12 }}>
               <span><span className="kbd">↑↓</span> navegar</span>

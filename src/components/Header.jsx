@@ -120,6 +120,18 @@ function buildCrumbs(route, routeLabel) {
   return [{ label: 'Início' }];
 }
 
+const headerStyle = `
+  @media (max-width: 767px) {
+    .hdr-root {
+      padding: 0 10px !important;
+      gap: 6px !important;
+    }
+    .hdr-crumb-parent { display: none !important; }
+    .hdr-invite-label { display: none !important; }
+    .hdr-invite-btn { padding: 0 8px !important; min-width: 32px !important; }
+  }
+`;
+
 export default function Header({
   route,
   setRoute,
@@ -145,7 +157,10 @@ export default function Header({
   const crumbs = buildCrumbs(route, routeLabel);
 
   return (
+    <>
+    <style>{headerStyle}</style>
     <header
+      className="hdr-root"
       style={{
         height: 60,
         padding: '0 16px 0 12px',
@@ -180,10 +195,11 @@ export default function Header({
           {crumbs.map((c, i) => (
             <Fragment key={i}>
               {i > 0 && (
-                <Icon name="chevron-right" size={13} style={{ color: 'var(--muted-2)' }} />
+                <Icon name="chevron-right" size={13} style={{ color: 'var(--muted-2)' }} className={i < crumbs.length - 1 ? 'hdr-crumb-parent' : undefined} />
               )}
               <button
                 onClick={() => c.id && setRoute(c.id)}
+                className={i < crumbs.length - 1 ? 'hdr-crumb-parent' : undefined}
                 style={{
                   border: 'none',
                   background: 'transparent',
@@ -209,8 +225,9 @@ export default function Header({
       {/* Direita: ações */}
       <div className="row gap-2" style={{ justifyContent: 'flex-end' }}>
         {isAdmin && onInvite && (
-          <button className="btn primary sm" onClick={onInvite} title="Convidar usuário">
-            <Icon name="user-plus" size={14} /> Convidar
+          <button className="btn primary sm hdr-invite-btn" onClick={onInvite} title="Convidar usuário">
+            <Icon name="user-plus" size={14} />
+            <span className="hdr-invite-label"> Convidar</span>
           </button>
         )}
 
@@ -237,5 +254,6 @@ export default function Header({
         </div>
       </div>
     </header>
+    </>
   );
 }
