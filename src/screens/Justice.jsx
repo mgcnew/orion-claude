@@ -132,9 +132,8 @@ function ProcessSlideOver({ process: proc, onClose, onSaved, addToast }) {
   return (
     <>
       <div style={{ position: 'fixed', inset: 0, zIndex: 400, background: 'rgba(0,0,0,.28)' }} onClick={onClose} />
-      <div style={{
+      <div className="just-slideover" style={{
         position: 'fixed', top: 0, right: 0, bottom: 0, zIndex: 401,
-        width: 'clamp(300px, 42vw, 520px)',
         background: 'var(--surface)', borderLeft: '1px solid var(--line)',
         boxShadow: '-8px 0 40px rgba(0,0,0,.12)',
         display: 'flex', flexDirection: 'column',
@@ -581,31 +580,64 @@ export default function JusticeScreen({ addToast, activeCompany }) {
 
   return (
     <>
-      <div className="fade-up" style={{ padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: 0, maxWidth: 1280, margin: '0 auto', width: '100%', minHeight: '100%', boxSizing: 'border-box' }}>
+      <style>{`
+        .just-page         { padding: 24px 28px; display: flex; flex-direction: column; gap: 0; max-width: 1280px; margin: 0 auto; width: 100%; min-height: 100%; box-sizing: border-box; }
+        .just-header       { display: flex; align-items: center; gap: 14px; margin-bottom: 20px; flex-wrap: wrap; }
+        .just-actions      { display: flex; gap: 8px; flex-wrap: wrap; }
+        .just-docs-grid    { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 22px; }
+        .just-doc-row      { display: grid; grid-template-columns: 1fr auto; gap: 10px; }
+        .just-doc-date     { width: 150px; }
+        .just-hist-row     { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .just-slideover    { width: clamp(300px, 42vw, 520px); }
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20, flexWrap: 'wrap' }}>
+        @media (max-width: 768px) {
+          .just-page       { padding: 14px; }
+          .just-header     { gap: 10px; margin-bottom: 14px; }
+          .just-subtitle   { display: none; }
+          .just-tabs       { margin-bottom: 14px !important; }
+          .just-tab        { padding: 9px 12px !important; }
+          .just-action-label { display: none; }
+          .just-docs-grid  { grid-template-columns: 1fr; gap: 16px; }
+          .just-doc-row    { grid-template-columns: 1fr; }
+          .just-doc-date   { width: 100% !important; }
+          .just-slideover  { width: 100% !important; }
+        }
+        @media (max-width: 768px) {
+          .just-col-vara,
+          .just-col-emissor { display: none; }
+        }
+        @media (max-width: 480px) {
+          .just-page       { padding: 12px; }
+          .just-hist-input { max-width: 100% !important; flex: 1; min-width: 0; }
+          .just-col-proxima { display: none; }
+          .just-table      { min-width: 0 !important; }
+        }
+      `}</style>
+      <div className="fade-up just-page">
+
+        <div className="just-header">
           <div style={{ width: 38, height: 38, borderRadius: 10, background: 'var(--brand-tint)', color: 'var(--brand)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             <Icon name="gavel" size={19} />
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700, letterSpacing: -0.3 }}>Justiça</h1>
-            <p style={{ margin: 0, fontSize: 12.5, color: 'var(--muted)' }}>Gestão de processos, dossiês e documentos jurídicos.</p>
+            <p className="just-subtitle" style={{ margin: 0, fontSize: 12.5, color: 'var(--muted)' }}>Gestão de processos, dossiês e documentos jurídicos.</p>
           </div>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <div className="just-actions">
             {tab === 'processos' && (
               <button className="btn primary sm" onClick={() => setShowNewProcess(true)}>
-                <Icon name="plus" size={13} /> Novo processo
+                <Icon name="plus" size={13} /> <span className="just-action-label">Novo processo</span>
               </button>
             )}
             <button className="btn sm" onClick={() => addToast({ kind: 'ok', msg: 'Exportando pacote do mês…' })}>
-              <Icon name="download" size={13} /> Exportar mês
+              <Icon name="download" size={13} /> <span className="just-action-label">Exportar mês</span>
             </button>
           </div>
         </div>
 
-        <div className="scroll-hidden" style={{ display: 'flex', gap: 0, borderBottom: '1px solid var(--line)', marginBottom: 22, overflowX: 'auto', flexShrink: 0 }}>
+        <div className="scroll-hidden just-tabs" style={{ display: 'flex', gap: 0, borderBottom: '1px solid var(--line)', marginBottom: 22, overflowX: 'auto', flexShrink: 0 }}>
           {TABS.map(t => (
-            <button key={t.id} onClick={() => setTab(t.id)} style={{
+            <button key={t.id} onClick={() => setTab(t.id)} className="just-tab" style={{
               display: 'flex', alignItems: 'center', gap: 7,
               padding: '10px 16px', border: 'none', background: 'transparent', whiteSpace: 'nowrap',
               color: tab === t.id ? 'var(--brand)' : 'var(--muted)',
@@ -623,11 +655,18 @@ export default function JusticeScreen({ addToast, activeCompany }) {
           casesLoading ? (
             <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
               <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 640 }}>
+                <table className="just-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 640 }}>
                   <thead>
                     <tr style={{ background: 'var(--surface-2)', color: 'var(--muted)', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.6 }}>
-                      {['Processo','Reclamante','Vara','Fase','Próxima ação',''].map((h, i) => (
-                        <th key={i} style={{ textAlign: 'left', padding: '10px 16px', fontWeight: 600, whiteSpace: 'nowrap' }}>{h}</th>
+                      {[
+                        { l: 'Processo' },
+                        { l: 'Reclamante' },
+                        { l: 'Vara', cls: 'just-col-vara' },
+                        { l: 'Fase' },
+                        { l: 'Próxima ação', cls: 'just-col-proxima' },
+                        { l: '' },
+                      ].map((h, i) => (
+                        <th key={i} className={h.cls} style={{ textAlign: 'left', padding: '10px 16px', fontWeight: 600, whiteSpace: 'nowrap' }}>{h.l}</th>
                       ))}
                     </tr>
                   </thead>
@@ -641,9 +680,9 @@ export default function JusticeScreen({ addToast, activeCompany }) {
                             <Skeleton height={12} style={{ maxWidth: 140, flex: 1 }} />
                           </div>
                         </td>
-                        <td style={{ padding: '12px 16px' }}><Skeleton height={12} style={{ maxWidth: 100 }} /></td>
+                        <td className="just-col-vara" style={{ padding: '12px 16px' }}><Skeleton height={12} style={{ maxWidth: 100 }} /></td>
                         <td style={{ padding: '12px 16px' }}><Skeleton width={80} height={18} radius={20} /></td>
-                        <td style={{ padding: '12px 16px' }}><Skeleton width={100} height={11} /></td>
+                        <td className="just-col-proxima" style={{ padding: '12px 16px' }}><Skeleton width={100} height={11} /></td>
                         <td style={{ padding: '12px 16px' }}><Skeleton width={20} height={20} radius={4} /></td>
                       </tr>
                     ))}
@@ -663,11 +702,18 @@ export default function JusticeScreen({ addToast, activeCompany }) {
           ) : (
             <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
               <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 640 }}>
+                <table className="just-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 640 }}>
                   <thead>
                     <tr style={{ background: 'var(--surface-2)', color: 'var(--muted)', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.6 }}>
-                      {['Processo','Reclamante','Vara','Fase','Próxima ação',''].map((h, i) => (
-                        <th key={i} style={{ textAlign: 'left', padding: '10px 16px', fontWeight: 600, whiteSpace: 'nowrap' }}>{h}</th>
+                      {[
+                        { l: 'Processo' },
+                        { l: 'Reclamante' },
+                        { l: 'Vara', cls: 'just-col-vara' },
+                        { l: 'Fase' },
+                        { l: 'Próxima ação', cls: 'just-col-proxima' },
+                        { l: '' },
+                      ].map((h, i) => (
+                        <th key={i} className={h.cls} style={{ textAlign: 'left', padding: '10px 16px', fontWeight: 600, whiteSpace: 'nowrap' }}>{h.l}</th>
                       ))}
                     </tr>
                   </thead>
@@ -689,11 +735,11 @@ export default function JusticeScreen({ addToast, activeCompany }) {
                               <span style={{ fontWeight: 500, whiteSpace: 'nowrap' }}>{p.autor}</span>
                             </div>
                           </td>
-                          <td style={{ padding: '12px 16px', color: 'var(--muted)', fontSize: 12.5, whiteSpace: 'nowrap' }}>{p.vara || '—'}</td>
+                          <td className="just-col-vara" style={{ padding: '12px 16px', color: 'var(--muted)', fontSize: 12.5, whiteSpace: 'nowrap' }}>{p.vara || '—'}</td>
                           <td style={{ padding: '12px 16px' }}>
                             <span className={`pill ${st}`}><span className="dot" />{p.fase}</span>
                           </td>
-                          <td style={{ padding: '12px 16px', whiteSpace: 'nowrap' }}>
+                          <td className="just-col-proxima" style={{ padding: '12px 16px', whiteSpace: 'nowrap' }}>
                             {p.proxima ? (
                               <span style={{ fontSize: 12.5, color: urgent ? 'var(--danger)' : 'var(--ink)', fontWeight: urgent ? 700 : 400, display: 'flex', alignItems: 'center', gap: 5 }}>
                                 {urgent && <Icon name="alert" size={12} />}
@@ -738,7 +784,7 @@ export default function JusticeScreen({ addToast, activeCompany }) {
 
         {/* ── DOCUMENTOS ── */}
         {tab === 'documentos' && !showPreview && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.1fr) minmax(0,1fr)', gap: 22 }}>
+          <div className="just-docs-grid">
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div style={{ fontSize: 11.5, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.6, fontWeight: 700 }}>1. Escolha o modelo</div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 10 }}>
@@ -791,9 +837,9 @@ export default function JusticeScreen({ addToast, activeCompany }) {
                           {employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
                         </select>
                       </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 10 }}>
+                      <div className="just-doc-row">
                         <div><label className="label">Cidade</label><input className="field" value={city} onChange={e => setCity(e.target.value)} /></div>
-                        <div style={{ width: 150 }}><label className="label">Data</label><input className="field" type="date" defaultValue={new Date().toISOString().slice(0, 10)} /></div>
+                        <div className="just-doc-date"><label className="label">Data</label><input className="field" type="date" defaultValue={new Date().toISOString().slice(0, 10)} /></div>
                       </div>
                       <div>
                         <label className="label">Motivo / fundamentação</label>
@@ -837,8 +883,8 @@ export default function JusticeScreen({ addToast, activeCompany }) {
         {/* ── HISTÓRICO ── */}
         {tab === 'historico' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <input className="field" style={{ maxWidth: 260 }} placeholder="Filtrar por funcionário…"
+            <div className="just-hist-row">
+              <input className="field just-hist-input" style={{ maxWidth: 260 }} placeholder="Filtrar por funcionário…"
                 value={histFilter} onChange={e => setHistFilter(e.target.value)} />
               <span style={{ fontSize: 12.5, color: 'var(--muted)' }}>{filteredHistory.length} registro{filteredHistory.length !== 1 ? 's' : ''}</span>
             </div>
@@ -849,11 +895,18 @@ export default function JusticeScreen({ addToast, activeCompany }) {
             ) : (
               <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
                 <div style={{ overflowX: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 600 }}>
+                  <table className="just-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 600 }}>
                     <thead>
                       <tr style={{ background: 'var(--surface-2)', color: 'var(--muted)', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.6 }}>
-                        {['Data','Documento','Funcionário','Emitido por','Status',''].map((h, i) => (
-                          <th key={i} style={{ textAlign: 'left', padding: '10px 16px', fontWeight: 600, whiteSpace: 'nowrap' }}>{h}</th>
+                        {[
+                          { l: 'Data' },
+                          { l: 'Documento' },
+                          { l: 'Funcionário' },
+                          { l: 'Emitido por', cls: 'just-col-emissor' },
+                          { l: 'Status' },
+                          { l: '' },
+                        ].map((h, i) => (
+                          <th key={i} className={h.cls} style={{ textAlign: 'left', padding: '10px 16px', fontWeight: 600, whiteSpace: 'nowrap' }}>{h.l}</th>
                         ))}
                       </tr>
                     </thead>
@@ -867,7 +920,7 @@ export default function JusticeScreen({ addToast, activeCompany }) {
                           </td>
                           <td style={{ padding: '11px 16px', fontWeight: 500 }}>{r.template_title}</td>
                           <td style={{ padding: '11px 16px', color: 'var(--ink-soft)' }}>{r.employees?.name || '—'}</td>
-                          <td style={{ padding: '11px 16px', color: 'var(--muted)', fontSize: 12.5 }}>{r.emitted_by || '—'}</td>
+                          <td className="just-col-emissor" style={{ padding: '11px 16px', color: 'var(--muted)', fontSize: 12.5 }}>{r.emitted_by || '—'}</td>
                           <td style={{ padding: '11px 16px' }}>
                             <span className={`pill ${r.status === 'Assinado' ? 'ok' : r.status === 'Homologado' ? 'info' : 'warn'}`}>
                               <span className="dot" />{r.status}
