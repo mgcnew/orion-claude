@@ -1521,6 +1521,25 @@ export function TimeScreen({ addToast, activeCompany }) {
 
   return (
     <>
+    <style>{`
+      .time-tabs { display:flex; overflow-x:auto; scrollbar-width:none; -webkit-overflow-scrolling:touch; border-bottom:1px solid var(--line); }
+      .time-tabs::-webkit-scrollbar { display:none; }
+      .time-kpi-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
+      .time-ent-table { display:block; }
+      .time-ent-cards { display:none; flex-direction:column; gap:10px; padding:12px; }
+      .time-card { background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:12px 14px; }
+      .time-card-head { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px; padding-bottom:8px; border-bottom:1px solid var(--line-soft); flex-wrap:wrap; }
+      .time-card-title { font-size:13.5px; font-weight:600; color:var(--ink); }
+      .time-card-date { font-size:12px; color:var(--muted); font-family:monospace; }
+      .time-card-row { display:flex; justify-content:space-between; align-items:center; padding:3px 0; gap:8px; }
+      .time-card-lbl { font-size:11.5px; color:var(--muted); }
+      .time-card-val { font-size:12.5px; color:var(--ink-soft); text-align:right; }
+      @media (max-width:768px) {
+        .time-kpi-grid { grid-template-columns:repeat(2,1fr); gap:10px; }
+        .time-ent-table { display:none !important; }
+        .time-ent-cards { display:flex; }
+      }
+    `}</style>
     <div className="fade-up" style={{ padding:24, display:'flex', flexDirection:'column', gap:18 }}>
 
       {/* ── Header ── */}
@@ -1567,7 +1586,7 @@ export function TimeScreen({ addToast, activeCompany }) {
       </div>
 
       {/* ── KPIs ── */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:12 }}>
+      <div className="time-kpi-grid">
         {[
           { label:'Horas trabalhadas', value:minutesToHM(stats.workedMins),  icon:'clock',   color:'var(--brand)'                                  },
           { label:'Horas extras',      value:minutesToHM(stats.extraMins),   icon:'sparkle', color:stats.extraMins>0  ? '#7c3aed' : 'var(--muted)' },
@@ -1589,9 +1608,9 @@ export function TimeScreen({ addToast, activeCompany }) {
       <QuickEntry employees={employees} defaultEmpId={empId} onSaved={refetch} />
 
       {/* ── Tabs ── */}
-      <div style={{ display:'flex', borderBottom:'1px solid var(--line)' }}>
+      <div className="time-tabs">
         {TABS.map(t => (
-          <button key={t.id} onClick={() => setTab(t.id)} style={{ display:'flex', alignItems:'center', gap:6, padding:'10px 16px', border:'none', background:'transparent', fontSize:13, fontWeight:tab===t.id?700:500, color:tab===t.id?'var(--brand)':'var(--muted)', borderBottom:`2px solid ${tab===t.id?'var(--brand)':'transparent'}`, marginBottom:-1, cursor:'pointer', whiteSpace:'nowrap' }}>
+          <button key={t.id} onClick={() => setTab(t.id)} style={{ display:'flex', alignItems:'center', gap:6, padding:'10px 16px', border:'none', background:'transparent', fontSize:13, fontWeight:tab===t.id?700:500, color:tab===t.id?'var(--brand)':'var(--muted)', borderBottom:`2px solid ${tab===t.id?'var(--brand)':'transparent'}`, marginBottom:-1, cursor:'pointer', whiteSpace:'nowrap', flexShrink:0 }}>
             <Icon name={t.icon} size={13} />{t.label}
           </button>
         ))}
@@ -1751,65 +1770,136 @@ export function TimeScreen({ addToast, activeCompany }) {
             : resumoRows.length===0 ? <EmptyState icon="dashboard" msg="Nenhum registro encontrado para este período." />
             : resumoIsEmployee ? (
               /* Detalhe dia a dia para funcionário selecionado */
-              <div style={{ overflowX:'auto' }}>
-                <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13, minWidth:500 }}>
-                  <thead>
-                    <tr style={{ background:'var(--surface-2)', color:'var(--muted)', fontSize:11, textTransform:'uppercase', letterSpacing:0.5 }}>
-                      {['Data','Entrada','Saída','H. Trabalhadas','H. Extras','Status','Obs'].map(h => (
-                        <th key={h} style={{ padding:'10px 18px', textAlign:'left', fontWeight:600, whiteSpace:'nowrap' }}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {resumoRows.map(r => {
-                      const w  = entryWorkedMins(r);
-                      const ex = r.status==='hora_extra' ? parseExtraHoursToMins(r.extra_hours) : Math.max(0, w - STANDARD_MINS);
-                      const sc = STATUS_COLOR[r.status] || STATUS_COLOR.presente;
-                      return (
-                        <tr key={r.id} style={{ borderTop:'1px solid var(--line-soft)' }}
-                          onMouseEnter={e => e.currentTarget.style.background='var(--hover)'}
-                          onMouseLeave={e => e.currentTarget.style.background='transparent'}>
-                          <td style={{ padding:'10px 18px', fontWeight:500 }}>{fmtDate(r.date)}</td>
-                          <td style={{ padding:'10px 18px', fontFamily:'monospace', color:'var(--muted)' }}>{r.time_in?.slice(0,5)||'—'}</td>
-                          <td style={{ padding:'10px 18px', fontFamily:'monospace', color:'var(--muted)' }}>{r.time_out?.slice(0,5)||'—'}</td>
-                          <td style={{ padding:'10px 18px', fontFamily:'monospace' }}>{w>0?minutesToHM(w):'—'}</td>
-                          <td style={{ padding:'10px 18px' }}>{ex>0?<span style={{ color:'#7c3aed', fontWeight:600 }}>{minutesToHM(ex)}</span>:'—'}</td>
-                          <td style={{ padding:'10px 18px' }}><span style={{ display:'inline-flex', alignItems:'center', gap:4, fontSize:11, fontWeight:600, color:sc.color, background:sc.bg, padding:'2px 8px', borderRadius:20 }}>{sc.label||r.status}</span></td>
-                          <td style={{ padding:'10px 18px', color:'var(--muted)', fontSize:12 }}>{r.notes||'—'}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+              <>
+                <div className="time-ent-table" style={{ overflowX:'auto' }}>
+                  <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13, minWidth:500 }}>
+                    <thead>
+                      <tr style={{ background:'var(--surface-2)', color:'var(--muted)', fontSize:11, textTransform:'uppercase', letterSpacing:0.5 }}>
+                        {['Data','Entrada','Saída','H. Trabalhadas','H. Extras','Status','Obs'].map(h => (
+                          <th key={h} style={{ padding:'10px 18px', textAlign:'left', fontWeight:600, whiteSpace:'nowrap' }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {resumoRows.map(r => {
+                        const w  = entryWorkedMins(r);
+                        const ex = r.status==='hora_extra' ? parseExtraHoursToMins(r.extra_hours) : Math.max(0, w - STANDARD_MINS);
+                        const sc = STATUS_COLOR[r.status] || STATUS_COLOR.presente;
+                        return (
+                          <tr key={r.id} style={{ borderTop:'1px solid var(--line-soft)' }}
+                            onMouseEnter={e => e.currentTarget.style.background='var(--hover)'}
+                            onMouseLeave={e => e.currentTarget.style.background='transparent'}>
+                            <td style={{ padding:'10px 18px', fontWeight:500 }}>{fmtDate(r.date)}</td>
+                            <td style={{ padding:'10px 18px', fontFamily:'monospace', color:'var(--muted)' }}>{r.time_in?.slice(0,5)||'—'}</td>
+                            <td style={{ padding:'10px 18px', fontFamily:'monospace', color:'var(--muted)' }}>{r.time_out?.slice(0,5)||'—'}</td>
+                            <td style={{ padding:'10px 18px', fontFamily:'monospace' }}>{w>0?minutesToHM(w):'—'}</td>
+                            <td style={{ padding:'10px 18px' }}>{ex>0?<span style={{ color:'#7c3aed', fontWeight:600 }}>{minutesToHM(ex)}</span>:'—'}</td>
+                            <td style={{ padding:'10px 18px' }}><span style={{ display:'inline-flex', alignItems:'center', gap:4, fontSize:11, fontWeight:600, color:sc.color, background:sc.bg, padding:'2px 8px', borderRadius:20 }}>{sc.label||r.status}</span></td>
+                            <td style={{ padding:'10px 18px', color:'var(--muted)', fontSize:12 }}>{r.notes||'—'}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="time-ent-cards">
+                  {resumoRows.map(r => {
+                    const w  = entryWorkedMins(r);
+                    const ex = r.status==='hora_extra' ? parseExtraHoursToMins(r.extra_hours) : Math.max(0, w - STANDARD_MINS);
+                    const sc = STATUS_COLOR[r.status] || STATUS_COLOR.presente;
+                    return (
+                      <div key={r.id} className="time-card">
+                        <div className="time-card-head">
+                          <span className="time-card-title">{fmtDate(r.date)}</span>
+                          <span style={{ display:'inline-flex', alignItems:'center', gap:4, fontSize:11, fontWeight:600, color:sc.color, background:sc.bg, padding:'2px 8px', borderRadius:20 }}>{sc.label||r.status}</span>
+                        </div>
+                        <div className="time-card-row">
+                          <span className="time-card-lbl">Entrada / Saída</span>
+                          <span className="time-card-val" style={{ fontFamily:'monospace' }}>{r.time_in?.slice(0,5)||'—'} → {r.time_out?.slice(0,5)||'—'}</span>
+                        </div>
+                        <div className="time-card-row">
+                          <span className="time-card-lbl">H. Trabalhadas</span>
+                          <span className="time-card-val" style={{ fontFamily:'monospace' }}>{w>0?minutesToHM(w):'—'}</span>
+                        </div>
+                        {ex>0 && (
+                          <div className="time-card-row">
+                            <span className="time-card-lbl">H. Extras</span>
+                            <span className="time-card-val" style={{ color:'#7c3aed', fontWeight:600 }}>{minutesToHM(ex)}</span>
+                          </div>
+                        )}
+                        {r.notes && (
+                          <div className="time-card-row">
+                            <span className="time-card-lbl">Obs.</span>
+                            <span className="time-card-val">{r.notes}</span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
             ) : (
               /* Resumo por funcionário */
-              <div style={{ overflowX:'auto' }}>
-                <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13, minWidth:500 }}>
-                  <thead>
-                    <tr style={{ background:'var(--surface-2)', color:'var(--muted)', fontSize:11, textTransform:'uppercase', letterSpacing:0.5 }}>
-                      {['Funcionário','Presentes','Faltas','Atrasos','H. Trabalhadas','H. Extras','Ajustes'].map(h => (
-                        <th key={h} style={{ padding:'10px 18px', textAlign:'left', fontWeight:600, whiteSpace:'nowrap' }}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {resumoRows.map((r,i) => (
-                      <tr key={i} style={{ borderTop:'1px solid var(--line-soft)' }}
-                        onMouseEnter={e => e.currentTarget.style.background='var(--hover)'}
-                        onMouseLeave={e => e.currentTarget.style.background='transparent'}>
-                        <td style={{ padding:'10px 18px', fontWeight:500 }}>{r.name}</td>
-                        <td style={{ padding:'10px 18px', color:'var(--muted)' }}>{r.presenteCount}d</td>
-                        <td style={{ padding:'10px 18px' }}>{r.faltaCount>0?<span className="pill bad" style={{ fontSize:11 }}>{r.faltaCount}d</span>:<span style={{ color:'var(--muted)' }}>—</span>}</td>
-                        <td style={{ padding:'10px 18px' }}>{r.atrasoCount>0?<span className="pill warn" style={{ fontSize:11 }}>{r.atrasoCount}x</span>:<span style={{ color:'var(--muted)' }}>—</span>}</td>
-                        <td style={{ padding:'10px 18px', fontFamily:'monospace' }}>{minutesToHM(r.workedMins)}</td>
-                        <td style={{ padding:'10px 18px' }}>{r.extraMins>0?<span style={{ color:'#7c3aed', fontWeight:600 }}>{minutesToHM(r.extraMins)}</span>:<span style={{ color:'var(--muted)' }}>—</span>}</td>
-                        <td style={{ padding:'10px 18px', color:'var(--muted)' }}>{r.ajusteCount>0?r.ajusteCount:'—'}</td>
+              <>
+                <div className="time-ent-table" style={{ overflowX:'auto' }}>
+                  <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13, minWidth:500 }}>
+                    <thead>
+                      <tr style={{ background:'var(--surface-2)', color:'var(--muted)', fontSize:11, textTransform:'uppercase', letterSpacing:0.5 }}>
+                        {['Funcionário','Presentes','Faltas','Atrasos','H. Trabalhadas','H. Extras','Ajustes'].map(h => (
+                          <th key={h} style={{ padding:'10px 18px', textAlign:'left', fontWeight:600, whiteSpace:'nowrap' }}>{h}</th>
+                        ))}
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {resumoRows.map((r,i) => (
+                        <tr key={i} style={{ borderTop:'1px solid var(--line-soft)' }}
+                          onMouseEnter={e => e.currentTarget.style.background='var(--hover)'}
+                          onMouseLeave={e => e.currentTarget.style.background='transparent'}>
+                          <td style={{ padding:'10px 18px', fontWeight:500 }}>{r.name}</td>
+                          <td style={{ padding:'10px 18px', color:'var(--muted)' }}>{r.presenteCount}d</td>
+                          <td style={{ padding:'10px 18px' }}>{r.faltaCount>0?<span className="pill bad" style={{ fontSize:11 }}>{r.faltaCount}d</span>:<span style={{ color:'var(--muted)' }}>—</span>}</td>
+                          <td style={{ padding:'10px 18px' }}>{r.atrasoCount>0?<span className="pill warn" style={{ fontSize:11 }}>{r.atrasoCount}x</span>:<span style={{ color:'var(--muted)' }}>—</span>}</td>
+                          <td style={{ padding:'10px 18px', fontFamily:'monospace' }}>{minutesToHM(r.workedMins)}</td>
+                          <td style={{ padding:'10px 18px' }}>{r.extraMins>0?<span style={{ color:'#7c3aed', fontWeight:600 }}>{minutesToHM(r.extraMins)}</span>:<span style={{ color:'var(--muted)' }}>—</span>}</td>
+                          <td style={{ padding:'10px 18px', color:'var(--muted)' }}>{r.ajusteCount>0?r.ajusteCount:'—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="time-ent-cards">
+                  {resumoRows.map((r,i) => (
+                    <div key={i} className="time-card">
+                      <div className="time-card-head">
+                        <span className="time-card-title">{r.name}</span>
+                        <span style={{ fontSize:11, color:'var(--muted)' }}>{r.presenteCount}d presentes</span>
+                      </div>
+                      <div className="time-card-row">
+                        <span className="time-card-lbl">Faltas</span>
+                        <span className="time-card-val">{r.faltaCount>0?<span className="pill bad" style={{ fontSize:11 }}>{r.faltaCount}d</span>:'—'}</span>
+                      </div>
+                      <div className="time-card-row">
+                        <span className="time-card-lbl">Atrasos</span>
+                        <span className="time-card-val">{r.atrasoCount>0?<span className="pill warn" style={{ fontSize:11 }}>{r.atrasoCount}x</span>:'—'}</span>
+                      </div>
+                      <div className="time-card-row">
+                        <span className="time-card-lbl">H. Trabalhadas</span>
+                        <span className="time-card-val" style={{ fontFamily:'monospace' }}>{minutesToHM(r.workedMins)}</span>
+                      </div>
+                      <div className="time-card-row">
+                        <span className="time-card-lbl">H. Extras</span>
+                        <span className="time-card-val">{r.extraMins>0?<span style={{ color:'#7c3aed', fontWeight:600 }}>{minutesToHM(r.extraMins)}</span>:'—'}</span>
+                      </div>
+                      {r.ajusteCount>0 && (
+                        <div className="time-card-row">
+                          <span className="time-card-lbl">Ajustes</span>
+                          <span className="time-card-val">{r.ajusteCount}</span>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </>
             )}
           </div>
         </div>
@@ -2454,7 +2544,7 @@ function BancoTable({ rows, loading }) {
           ? <EmptyState icon="chart" msg="Nenhum registro neste período." />
           : (
             <>
-              <div style={{ overflowX:'auto' }}>
+              <div className="time-ent-table" style={{ overflowX:'auto' }}>
                 <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13, minWidth:500 }}>
                   <thead>
                     <tr style={{ background:'var(--surface-2)', color:'var(--muted)', fontSize:11, textTransform:'uppercase', letterSpacing:0.5 }}>
@@ -2480,6 +2570,41 @@ function BancoTable({ rows, loading }) {
                   </tbody>
                 </table>
               </div>
+
+              {/* Cards — visíveis apenas no mobile */}
+              <div className="time-ent-cards">
+                {paged.map((r,i) => (
+                  <div key={i} className="time-card">
+                    <div className="time-card-head">
+                      <span className="time-card-title">{r.name}</span>
+                      <span style={{ fontSize:11, color:'var(--muted)' }}>{r.presenteCount}d presentes</span>
+                    </div>
+                    <div className="time-card-row">
+                      <span className="time-card-lbl">Faltas</span>
+                      <span className="time-card-val">{r.faltaCount>0?<span className="pill bad" style={{ fontSize:11 }}>{r.faltaCount}d</span>:'—'}</span>
+                    </div>
+                    <div className="time-card-row">
+                      <span className="time-card-lbl">Atrasos</span>
+                      <span className="time-card-val">{r.atrasoCount>0?<span className="pill warn" style={{ fontSize:11 }}>{r.atrasoCount}x</span>:'—'}</span>
+                    </div>
+                    <div className="time-card-row">
+                      <span className="time-card-lbl">H. Trabalhadas</span>
+                      <span className="time-card-val" style={{ fontFamily:'monospace' }}>{minutesToHM(r.workedMins)}</span>
+                    </div>
+                    <div className="time-card-row">
+                      <span className="time-card-lbl">H. Extras</span>
+                      <span className="time-card-val">{r.extraMins>0?<span style={{ color:'#7c3aed', fontWeight:600 }}>{minutesToHM(r.extraMins)}</span>:'—'}</span>
+                    </div>
+                    {r.ajusteCount>0 && (
+                      <div className="time-card-row">
+                        <span className="time-card-lbl">Ajustes</span>
+                        <span className="time-card-val">{r.ajusteCount}</span>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+
               <Pagination total={rows.length} page={page} perPage={perPage} onPage={setPage} onPerPage={setPerPage} />
             </>
           )
@@ -2516,7 +2641,7 @@ function EntriesTable({ entries, loading, columns, emptyMsg, showEmployee }) {
   return (
     <div style={{ background:'var(--surface)', border:'1px solid var(--line)', borderRadius:10, overflow:'hidden' }}>
       {loading ? (
-        <div style={{ overflowX:'auto' }}>
+        <div className="time-ent-table" style={{ overflowX:'auto' }}>
           <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13, minWidth:400 }}>
             <thead>
               <tr style={{ background:'var(--surface-2)', color:'var(--muted)', fontSize:11, textTransform:'uppercase', letterSpacing:0.5 }}>
@@ -2540,7 +2665,7 @@ function EntriesTable({ entries, loading, columns, emptyMsg, showEmployee }) {
         <EmptyState icon="clock" msg={emptyMsg||'Nenhum registro encontrado.'} />
       ) : (
         <>
-          <div style={{ overflowX:'auto' }}>
+          <div className="time-ent-table" style={{ overflowX:'auto' }}>
             <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13, minWidth:400 }}>
               <thead>
                 <tr style={{ background:'var(--surface-2)', color:'var(--muted)', fontSize:11, textTransform:'uppercase', letterSpacing:0.5 }}>
@@ -2562,6 +2687,34 @@ function EntriesTable({ entries, loading, columns, emptyMsg, showEmployee }) {
               </tbody>
             </table>
           </div>
+
+          {/* Cards — visíveis apenas no mobile */}
+          <div className="time-ent-cards">
+            {paged.map(r => {
+              const titleCol  = cols[0];
+              const statusCol = cols.find(c => c.key === 'status');
+              const rowCols   = cols.filter(c => c !== titleCol && c !== statusCol);
+              return (
+                <div key={r.id} className="time-card">
+                  <div className="time-card-head">
+                    <span className="time-card-title">{titleCol?.render(r) ?? '—'}</span>
+                    {statusCol && statusCol.render(r)}
+                  </div>
+                  {rowCols.map(c => {
+                    const val = c.render(r);
+                    if (val == null) return null;
+                    return (
+                      <div key={c.key} className="time-card-row">
+                        <span className="time-card-lbl">{c.label}</span>
+                        <span className="time-card-val">{val}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })}
+          </div>
+
           <Pagination total={entries.length} page={page} perPage={perPage} onPage={setPage} onPerPage={setPerPage} />
         </>
       )}
