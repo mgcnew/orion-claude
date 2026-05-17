@@ -453,9 +453,22 @@ select {
 }
 
 /* === RH Screen responsive === */
+.rh-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
+  margin-bottom: 20px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+.rh-tabs::-webkit-scrollbar { display: none; }
+
 @media (max-width: 640px) {
   .rh-screen { padding: 12px !important; }
   .rh-tab-label { display: none; }
+  .rh-tab { padding: 10px 14px !important; }
+  .rh-tabs { margin-bottom: 14px; }
 }
 /* Advertências */
 @media (max-width: 860px) {

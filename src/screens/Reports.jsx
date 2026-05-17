@@ -517,9 +517,16 @@ function ExportDropdown({ onExport }) {
 function FilterModal({ report, selectedId, onSelectReport, filters, setFilters, employees, depts, companies, onClose, onClear }) {
   return (
     <div
-      style={{ position: 'fixed', inset: 0, zIndex: 400, background: 'rgba(0,0,0,.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
+      style={{ position: 'fixed', inset: 0, zIndex: 400, background: 'rgba(0,0,0,.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 'clamp(8px, 2vw, 16px)' }}
       onClick={onClose}
     >
+      <style>{`
+        @media (max-width: 520px) {
+          .rep-modal-head { padding: 14px 14px 12px !important; }
+          .rep-modal-body { padding: 16px 14px !important; gap: 16px !important; }
+          .rep-modal-foot { padding: 10px 14px !important; }
+        }
+      `}</style>
       <div
         onClick={e => e.stopPropagation()}
         style={{
@@ -530,12 +537,12 @@ function FilterModal({ report, selectedId, onSelectReport, filters, setFilters, 
           maxHeight: 'min(90vh, 680px)',
         }}
       >
-        <div style={{ flexShrink: 0, padding: '16px 20px 14px', borderBottom: '1px solid var(--line)', display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div className="rep-modal-head" style={{ flexShrink: 0, padding: '16px 20px 14px', borderBottom: '1px solid var(--line)', display: 'flex', alignItems: 'center', gap: 10 }}>
           <Icon name="filter" size={15} style={{ color: 'var(--brand)' }} />
           <span style={{ fontSize: 14.5, fontWeight: 700, flex: 1 }}>Filtros</span>
           <button className="btn ghost icon sm" onClick={onClose}><Icon name="x" size={14} /></button>
         </div>
-        <div className="scroll-hidden" style={{ flex: 1, overflowY: 'auto', minHeight: 0, padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 20 }}>
+        <div className="scroll-hidden rep-modal-body" style={{ flex: 1, overflowY: 'auto', minHeight: 0, padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 20 }}>
           <div>
             <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 6 }}>Tipo de relatório</label>
             <CustomSelect value={selectedId} onChange={onSelectReport} groups={REPORT_CATALOG} />
@@ -546,7 +553,7 @@ function FilterModal({ report, selectedId, onSelectReport, filters, setFilters, 
             <ReportFilters report={report} filters={filters} setFilters={setFilters} employees={employees} depts={depts} companies={companies} />
           </div>
         </div>
-        <div style={{ flexShrink: 0, padding: '12px 20px', borderTop: '1px solid var(--line)', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+        <div className="rep-modal-foot" style={{ flexShrink: 0, padding: '12px 20px', borderTop: '1px solid var(--line)', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
           <button className="btn ghost sm" onClick={onClear}>Limpar filtros</button>
           <button className="btn primary sm" onClick={onClose}>Aplicar</button>
         </div>
@@ -649,11 +656,37 @@ export default function ReportsScreen({ addToast, activeCompany }) {
 
   return (
     <>
-    <div className="fade-up" style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
-        <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-            <div style={{ flex: 1, minWidth: 0 }}>
+    <style>{`
+      .rep-root      { display: flex; height: 100%; overflow: hidden; }
+      .rep-col       { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
+      .rep-head      { padding: 14px 16px; border-bottom: 1px solid var(--line); flex-shrink: 0; }
+      .rep-head-row  { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+      .rep-title-wrap{ flex: 1; min-width: 0; }
+      .rep-desc      { margin: 2px 0 0; font-size: 12.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .rep-actions   { display: flex; gap: 6px; flex-shrink: 0; flex-wrap: wrap; }
+      .rep-history   { display: flex; align-items: center; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+      .rep-info-bar  { padding: 10px 16px; border-bottom: 1px solid var(--line); flex-shrink: 0; display: flex; align-items: center; gap: 10px; background: var(--surface-2); }
+
+      @media (max-width: 640px) {
+        .rep-head      { padding: 12px; }
+        .rep-info-bar  { padding: 8px 12px; }
+        .rep-desc      { display: none; }
+        .rep-actions   { width: 100%; gap: 6px; }
+        .rep-actions .btn.sm { flex: 1; justify-content: center; min-width: 0; }
+        .rep-clear-label { display: none; }
+        .rep-history-recents-label { display: none; }
+        .rep-history .pill { font-size: 10px !important; padding: 3px 6px !important; }
+        .rep-history .pill > span { max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      }
+      @media (max-width: 480px) {
+        .rep-history .pill:nth-child(n+4) { display: none; }
+      }
+    `}</style>
+    <div className="fade-up rep-root">
+      <div className="rep-col">
+        <div className="rep-head">
+          <div className="rep-head-row">
+            <div className="rep-title-wrap">
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
                 <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.7 }}>
                   {selected?.group} /
@@ -662,12 +695,10 @@ export default function ReportsScreen({ addToast, activeCompany }) {
                   {selected?.label}
                 </h1>
               </div>
-              <p style={{ margin: '2px 0 0', fontSize: 12.5, color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {selected?.desc}
-              </p>
+              <p className="rep-desc">{selected?.desc}</p>
             </div>
 
-            <div style={{ display: 'flex', gap: 6, flexShrink: 0, flexWrap: 'wrap' }}>
+            <div className="rep-actions">
               <button className="btn sm" onClick={() => setFilterModalOpen(true)} style={{ position: 'relative' }}>
                 <Icon name="filter" size={13} />
                 Filtros
@@ -681,21 +712,23 @@ export default function ReportsScreen({ addToast, activeCompany }) {
                 )}
               </button>
               {activeFiltersCount > 0 && (
-                <button className="btn sm ghost" onClick={() => setFilters({})}>Limpar filtros</button>
+                <button className="btn sm ghost" onClick={() => setFilters({})}>
+                  <Icon name="x" size={12} /> <span className="rep-clear-label">Limpar filtros</span>
+                </button>
               )}
               {rows.length > 0 && <ExportDropdown onExport={handleExport} />}
             </div>
           </div>
 
           {history.length > 0 && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
-              <span style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--muted-2)', textTransform: 'uppercase', letterSpacing: 0.6, flexShrink: 0 }}>
+            <div className="rep-history">
+              <span className="rep-history-recents-label" style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--muted-2)', textTransform: 'uppercase', letterSpacing: 0.6, flexShrink: 0 }}>
                 Recentes:
               </span>
               {history.slice(0, 5).map(h => (
                 <span key={h.id} className="pill" style={{ fontSize: 10.5, gap: 4 }}>
                   <Icon name="download" size={9} />
-                  {h.report} · {h.format} · {h.rows}reg
+                  <span>{h.report} · {h.format} · {h.rows}reg</span>
                 </span>
               ))}
               <button className="btn ghost sm icon" onClick={() => setHistory([])}>
@@ -707,11 +740,7 @@ export default function ReportsScreen({ addToast, activeCompany }) {
 
         <div style={{ flex: 1, display: 'flex', overflow: 'hidden', minHeight: 0 }}>
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
-            <div style={{
-              padding: '10px 16px', borderBottom: '1px solid var(--line)',
-              flexShrink: 0, display: 'flex', alignItems: 'center', gap: 10,
-              background: 'var(--surface-2)',
-            }}>
+            <div className="rep-info-bar">
               {loading ? (
                 <span className="pulse" style={{ fontSize: 12.5, color: 'var(--muted)' }}>Carregando dados…</span>
               ) : (

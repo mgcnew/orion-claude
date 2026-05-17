@@ -58,7 +58,7 @@ export default function RHScreen({ addToast, activeCompany, route, openModal, us
   return (
     <div
       className="fade-up rh-screen"
-      style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 0, height: '100%', boxSizing: 'border-box' }}
+      style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 0, boxSizing: 'border-box' }}
     >
       <div style={{ marginBottom: 16 }}>
         <h1 style={{ margin: '0 0 4px', fontSize: 22, fontWeight: 700, letterSpacing: -0.4 }}>Recursos Humanos</h1>
@@ -66,12 +66,13 @@ export default function RHScreen({ addToast, activeCompany, route, openModal, us
       </div>
 
       {/* Tab bar */}
-      <div style={{ display: 'flex', borderBottom: '1px solid var(--line)', flexShrink: 0, marginBottom: 20, overflowX: 'auto' }}>
+      <div className="rh-tabs">
         {TABS.map(t => (
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
             title={t.label}
+            className="rh-tab"
             style={{
               display: 'flex', alignItems: 'center', gap: 6,
               padding: '8px 14px', border: 'none', background: 'transparent',
@@ -87,7 +88,7 @@ export default function RHScreen({ addToast, activeCompany, route, openModal, us
         ))}
       </div>
 
-      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+      <div>
         {tab === 'resumo' && (
           <ResumoTab warnings={warnings} vacations={vacations} payslips={payslips} setTab={setTab} />
         )}
