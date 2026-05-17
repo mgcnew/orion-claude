@@ -1,5 +1,18 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import Icon from '../components/Icon.jsx';
+
+const cltStyle = `
+  .clt-page   { padding: clamp(14px, 4vw, 28px); }
+  .clt-tabs   { display:flex; overflow-x:auto; scrollbar-width:none; -webkit-overflow-scrolling:touch; border-bottom:1px solid var(--line); }
+  .clt-tabs::-webkit-scrollbar { display:none; }
+  .clt-sim    { display:grid; grid-template-columns:320px 1fr; gap:20px; align-items:start; }
+  .clt-search { width:280px; }
+  @media (max-width:768px) {
+    .clt-sim    { grid-template-columns:1fr; }
+    .clt-search { width:100% !important; }
+    .clt-header { flex-direction:column; align-items:stretch !important; gap:10px !important; }
+  }
+`;
 
 // ============================================================
 // DATA
@@ -356,6 +369,65 @@ function ItemCard({ item }) {
   );
 }
 
+function CatDropdown({ value, onChange, options }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef();
+  useEffect(() => {
+    const h = (e) => { if (!ref.current?.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, []);
+  const selected = options.find(o => o.value === value) || options[0];
+  return (
+    <div ref={ref} style={{ position: 'relative', flexShrink: 0 }}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          height: 36, padding: '0 12px', borderRadius: 8,
+          border: `1px solid ${open ? 'var(--brand)' : 'var(--line)'}`,
+          background: 'var(--surface-2)', color: 'var(--ink)',
+          fontSize: 13, fontWeight: 500, cursor: 'pointer',
+          whiteSpace: 'nowrap', transition: 'border-color .12s',
+        }}
+      >
+        {selected.icon && <Icon name={selected.icon} size={13} style={{ color: 'var(--muted)', flexShrink: 0 }} />}
+        <span style={{ flex: 1 }}>{selected.label}</span>
+        <Icon name="chevron-down" size={12} style={{ color: 'var(--muted)', transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }} />
+      </button>
+      {open && (
+        <div style={{
+          position: 'absolute', top: 'calc(100% + 4px)', left: 0,
+          minWidth: '100%', background: 'var(--surface)',
+          border: '1px solid var(--line)', borderRadius: 10,
+          boxShadow: '0 8px 24px rgba(0,0,0,.12)', zIndex: 200,
+          overflow: 'hidden', maxHeight: 320, overflowY: 'auto',
+        }}>
+          {options.map(o => (
+            <button
+              key={o.value}
+              onClick={() => { onChange(o.value); setOpen(false); }}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 10,
+                width: '100%', padding: '9px 14px', border: 'none', textAlign: 'left',
+                background: value === o.value ? 'var(--brand-tint)' : 'transparent',
+                color: value === o.value ? 'var(--brand)' : 'var(--ink)',
+                fontSize: 13, fontWeight: value === o.value ? 600 : 400, cursor: 'pointer',
+              }}
+              onMouseEnter={e => { if (value !== o.value) e.currentTarget.style.background = 'var(--hover)'; }}
+              onMouseLeave={e => { if (value !== o.value) e.currentTarget.style.background = 'transparent'; }}
+            >
+              {o.icon && <Icon name={o.icon} size={13} style={{ color: value === o.value ? 'var(--brand)' : 'var(--muted)', flexShrink: 0 }} />}
+              <span style={{ flex: 1 }}>{o.label}</span>
+              {value === o.value && <Icon name="check" size={13} style={{ color: 'var(--brand)', flexShrink: 0 }} />}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function DireitosTab({ search }) {
   const [catAtiva, setCatAtiva] = useState('todas');
 
@@ -376,26 +448,19 @@ function DireitosTab({ search }) {
   const exibir = catAtiva === 'todas' ? resultados : resultados.filter(c => c.id === catAtiva);
   const totalItens = resultados.reduce((s, c) => s + c.items.length, 0);
 
+  const catOptions = [
+    { value: 'todas', label: `Todas as categorias (${totalItens})`, icon: 'scale' },
+    ...resultados.map(cat => ({ value: cat.id, label: `${cat.label} (${cat.items.length})`, icon: cat.icon })),
+  ];
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       {/* Filtro de categorias */}
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-        <button
-          className={`btn sm ${catAtiva === 'todas' ? 'primary' : 'ghost'}`}
-          onClick={() => setCatAtiva('todas')}
-        >
-          Todas ({totalItens})
-        </button>
-        {resultados.map(cat => (
-          <button
-            key={cat.id}
-            className={`btn sm ${catAtiva === cat.id ? 'primary' : 'ghost'}`}
-            onClick={() => setCatAtiva(cat.id)}
-          >
-            <Icon name={cat.icon} size={13} /> {cat.label} ({cat.items.length})
-          </button>
-        ))}
-      </div>
+      <CatDropdown
+        value={catAtiva}
+        onChange={setCatAtiva}
+        options={catOptions}
+      />
 
       {exibir.length === 0 && (
         <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--muted)', fontSize: 13 }}>
@@ -477,7 +542,7 @@ function SimuladorTab() {
   const totalEstimado = calcTotal();
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: 20, alignItems: 'start' }}>
+    <div className="clt-sim">
       {/* Formulário */}
       <div className="card" style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
         <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: 1, color: 'var(--muted-2)', textTransform: 'uppercase' }}>
@@ -626,8 +691,10 @@ export default function CLTScreen() {
   const [search, setSearch] = useState('');
 
   return (
-    <div className="fade-up" style={{ padding: 28, maxWidth: 1180, margin: '0 auto', width: '100%', display: 'flex', flexDirection: 'column', gap: 20 }}>
-      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 16, flexWrap: 'wrap' }}>
+    <>
+    <style>{cltStyle}</style>
+    <div className="fade-up clt-page" style={{ maxWidth: 1180, margin: '0 auto', width: '100%', display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <div className="clt-header" style={{ display: 'flex', alignItems: 'flex-end', gap: 16, flexWrap: 'wrap' }}>
         <div style={{ flex: 1, minWidth: 200 }}>
           <h1 style={{ margin: '0 0 4px', fontSize: 22, fontWeight: 700, letterSpacing: -0.4 }}>CLT & Direitos</h1>
           <p style={{ margin: 0, fontSize: 13, color: 'var(--muted)' }}>
@@ -638,29 +705,29 @@ export default function CLTScreen() {
           <div style={{ position: 'relative', flexShrink: 0 }}>
             <Icon name="search" size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--muted)', pointerEvents: 'none' }} />
             <input
-              className="field"
+              className="field clt-search"
               placeholder="Buscar por palavra-chave ou artigo…"
               value={search}
               onChange={e => setSearch(e.target.value)}
-              style={{ paddingLeft: 32, width: 280, background: 'var(--surface-2)' }}
+              style={{ paddingLeft: 32, background: 'var(--surface-2)' }}
             />
           </div>
         )}
       </div>
 
       {/* Tabs */}
-      <div className="row gap-2" style={{ borderBottom: '1px solid var(--line)' }}>
+      <div className="clt-tabs">
         {TABS.map(t => (
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
-            className="row gap-2"
             style={{
+              display: 'flex', alignItems: 'center', gap: 6,
               padding: '10px 14px', border: 'none', background: 'transparent',
               color: tab === t.id ? 'var(--brand)' : 'var(--muted)',
               fontSize: 13, fontWeight: tab === t.id ? 700 : 500, cursor: 'pointer',
               borderBottom: `2px solid ${tab === t.id ? 'var(--brand)' : 'transparent'}`,
-              marginBottom: -1,
+              marginBottom: -1, whiteSpace: 'nowrap', flexShrink: 0,
             }}
           >
             <Icon name={t.icon} size={14} /> {t.label}
@@ -672,5 +739,6 @@ export default function CLTScreen() {
       {tab === 'simulador' && <SimuladorTab />}
       {tab === 'valores'   && <ValoresTab />}
     </div>
+    </>
   );
 }
