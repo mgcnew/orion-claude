@@ -121,11 +121,15 @@ function buildCrumbs(route, routeLabel) {
 }
 
 const headerStyle = `
+  .hdr-search-mobile { display: none; }
   @media (max-width: 767px) {
     .hdr-root {
       padding: 0 10px !important;
       gap: 6px !important;
+      grid-template-columns: 1fr auto !important;
     }
+    .hdr-center { display: none !important; }
+    .hdr-search-mobile { display: flex; }
     .hdr-crumb-parent { display: none !important; }
     .hdr-invite-label { display: none !important; }
     .hdr-invite-btn { padding: 0 8px !important; min-width: 32px !important; }
@@ -219,11 +223,18 @@ export default function Header({
         </div>
       </div>
 
-      {/* Centro: busca global */}
-      <SearchBar setRoute={setRoute} setRouteParam={setRouteParam} setRouteLabel={setRouteLabel} />
+      {/* Centro: busca global (oculto no mobile) */}
+      <div className="hdr-center" style={{ display: 'flex', justifyContent: 'center' }}>
+        <SearchBar setRoute={setRoute} setRouteParam={setRouteParam} setRouteLabel={setRouteLabel} />
+      </div>
 
       {/* Direita: ações */}
       <div className="row gap-2" style={{ justifyContent: 'flex-end' }}>
+        {/* Busca no mobile (ícone ao lado dos demais botões) */}
+        <div className="hdr-search-mobile">
+          <SearchBar setRoute={setRoute} setRouteParam={setRouteParam} setRouteLabel={setRouteLabel} />
+        </div>
+
         {isAdmin && onInvite && (
           <button className="btn primary sm hdr-invite-btn" onClick={onInvite} title="Convidar usuário">
             <Icon name="user-plus" size={14} />
