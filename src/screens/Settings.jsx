@@ -5,15 +5,30 @@ import { supabase } from '../lib/supabase.js';
 import { useCompanies, createCompany, updateCompany } from '../hooks/useEmployees.js';
 import PermissionsScreen from './Permissions.jsx';
 
+const settStyle = `
+  .sett-page     { padding: clamp(14px, 4vw, 28px); display:flex; flex-direction:column; gap:20px; max-width:1180px; margin:0 auto; width:100%; }
+  .sett-tabs     { display:flex; overflow-x:auto; scrollbar-width:none; -webkit-overflow-scrolling:touch; border-bottom:1px solid var(--line); }
+  .sett-tabs::-webkit-scrollbar { display:none; }
+  .sett-row      { display:flex; align-items:flex-start; justify-content:space-between; gap:24px; padding:18px 0; border-bottom:1px solid var(--line-soft); }
+  .sett-row-ctrl { flex-shrink:0; }
+  .sett-hist     { overflow-x:auto; }
+  .sett-co-lbl   { display:inline; }
+  @media (max-width:768px) {
+    .sett-row      { flex-direction:column; gap:10px; }
+    .sett-row-ctrl { overflow-x:auto; width:100%; }
+    .sett-co-lbl   { display:none; }
+  }
+`;
+
 // ── UI primitives (locais a Settings) ───────────────────────────
 function SettingRow({ label, description, children }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 24, padding: '18px 0', borderBottom: '1px solid var(--line-soft)' }}>
+    <div className="sett-row">
       <div style={{ minWidth: 0 }}>
         <div style={{ fontSize: 13.5, fontWeight: 600, marginBottom: 2 }}>{label}</div>
         {description && <div style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.5 }}>{description}</div>}
       </div>
-      <div style={{ flexShrink: 0 }}>{children}</div>
+      <div className="sett-row-ctrl">{children}</div>
     </div>
   );
 }
@@ -202,11 +217,11 @@ function EmpresasTab({ addToast }) {
               </div>
               <div className="row gap-2">
                 <button className="btn ghost sm" onClick={() => openEdit(c)}>
-                  <Icon name="edit" size={13} /> Editar
+                  <Icon name="edit" size={13} /> <span className="sett-co-lbl">Editar</span>
                 </button>
                 <button className="btn ghost sm" onClick={() => handleToggleActive(c)} style={{ color: c.active ? 'var(--bad)' : 'var(--good)' }}>
                   <Icon name={c.active ? 'x' : 'check'} size={13} />
-                  {c.active ? 'Desativar' : 'Ativar'}
+                  <span className="sett-co-lbl">{c.active ? 'Desativar' : 'Ativar'}</span>
                 </button>
               </div>
             </div>
@@ -592,30 +607,32 @@ function SegurancaTab({ addToast, tweaks, setTweak }) {
         ) : auditRows.length === 0 ? (
           <div style={{ fontSize: 13, color: 'var(--muted)', padding: '12px 0' }}>Nenhum registro encontrado.</div>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
-            <thead>
-              <tr>
-                {['Ação', 'Alvo', 'IP', 'Dispositivo', 'Data'].map(h => (
-                  <th key={h} style={{ textAlign: 'left', padding: '6px 8px', color: 'var(--muted)', fontWeight: 600, borderBottom: '1px solid var(--line)' }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {auditRows.map(r => (
-                <tr key={r.id} style={{ borderBottom: '1px solid var(--line-soft)' }}>
-                  <td style={{ padding: '8px 8px' }}>
-                    <span className={`pill ${r.action === 'LOGIN' ? 'ok' : 'warn'}`} style={{ fontSize: 10.5 }}>{r.action}</span>
-                  </td>
-                  <td style={{ padding: '8px 8px', color: 'var(--muted)' }}>{r.target || '—'}</td>
-                  <td style={{ padding: '8px 8px', color: 'var(--muted)', fontFamily: 'monospace' }}>{r.ip || '—'}</td>
-                  <td style={{ padding: '8px 8px', color: 'var(--muted)', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.device || '—'}</td>
-                  <td style={{ padding: '8px 8px', color: 'var(--muted)', whiteSpace: 'nowrap' }}>
-                    {new Date(r.created_at).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
-                  </td>
+          <div className="sett-hist">
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+              <thead>
+                <tr>
+                  {['Ação', 'Alvo', 'IP', 'Dispositivo', 'Data'].map(h => (
+                    <th key={h} style={{ textAlign: 'left', padding: '6px 8px', color: 'var(--muted)', fontWeight: 600, borderBottom: '1px solid var(--line)', whiteSpace: 'nowrap' }}>{h}</th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {auditRows.map(r => (
+                  <tr key={r.id} style={{ borderBottom: '1px solid var(--line-soft)' }}>
+                    <td style={{ padding: '8px 8px' }}>
+                      <span className={`pill ${r.action === 'LOGIN' ? 'ok' : 'warn'}`} style={{ fontSize: 10.5 }}>{r.action}</span>
+                    </td>
+                    <td style={{ padding: '8px 8px', color: 'var(--muted)' }}>{r.target || '—'}</td>
+                    <td style={{ padding: '8px 8px', color: 'var(--muted)', fontFamily: 'monospace', whiteSpace: 'nowrap' }}>{r.ip || '—'}</td>
+                    <td style={{ padding: '8px 8px', color: 'var(--muted)', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.device || '—'}</td>
+                    <td style={{ padding: '8px 8px', color: 'var(--muted)', whiteSpace: 'nowrap' }}>
+                      {new Date(r.created_at).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
     </div>
@@ -637,18 +654,9 @@ export default function SettingsScreen({ initialTab, addToast, setRoute, activeC
   ];
 
   return (
-    <div
-      className="fade-up"
-      style={{
-        padding: 28,
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 20,
-        maxWidth: 1180,
-        margin: '0 auto',
-        width: '100%',
-      }}
-    >
+    <>
+    <style>{settStyle}</style>
+    <div className="fade-up sett-page">
       <div>
         <h1 style={{ margin: '0 0 4px', fontSize: 22, fontWeight: 700, letterSpacing: -0.4 }}>Configurações</h1>
         <p style={{ margin: 0, fontSize: 13, color: 'var(--muted)' }}>
@@ -656,7 +664,7 @@ export default function SettingsScreen({ initialTab, addToast, setRoute, activeC
         </p>
       </div>
 
-      <div className="row gap-2" style={{ borderBottom: '1px solid var(--line)' }}>
+      <div className="sett-tabs">
         {tabs.map((t) => (
           <button
             key={t.id}
@@ -675,6 +683,8 @@ export default function SettingsScreen({ initialTab, addToast, setRoute, activeC
               cursor: 'pointer',
               borderBottom: `2px solid ${tab === t.id ? 'var(--brand)' : 'transparent'}`,
               marginBottom: -1,
+              whiteSpace: 'nowrap',
+              flexShrink: 0,
             }}
           >
             <Icon name={t.i} size={14} /> {t.l}
@@ -687,5 +697,6 @@ export default function SettingsScreen({ initialTab, addToast, setRoute, activeC
       {tab === 'seguranca' && <SegurancaTab addToast={addToast} tweaks={tweaks} setTweak={setTweak} />}
       {tab === 'permissoes' && <PermissionsScreen addToast={addToast} embedded={true} activeCompany={activeCompany} />}
     </div>
+    </>
   );
 }
