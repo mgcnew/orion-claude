@@ -589,6 +589,14 @@ export default function JusticeScreen({ addToast, activeCompany }) {
         .just-doc-date     { width: 150px; }
         .just-hist-row     { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
         .just-slideover    { width: clamp(300px, 42vw, 520px); }
+        .just-hist-cards   { display: none; flex-direction: column; gap: 10px; padding: 12px; }
+        .just-hist-card    { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+        .just-hist-card-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--line-soft); gap: 8px; }
+        .just-hist-card-date { font-family: monospace; font-size: 12px; color: var(--muted); }
+        .just-hist-card-title { font-size: 13.5px; font-weight: 600; color: var(--ink); margin-bottom: 8px; }
+        .just-hist-card-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 3px 0; }
+        .just-hist-card-lbl { font-size: 11.5px; color: var(--muted); }
+        .just-hist-card-val { font-size: 12.5px; color: var(--ink-soft); text-align: right; }
 
         @media (max-width: 768px) {
           .just-page       { padding: 14px; }
@@ -611,6 +619,10 @@ export default function JusticeScreen({ addToast, activeCompany }) {
           .just-hist-input { max-width: 100% !important; flex: 1; min-width: 0; }
           .just-col-proxima { display: none; }
           .just-table      { min-width: 0 !important; }
+        }
+        @media (max-width: 768px) {
+          .just-hist-table-wrap { display: none !important; }
+          .just-hist-cards      { display: flex; }
         }
       `}</style>
       <div className="fade-up just-page">
@@ -893,7 +905,8 @@ export default function JusticeScreen({ addToast, activeCompany }) {
                 Nenhum documento gerado ainda.
               </div>
             ) : (
-              <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
+              <>
+              <div className="just-hist-table-wrap" style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
                 <div style={{ overflowX: 'auto' }}>
                   <table className="just-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 600 }}>
                     <thead>
@@ -938,6 +951,36 @@ export default function JusticeScreen({ addToast, activeCompany }) {
                   </table>
                 </div>
               </div>
+
+              {/* Cards — visíveis apenas no mobile */}
+              <div className="just-hist-cards">
+                {filteredHistory.map(r => (
+                  <div key={r.id} className="just-hist-card">
+                    <div className="just-hist-card-top">
+                      <span className="just-hist-card-date">
+                        {new Date(r.created_at).toLocaleDateString('pt-BR')}
+                      </span>
+                      <span className={`pill ${r.status === 'Assinado' ? 'ok' : r.status === 'Homologado' ? 'info' : 'warn'}`}>
+                        <span className="dot" />{r.status}
+                      </span>
+                      <RowMenu items={[
+                        { label: 'Baixar PDF', icon: 'download', action: () => addToast({ kind: 'ok', msg: 'PDF baixado' }) },
+                        { label: 'Imprimir', icon: 'print', action: () => addToast({ kind: 'ok', msg: 'Imprimindo…' }) },
+                      ]} />
+                    </div>
+                    <div className="just-hist-card-title">{r.template_title}</div>
+                    <div className="just-hist-card-row">
+                      <span className="just-hist-card-lbl">Funcionário</span>
+                      <span className="just-hist-card-val">{r.employees?.name || '—'}</span>
+                    </div>
+                    <div className="just-hist-card-row">
+                      <span className="just-hist-card-lbl">Emitido por</span>
+                      <span className="just-hist-card-val">{r.emitted_by || '—'}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              </>
             )}
           </div>
         )}
