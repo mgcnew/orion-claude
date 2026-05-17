@@ -2,15 +2,20 @@ import { useState, useMemo, useRef, useEffect } from 'react';
 import Icon from '../components/Icon.jsx';
 
 const cltStyle = `
-  .clt-page   { padding: clamp(14px, 4vw, 28px); }
-  .clt-tabs   { display:flex; overflow-x:auto; scrollbar-width:none; -webkit-overflow-scrolling:touch; border-bottom:1px solid var(--line); }
+  .clt-page      { padding: clamp(14px, 4vw, 28px); }
+  .clt-tabs      { display:flex; overflow-x:auto; scrollbar-width:none; -webkit-overflow-scrolling:touch; border-bottom:1px solid var(--line); }
   .clt-tabs::-webkit-scrollbar { display:none; }
-  .clt-sim    { display:grid; grid-template-columns:320px 1fr; gap:20px; align-items:start; }
-  .clt-search { width:280px; }
+  .clt-sim       { display:grid; grid-template-columns:320px 1fr; gap:20px; align-items:start; }
+  .clt-search    { width:280px; }
+  .clt-tipo-btns { display:flex; flex-direction:column; gap:6px; }
+  .clt-tipo-drop { display:none; }
+  .clt-val-table { overflow-x:auto; }
   @media (max-width:768px) {
-    .clt-sim    { grid-template-columns:1fr; }
-    .clt-search { width:100% !important; }
-    .clt-header { flex-direction:column; align-items:stretch !important; gap:10px !important; }
+    .clt-sim       { grid-template-columns:1fr; }
+    .clt-search    { width:100% !important; }
+    .clt-header    { flex-direction:column; align-items:stretch !important; gap:10px !important; }
+    .clt-tipo-btns { display:none; }
+    .clt-tipo-drop { display:block; }
   }
 `;
 
@@ -551,7 +556,16 @@ function SimuladorTab() {
 
         <div>
           <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 6 }}>Tipo de rescisão</label>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {/* mobile: dropdown */}
+          <div className="clt-tipo-drop">
+            <CatDropdown
+              value={tipo}
+              onChange={setTipo}
+              options={RESCISAO_TIPOS.map(t => ({ value: t.id, label: t.label, icon: 'doc' }))}
+            />
+          </div>
+          {/* desktop: botões verticais */}
+          <div className="clt-tipo-btns">
             {RESCISAO_TIPOS.map(t => (
               <button
                 key={t.id}
@@ -659,18 +673,20 @@ function ValoresTab() {
         <div key={gi} className="card" style={{ padding: 20 }}>
           <div style={{ fontSize: 14, fontWeight: 700, marginBottom: grupo.obs ? 4 : 14 }}>{grupo.cat}</div>
           {grupo.obs && <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 12 }}>{grupo.obs}</div>}
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-            <tbody>
-              {grupo.itens.map((it, ii) => (
-                <tr key={ii} style={{ borderBottom: ii < grupo.itens.length - 1 ? '1px solid var(--line)' : 'none' }}>
-                  <td style={{ padding: '9px 8px', color: 'var(--ink-soft)' }}>{it.label}</td>
-                  <td style={{ padding: '9px 8px', fontWeight: 700, color: 'var(--ink)', textAlign: 'right', whiteSpace: 'nowrap' }}>{it.valor}</td>
-                  <td style={{ padding: '9px 8px', color: 'var(--muted)', fontSize: 11.5, textAlign: 'right', whiteSpace: 'nowrap' }}>{it.ref}</td>
-                  {it.vig && <td style={{ padding: '9px 8px' }}><span className="pill ok" style={{ fontSize: 10 }}>{it.vig}</span></td>}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div className="clt-val-table">
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <tbody>
+                {grupo.itens.map((it, ii) => (
+                  <tr key={ii} style={{ borderBottom: ii < grupo.itens.length - 1 ? '1px solid var(--line)' : 'none' }}>
+                    <td style={{ padding: '9px 8px', color: 'var(--ink-soft)' }}>{it.label}</td>
+                    <td style={{ padding: '9px 8px', fontWeight: 700, color: 'var(--ink)', textAlign: 'right', whiteSpace: 'nowrap' }}>{it.valor}</td>
+                    <td style={{ padding: '9px 8px', color: 'var(--muted)', fontSize: 11.5, textAlign: 'right', whiteSpace: 'nowrap' }}>{it.ref}</td>
+                    {it.vig && <td style={{ padding: '9px 8px' }}><span className="pill ok" style={{ fontSize: 10 }}>{it.vig}</span></td>}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       ))}
     </div>
