@@ -667,6 +667,21 @@ export default function ReportsScreen({ addToast, activeCompany }) {
       .rep-history   { display: flex; align-items: center; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
       .rep-info-bar  { padding: 10px 16px; border-bottom: 1px solid var(--line); flex-shrink: 0; display: flex; align-items: center; gap: 10px; background: var(--surface-2); }
 
+      .rep-cards     { display: none; padding: 12px; flex-direction: column; gap: 10px; }
+      .rep-card      { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+      .rep-card-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid var(--line-soft); }
+      .rep-card-idx  { font-size: 11px; font-family: monospace; color: var(--muted-2); flex-shrink: 0; padding: 1px 6px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--line); }
+      .rep-card-title{ font-size: 14px; font-weight: 600; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
+      .rep-card-rows { display: flex; flex-direction: column; gap: 6px; }
+      .rep-card-row  { display: flex; gap: 12px; align-items: flex-start; font-size: 12.5px; }
+      .rep-card-label{ flex: 0 0 100px; color: var(--muted); font-size: 11.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; }
+      .rep-card-value{ flex: 1; min-width: 0; color: var(--ink-soft); word-break: break-word; }
+
+      @media (max-width: 768px) {
+        .rep-table  { display: none; }
+        .rep-cards  { display: flex; }
+      }
+
       @media (max-width: 640px) {
         .rep-head      { padding: 12px; }
         .rep-info-bar  { padding: 8px 12px; }
@@ -755,7 +770,8 @@ export default function ReportsScreen({ addToast, activeCompany }) {
 
             <div style={{ flex: 1, overflowY: 'auto', overflowX: 'auto', minHeight: 0 }}>
               {loading ? (
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 480 }}>
+                <>
+                <table className="rep-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 480 }}>
                   <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
                     <tr style={{ background: 'var(--surface-2)', color: 'var(--muted)', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.6 }}>
                       <th style={{ padding: '9px 14px', textAlign: 'left', fontWeight: 600, width: 36, color: 'var(--muted-2)' }}>#</th>
@@ -779,13 +795,33 @@ export default function ReportsScreen({ addToast, activeCompany }) {
                     ))}
                   </tbody>
                 </table>
+                <div className="rep-cards">
+                  {Array.from({ length: 5 }, (_, i) => (
+                    <div key={i} className="rep-card">
+                      <div className="rep-card-head">
+                        <Skeleton width={28} height={14} radius={20} />
+                        <Skeleton height={14} style={{ maxWidth: '60%', flex: 1 }} />
+                      </div>
+                      <div className="rep-card-rows">
+                        {selected.columns.slice(1).map((_col, ci) => (
+                          <div key={ci} className="rep-card-row">
+                            <Skeleton width={80} height={10} />
+                            <Skeleton height={10} style={{ flex: 1, maxWidth: '60%' }} />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                </>
               ) : rows.length === 0 ? (
                 <div style={{ padding: 64, textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>
                   <Icon name="folder" size={32} style={{ opacity: 0.2, display: 'block', margin: '0 auto 12px' }} />
                   Nenhum registro encontrado com os filtros aplicados.
                 </div>
               ) : (
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 480 }}>
+                <>
+                <table className="rep-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 480 }}>
                   <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
                     <tr style={{ background: 'var(--surface-2)', color: 'var(--muted)', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.6 }}>
                       <th style={{ padding: '9px 14px', textAlign: 'left', fontWeight: 600, width: 36, color: 'var(--muted-2)' }}>#</th>
@@ -813,6 +849,27 @@ export default function ReportsScreen({ addToast, activeCompany }) {
                     ))}
                   </tbody>
                 </table>
+                <div className="rep-cards">
+                  {paged.map((row, i) => (
+                    <div key={i} className="rep-card">
+                      <div className="rep-card-head">
+                        <span className="rep-card-idx">#{(page - 1) * perPage + i + 1}</span>
+                        <span className="rep-card-title">{row.cells[0]}</span>
+                      </div>
+                      {row.cells.length > 1 && (
+                        <div className="rep-card-rows">
+                          {row.cells.slice(1).map((cell, ci) => (
+                            <div key={ci} className="rep-card-row">
+                              <span className="rep-card-label">{selected.columns[ci + 1]}</span>
+                              <span className="rep-card-value">{cell || '—'}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                </>
               )}
             </div>
             {rows.length > 0 && (
