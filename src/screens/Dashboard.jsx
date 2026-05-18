@@ -496,7 +496,7 @@ function DashboardSkeleton() {
       </div>
 
       {/* Main grid */}
-      <div className="dash-grid-main" style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: 16 }}>
+      <div className="dash-grid-main" style={{ gap: 16 }}>
         {/* Chart placeholder */}
         <div className="card" style={{ padding: 20 }}>
           <Skeleton width={180} height={16} style={{ marginBottom: 6 }} />
@@ -523,7 +523,7 @@ function DashboardSkeleton() {
       </div>
 
       {/* Lower grid */}
-      <div className="dash-grid-lower" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
+      <div className="dash-grid-lower" style={{ gap: 16 }}>
         {[0, 1, 2].map(j => (
           <div key={j} className="card" style={{ padding: 20 }}>
             <Skeleton width={140} height={15} style={{ marginBottom: 16 }} />
@@ -577,7 +577,19 @@ export default function Dashboard({ setRoute, navigate, addToast, activeCompany,
   const desPercent = data.totalEmployees > 0 ? ((data.counts.desligado / data.totalEmployees) * 100).toFixed(1) : '0';
 
   return (
-    <div className="fade-up dash-page" style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 20 }}>
+    <>
+    <style>{`
+      .dash-page       { padding: clamp(14px,4vw,24px); display:flex; flex-direction:column; gap:20px; }
+      .dash-grid-main  { display:grid; grid-template-columns:1.6fr 1fr; gap:16px; }
+      .dash-grid-lower { display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; }
+      .dash-donut-inner{ display:flex; flex-direction:row; align-items:center; gap:16px; }
+      @media (max-width:768px) {
+        .dash-grid-main  { grid-template-columns:1fr; }
+        .dash-grid-lower { grid-template-columns:1fr; }
+        .dash-donut-inner{ flex-direction:column; align-items:stretch; }
+      }
+    `}</style>
+    <div className="fade-up dash-page">
       {/* Page header */}
       <div className="row" style={{ alignItems: 'flex-start', flexWrap: 'wrap', gap: 16 }}>
         <div className="grow" style={{ minWidth: 240 }}>
@@ -634,7 +646,7 @@ export default function Dashboard({ setRoute, navigate, addToast, activeCompany,
       </div>
 
       {/* Main grid */}
-      <div className="dash-grid-main" style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: 16 }}>
+      <div className="dash-grid-main" style={{ gap: 16 }}>
         {/* Admissions chart */}
         <AdmissionsChart
           admissions={data.admissionsSeries}
@@ -649,7 +661,7 @@ export default function Dashboard({ setRoute, navigate, addToast, activeCompany,
           <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 16 }}>
             Distribuição por situação
           </div>
-          <div className="dash-donut-inner row gap-4" style={{ alignItems: 'center' }}>
+          <div className="dash-donut-inner">
             <DonutChart
               segments={[
                 { v: data.counts.ativo, color: 'var(--brand)', label: 'Ativos' },
@@ -686,7 +698,7 @@ export default function Dashboard({ setRoute, navigate, addToast, activeCompany,
       </div>
 
       {/* Lower grid */}
-      <div className="dash-grid-lower" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
+      <div className="dash-grid-lower" style={{ gap: 16 }}>
         {/* Activity timeline */}
         <div className="card" style={{ padding: 20 }}>
           <div className="row" style={{ marginBottom: 16 }}>
@@ -887,6 +899,7 @@ export default function Dashboard({ setRoute, navigate, addToast, activeCompany,
         </div>
       </div>
     </div>
+    </>
   );
 }
 
