@@ -513,6 +513,8 @@ function SegurancaTab({ addToast, tweaks, setTweak }) {
   const [histDays, setHistDays] = useState(30);
   const [histAction, setHistAction] = useState(null);
   const [histSearch, setHistSearch] = useState('');
+  const [histPage, setHistPage] = useState(1);
+  const HIST_PAGE_SIZE = 15;
 
   const [newPwd, setNewPwd] = useState('');
   const [confirmPwd, setConfirmPwd] = useState('');
@@ -540,16 +542,22 @@ function SegurancaTab({ addToast, tweaks, setTweak }) {
 
   const distinctActions = useMemo(() => [...new Set(auditRows.map(r => r.action))].sort(), [auditRows]);
 
-  const filteredRows = useMemo(() => auditRows.filter(r => {
-    if (histAction && r.action !== histAction) return false;
-    if (histSearch) {
-      const q = histSearch.toLowerCase();
-      if (!(r.ip || '').toLowerCase().includes(q) &&
-          !(r.device || '').toLowerCase().includes(q) &&
-          !(r.target || '').toLowerCase().includes(q)) return false;
-    }
-    return true;
-  }), [auditRows, histAction, histSearch]);
+  const filteredRows = useMemo(() => {
+    setHistPage(1);
+    return auditRows.filter(r => {
+      if (histAction && r.action !== histAction) return false;
+      if (histSearch) {
+        const q = histSearch.toLowerCase();
+        if (!(r.ip || '').toLowerCase().includes(q) &&
+            !(r.device || '').toLowerCase().includes(q) &&
+            !(r.target || '').toLowerCase().includes(q)) return false;
+      }
+      return true;
+    });
+  }, [auditRows, histAction, histSearch]);
+
+  const totalPages = Math.ceil(filteredRows.length / HIST_PAGE_SIZE);
+  const pagedRows  = filteredRows.slice((histPage - 1) * HIST_PAGE_SIZE, histPage * HIST_PAGE_SIZE);
 
   async function handleChangePassword(e) {
     e.preventDefault();
@@ -720,9 +728,15 @@ function SegurancaTab({ addToast, tweaks, setTweak }) {
           <div style={{ fontSize: 13, color: 'var(--muted)', padding: '12px 0' }}>Nenhum resultado para os filtros aplicados.</div>
         ) : (
           <>
-            <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 8 }}>
-              {filteredRows.length} {filteredRows.length === 1 ? 'evento' : 'eventos'}
-              {(histAction || histSearch) && <> · <button className="btn ghost sm" style={{ fontSize: 10, padding: '1px 6px' }} onClick={() => { setHistAction(null); setHistSearch(''); }}>Limpar filtros</button></>}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 11, color: 'var(--muted)' }}>
+                {filteredRows.length} {filteredRows.length === 1 ? 'evento' : 'eventos'}
+              </span>
+              {(histAction || histSearch) && (
+                <button className="btn ghost sm" style={{ fontSize: 10, padding: '1px 6px' }} onClick={() => { setHistAction(null); setHistSearch(''); }}>
+                  Limpar filtros
+                </button>
+              )}
             </div>
             {/* desktop */}
             <div className="sett-hist sett-acc-table">
@@ -735,7 +749,7 @@ function SegurancaTab({ addToast, tweaks, setTweak }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredRows.map(r => (
+                  {pagedRows.map(r => (
                     <tr key={r.id} style={{ borderBottom: '1px solid var(--line-soft)' }}
                       onMouseEnter={e => e.currentTarget.style.background = 'var(--hover)'}
                       onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
@@ -756,7 +770,7 @@ function SegurancaTab({ addToast, tweaks, setTweak }) {
             </div>
             {/* mobile cards */}
             <div className="sett-acc-cards">
-              {filteredRows.map(r => (
+              {pagedRows.map(r => (
                 <div key={r.id} className="sett-acc-card">
                   <div className="sett-acc-head">
                     <span style={{ fontFamily: 'monospace', fontSize: 11.5, color: 'var(--muted)' }}>
@@ -785,6 +799,41 @@ function SegurancaTab({ addToast, tweaks, setTweak }) {
                 </div>
               ))}
             </div>
+            {/* paginação */}
+            {totalPages > 1 && (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 14, flexWrap: 'wrap' }}>
+                <button
+                  className="btn ghost sm"
+                  disabled={histPage === 1}
+                  onClick={() => setHistPage(p => p - 1)}
+                >
+                  <Icon name="chevron-left" size={13} />
+                </button>
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+                  <button
+                    key={p}
+                    className="btn sm"
+                    onClick={() => setHistPage(p)}
+                    style={{
+                      minWidth: 32,
+                      background: histPage === p ? 'var(--brand)' : 'transparent',
+                      color: histPage === p ? 'var(--brand-ink, #fff)' : 'var(--muted)',
+                      borderColor: histPage === p ? 'var(--brand)' : 'var(--line)',
+                      fontWeight: histPage === p ? 700 : 400,
+                    }}
+                  >
+                    {p}
+                  </button>
+                ))}
+                <button
+                  className="btn ghost sm"
+                  disabled={histPage === totalPages}
+                  onClick={() => setHistPage(p => p + 1)}
+                >
+                  <Icon name="chevron-right" size={13} />
+                </button>
+              </div>
+            )}
           </>
         )}
       </div>
