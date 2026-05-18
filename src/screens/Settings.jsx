@@ -11,12 +11,21 @@ const settStyle = `
   .sett-tabs::-webkit-scrollbar { display:none; }
   .sett-row      { display:flex; align-items:flex-start; justify-content:space-between; gap:24px; padding:18px 0; border-bottom:1px solid var(--line-soft); }
   .sett-row-ctrl { flex-shrink:0; }
-  .sett-hist     { overflow-x:auto; }
-  .sett-co-lbl   { display:inline; }
+  .sett-hist      { overflow-x:auto; }
+  .sett-co-lbl    { display:inline; }
+  .sett-acc-table { display:block; }
+  .sett-acc-cards { display:none; flex-direction:column; gap:8px; margin-top:10px; }
+  .sett-acc-card  { background:var(--surface-2); border:1px solid var(--line); border-radius:10px; padding:10px 12px; }
+  .sett-acc-head  { display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; }
+  .sett-acc-row   { display:flex; gap:6px; padding:4px 0; border-top:1px solid var(--line-soft); }
+  .sett-acc-lbl   { color:var(--muted); font-size:11px; min-width:44px; flex-shrink:0; padding-top:2px; }
+  .sett-acc-val   { font-size:12px; color:var(--ink-soft); flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   @media (max-width:768px) {
-    .sett-row      { flex-direction:column; gap:10px; }
-    .sett-row-ctrl { overflow-x:auto; width:100%; }
-    .sett-co-lbl   { display:none; }
+    .sett-row       { flex-direction:column; gap:10px; }
+    .sett-row-ctrl  { overflow-x:auto; width:100%; }
+    .sett-co-lbl    { display:none; }
+    .sett-acc-table { display:none !important; }
+    .sett-acc-cards { display:flex; }
   }
 `;
 
@@ -562,11 +571,11 @@ function SegurancaTab({ addToast, tweaks, setTweak }) {
         <form onSubmit={handleChangePassword} style={{ display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 380 }}>
           <div>
             <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Nova senha</label>
-            <input className="input" type="password" placeholder="Mínimo 6 caracteres" value={newPwd} onChange={e => setNewPwd(e.target.value)} style={{ width: '100%' }} />
+            <input className="field" type="password" placeholder="Mínimo 6 caracteres" value={newPwd} onChange={e => setNewPwd(e.target.value)} style={{ width: '100%' }} />
           </div>
           <div>
             <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Confirmar nova senha</label>
-            <input className="input" type="password" placeholder="Repita a nova senha" value={confirmPwd} onChange={e => setConfirmPwd(e.target.value)} style={{ width: '100%' }} />
+            <input className="field" type="password" placeholder="Repita a nova senha" value={confirmPwd} onChange={e => setConfirmPwd(e.target.value)} style={{ width: '100%' }} />
           </div>
           <div>
             <button className="btn primary sm" type="submit" disabled={pwdLoading || !newPwd}>
@@ -607,32 +616,66 @@ function SegurancaTab({ addToast, tweaks, setTweak }) {
         ) : auditRows.length === 0 ? (
           <div style={{ fontSize: 13, color: 'var(--muted)', padding: '12px 0' }}>Nenhum registro encontrado.</div>
         ) : (
-          <div className="sett-hist">
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
-              <thead>
-                <tr>
-                  {['Ação', 'Alvo', 'IP', 'Dispositivo', 'Data'].map(h => (
-                    <th key={h} style={{ textAlign: 'left', padding: '6px 8px', color: 'var(--muted)', fontWeight: 600, borderBottom: '1px solid var(--line)', whiteSpace: 'nowrap' }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {auditRows.map(r => (
-                  <tr key={r.id} style={{ borderBottom: '1px solid var(--line-soft)' }}>
-                    <td style={{ padding: '8px 8px' }}>
-                      <span className={`pill ${r.action === 'LOGIN' ? 'ok' : 'warn'}`} style={{ fontSize: 10.5 }}>{r.action}</span>
-                    </td>
-                    <td style={{ padding: '8px 8px', color: 'var(--muted)' }}>{r.target || '—'}</td>
-                    <td style={{ padding: '8px 8px', color: 'var(--muted)', fontFamily: 'monospace', whiteSpace: 'nowrap' }}>{r.ip || '—'}</td>
-                    <td style={{ padding: '8px 8px', color: 'var(--muted)', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.device || '—'}</td>
-                    <td style={{ padding: '8px 8px', color: 'var(--muted)', whiteSpace: 'nowrap' }}>
-                      {new Date(r.created_at).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
-                    </td>
+          <>
+            {/* desktop */}
+            <div className="sett-hist sett-acc-table">
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+                <thead>
+                  <tr>
+                    {['Ação', 'Alvo', 'IP', 'Dispositivo', 'Data'].map(h => (
+                      <th key={h} style={{ textAlign: 'left', padding: '6px 8px', color: 'var(--muted)', fontWeight: 600, borderBottom: '1px solid var(--line)', whiteSpace: 'nowrap' }}>{h}</th>
+                    ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {auditRows.map(r => (
+                    <tr key={r.id} style={{ borderBottom: '1px solid var(--line-soft)' }}>
+                      <td style={{ padding: '8px 8px' }}>
+                        <span className={`pill ${r.action === 'LOGIN' ? 'ok' : 'warn'}`} style={{ fontSize: 10.5 }}>{r.action}</span>
+                      </td>
+                      <td style={{ padding: '8px 8px', color: 'var(--muted)' }}>{r.target || '—'}</td>
+                      <td style={{ padding: '8px 8px', color: 'var(--muted)', fontFamily: 'monospace', whiteSpace: 'nowrap' }}>{r.ip || '—'}</td>
+                      <td style={{ padding: '8px 8px', color: 'var(--muted)', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.device || '—'}</td>
+                      <td style={{ padding: '8px 8px', color: 'var(--muted)', whiteSpace: 'nowrap' }}>
+                        {new Date(r.created_at).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {/* mobile cards */}
+            <div className="sett-acc-cards">
+              {auditRows.map(r => (
+                <div key={r.id} className="sett-acc-card">
+                  <div className="sett-acc-head">
+                    <span style={{ fontFamily: 'monospace', fontSize: 11.5, color: 'var(--muted)' }}>
+                      {new Date(r.created_at).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
+                    </span>
+                    <span className={`pill ${r.action === 'LOGIN' ? 'ok' : 'warn'}`} style={{ fontSize: 10.5 }}>{r.action}</span>
+                  </div>
+                  {r.target && (
+                    <div className="sett-acc-row">
+                      <span className="sett-acc-lbl">Alvo</span>
+                      <span className="sett-acc-val">{r.target}</span>
+                    </div>
+                  )}
+                  {r.ip && (
+                    <div className="sett-acc-row">
+                      <span className="sett-acc-lbl">IP</span>
+                      <span className="sett-acc-val" style={{ fontFamily: 'monospace' }}>{r.ip}</span>
+                    </div>
+                  )}
+                  {r.device && (
+                    <div className="sett-acc-row">
+                      <span className="sett-acc-lbl">Device</span>
+                      <span className="sett-acc-val">{r.device}</span>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </>
         )}
       </div>
     </div>
