@@ -486,11 +486,33 @@ function AparenciaTab({ tweaks, setTweak }) {
   );
 }
 
+const ACTION_PILL = {
+  LOGIN:   'ok',
+  CRIOU:   'ok',
+  ASSINOU: 'ok',
+  GEROU:   'ok',
+  EDITOU:  'info',
+  UPLOAD:  'info',
+  ACESSOU: '',
+  EXPORT:  'warn',
+  EXCLUIU: 'bad',
+};
+
+const HIST_PERIOD_OPTIONS = [
+  { label: 'Hoje',       value: 1  },
+  { label: '7 dias',     value: 7  },
+  { label: '30 dias',    value: 30 },
+  { label: 'Trimestre',  value: 90 },
+];
+
 // ── SegurancaTab ────────────────────────────────────────────────
 function SegurancaTab({ addToast, tweaks, setTweak }) {
   const [user, setUser] = useState(null);
   const [auditRows, setAuditRows] = useState([]);
   const [loadingAudit, setLoadingAudit] = useState(true);
+  const [histDays, setHistDays] = useState(30);
+  const [histAction, setHistAction] = useState(null);
+  const [histSearch, setHistSearch] = useState('');
 
   const [newPwd, setNewPwd] = useState('');
   const [confirmPwd, setConfirmPwd] = useState('');
@@ -505,14 +527,29 @@ function SegurancaTab({ addToast, tweaks, setTweak }) {
   useEffect(() => {
     if (!user) return;
     setLoadingAudit(true);
+    const since = new Date(Date.now() - histDays * 86400000).toISOString();
     supabase
       .from('audit_log')
       .select('id, action, target, ip, device, created_at')
       .eq('actor_id', user.id)
+      .gte('created_at', since)
       .order('created_at', { ascending: false })
-      .limit(10)
+      .limit(200)
       .then(({ data }) => { setAuditRows(data ?? []); setLoadingAudit(false); });
-  }, [user]);
+  }, [user, histDays]);
+
+  const distinctActions = useMemo(() => [...new Set(auditRows.map(r => r.action))].sort(), [auditRows]);
+
+  const filteredRows = useMemo(() => auditRows.filter(r => {
+    if (histAction && r.action !== histAction) return false;
+    if (histSearch) {
+      const q = histSearch.toLowerCase();
+      if (!(r.ip || '').toLowerCase().includes(q) &&
+          !(r.device || '').toLowerCase().includes(q) &&
+          !(r.target || '').toLowerCase().includes(q)) return false;
+    }
+    return true;
+  }), [auditRows, histAction, histSearch]);
 
   async function handleChangePassword(e) {
     e.preventDefault();
@@ -610,35 +647,108 @@ function SegurancaTab({ addToast, tweaks, setTweak }) {
       )}
 
       <div className="card" style={{ padding: 20 }}>
-        <SectionTitle>Histórico de acesso</SectionTitle>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10, marginBottom: 14 }}>
+          <SectionTitle>Histórico de acesso</SectionTitle>
+          <select
+            className="field"
+            value={histDays}
+            onChange={e => { setHistDays(Number(e.target.value)); setHistAction(null); setHistSearch(''); }}
+            style={{ height: 32, fontSize: 12, width: 'auto', paddingTop: 0, paddingBottom: 0 }}
+          >
+            {HIST_PERIOD_OPTIONS.map(o => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Filtros de ação + busca */}
+        {!loadingAudit && auditRows.length > 0 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+              <button
+                className="btn sm"
+                style={{
+                  borderColor: histAction === null ? 'var(--brand)' : 'var(--line)',
+                  background: histAction === null ? 'var(--brand-tint)' : 'transparent',
+                  color: histAction === null ? 'var(--brand)' : 'var(--muted)',
+                  fontWeight: histAction === null ? 700 : 500,
+                }}
+                onClick={() => setHistAction(null)}
+              >
+                Todos <span style={{ fontSize: 10, fontWeight: 700, marginLeft: 4, padding: '0 5px', borderRadius: 8, background: histAction === null ? 'var(--brand)' : 'var(--surface-2)', color: histAction === null ? '#fff' : 'var(--muted)' }}>{auditRows.length}</span>
+              </button>
+              {distinctActions.map(a => {
+                const active = histAction === a;
+                const count = auditRows.filter(r => r.action === a).length;
+                return (
+                  <button
+                    key={a}
+                    className="btn sm"
+                    style={{
+                      borderColor: active ? 'var(--brand)' : 'var(--line)',
+                      background: active ? 'var(--brand-tint)' : 'transparent',
+                      color: active ? 'var(--brand)' : 'var(--muted)',
+                      fontWeight: active ? 700 : 500,
+                      fontFamily: 'monospace',
+                      fontSize: 11,
+                    }}
+                    onClick={() => setHistAction(active ? null : a)}
+                  >
+                    {a} <span style={{ fontSize: 10, marginLeft: 4, padding: '0 4px', borderRadius: 8, background: active ? 'var(--brand)' : 'var(--surface-2)', color: active ? '#fff' : 'var(--muted)' }}>{count}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <div style={{ position: 'relative' }}>
+              <Icon name="search" size={12} style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: 'var(--muted)', pointerEvents: 'none' }} />
+              <input
+                className="field"
+                value={histSearch}
+                onChange={e => setHistSearch(e.target.value)}
+                placeholder="Buscar por IP, dispositivo ou alvo…"
+                style={{ paddingLeft: 28, height: 32, fontSize: 12 }}
+              />
+            </div>
+          </div>
+        )}
+
         {loadingAudit ? (
-          <div style={{ fontSize: 13, color: 'var(--muted)', padding: '12px 0' }}>Carregando…</div>
+          <div style={{ fontSize: 13, color: 'var(--muted)', padding: '12px 0' }} className="pulse">Carregando…</div>
         ) : auditRows.length === 0 ? (
-          <div style={{ fontSize: 13, color: 'var(--muted)', padding: '12px 0' }}>Nenhum registro encontrado.</div>
+          <div style={{ fontSize: 13, color: 'var(--muted)', padding: '12px 0' }}>Nenhum registro no período.</div>
+        ) : filteredRows.length === 0 ? (
+          <div style={{ fontSize: 13, color: 'var(--muted)', padding: '12px 0' }}>Nenhum resultado para os filtros aplicados.</div>
         ) : (
           <>
+            <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 8 }}>
+              {filteredRows.length} {filteredRows.length === 1 ? 'evento' : 'eventos'}
+              {(histAction || histSearch) && <> · <button className="btn ghost sm" style={{ fontSize: 10, padding: '1px 6px' }} onClick={() => { setHistAction(null); setHistSearch(''); }}>Limpar filtros</button></>}
+            </div>
             {/* desktop */}
             <div className="sett-hist sett-acc-table">
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
                 <thead>
-                  <tr>
-                    {['Ação', 'Alvo', 'IP', 'Dispositivo', 'Data'].map(h => (
-                      <th key={h} style={{ textAlign: 'left', padding: '6px 8px', color: 'var(--muted)', fontWeight: 600, borderBottom: '1px solid var(--line)', whiteSpace: 'nowrap' }}>{h}</th>
+                  <tr style={{ background: 'var(--surface-2)' }}>
+                    {['Data', 'Ação', 'Alvo', 'IP', 'Dispositivo'].map(h => (
+                      <th key={h} style={{ textAlign: 'left', padding: '7px 10px', color: 'var(--muted)', fontWeight: 600, fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5, borderBottom: '1px solid var(--line)', whiteSpace: 'nowrap' }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {auditRows.map(r => (
-                    <tr key={r.id} style={{ borderBottom: '1px solid var(--line-soft)' }}>
-                      <td style={{ padding: '8px 8px' }}>
-                        <span className={`pill ${r.action === 'LOGIN' ? 'ok' : 'warn'}`} style={{ fontSize: 10.5 }}>{r.action}</span>
-                      </td>
-                      <td style={{ padding: '8px 8px', color: 'var(--muted)' }}>{r.target || '—'}</td>
-                      <td style={{ padding: '8px 8px', color: 'var(--muted)', fontFamily: 'monospace', whiteSpace: 'nowrap' }}>{r.ip || '—'}</td>
-                      <td style={{ padding: '8px 8px', color: 'var(--muted)', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.device || '—'}</td>
-                      <td style={{ padding: '8px 8px', color: 'var(--muted)', whiteSpace: 'nowrap' }}>
+                  {filteredRows.map(r => (
+                    <tr key={r.id} style={{ borderBottom: '1px solid var(--line-soft)' }}
+                      onMouseEnter={e => e.currentTarget.style.background = 'var(--hover)'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                    >
+                      <td style={{ padding: '8px 10px', color: 'var(--muted)', fontFamily: 'monospace', fontSize: 11.5, whiteSpace: 'nowrap' }}>
                         {new Date(r.created_at).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
                       </td>
+                      <td style={{ padding: '8px 10px' }}>
+                        <span className={`pill ${ACTION_PILL[r.action] ?? ''}`} style={{ fontSize: 10.5, fontFamily: 'monospace' }}>{r.action}</span>
+                      </td>
+                      <td style={{ padding: '8px 10px', color: 'var(--ink-soft)', maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.target || '—'}</td>
+                      <td style={{ padding: '8px 10px', color: 'var(--muted)', fontFamily: 'monospace', fontSize: 11.5, whiteSpace: 'nowrap' }}>{r.ip || '—'}</td>
+                      <td style={{ padding: '8px 10px', color: 'var(--muted)', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.device || '—'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -646,13 +756,13 @@ function SegurancaTab({ addToast, tweaks, setTweak }) {
             </div>
             {/* mobile cards */}
             <div className="sett-acc-cards">
-              {auditRows.map(r => (
+              {filteredRows.map(r => (
                 <div key={r.id} className="sett-acc-card">
                   <div className="sett-acc-head">
                     <span style={{ fontFamily: 'monospace', fontSize: 11.5, color: 'var(--muted)' }}>
                       {new Date(r.created_at).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
                     </span>
-                    <span className={`pill ${r.action === 'LOGIN' ? 'ok' : 'warn'}`} style={{ fontSize: 10.5 }}>{r.action}</span>
+                    <span className={`pill ${ACTION_PILL[r.action] ?? ''}`} style={{ fontSize: 10.5, fontFamily: 'monospace' }}>{r.action}</span>
                   </div>
                   {r.target && (
                     <div className="sett-acc-row">
