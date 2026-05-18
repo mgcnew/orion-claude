@@ -96,6 +96,7 @@ export default function App() {
       setSession(s);
       setAuthLoading(false);
       if (event === 'SIGNED_IN' && s?.user) {
+        setRoute('dashboard');
         logAudit(null, 'LOGIN', s.user.email);
         supabase.from('profiles').select('*').eq('id', s.user.id).maybeSingle()
           .then(({ data }) => { if (data) setUserProfile(data); });
