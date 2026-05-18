@@ -1,10 +1,25 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
+import imageCompression from 'browser-image-compression';
 import Icon from '../components/Icon.jsx';
 import Skeleton from '../components/Skeleton.jsx';
 import { useAllDocuments, useEmployees, logAudit } from '../hooks/useEmployees.js';
 import { supabase } from '../lib/supabase.js';
 import { usePermissions } from '../lib/permissions.jsx';
+
+const IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
+
+async function compressIfImage(file) {
+  if (!IMAGE_TYPES.includes(file.type.toLowerCase())) return file;
+  const compressed = await imageCompression(file, {
+    maxSizeMB: 1.5,
+    maxWidthOrHeight: 2560,
+    useWebWorker: true,
+    fileType: file.type,
+  });
+  // preserve original file name
+  return new File([compressed], file.name, { type: compressed.type });
+}
 
 const CATEGORIES = [
   { id: 'contratos',     name: 'Contratos',       icon: 'doc',         color: '#2A5BFF' },
@@ -120,6 +135,7 @@ function AddDocModal({ onClose, onSaved, employees = [], companyId = null }) {
   const [form, setForm]     = useState({ name: '', doc_date: '', employee_id: '', file: null });
   const [extras, setExtras] = useState({});
   const [saving, setSaving] = useState(false);
+  const [compressing, setCompressing] = useState(false);
   const [userId, setUserId] = useState(null);
   const fileRef = useRef();
   const cameraRef = useRef();
@@ -161,18 +177,25 @@ function AddDocModal({ onClose, onSaved, employees = [], companyId = null }) {
 
   const doSave = async () => {
     if (!form.name.trim()) return false;
-    setSaving(true);
     const notes = Object.keys(extras).length ? JSON.stringify(extras) : null;
-    const file  = form.file;
+    const rawFile = form.file;
 
+    let fileToUpload = rawFile;
+    if (rawFile && IMAGE_TYPES.includes(rawFile.type.toLowerCase())) {
+      setCompressing(true);
+      try { fileToUpload = await compressIfImage(rawFile); } catch { fileToUpload = rawFile; }
+      setCompressing(false);
+    }
+
+    setSaving(true);
     let file_url = null;
-    if (file) {
-      const ext  = file.name.split('.').pop();
+    if (fileToUpload) {
+      const ext  = fileToUpload.name.split('.').pop();
       const empId = form.employee_id || 'empresa';
       const path = `${empId}/${Date.now()}.${ext}`;
       const { error: uploadErr } = await supabase.storage
         .from('employee-documents')
-        .upload(path, file, { upsert: false });
+        .upload(path, fileToUpload, { upsert: false });
       if (uploadErr) { alert('Erro no upload: ' + uploadErr.message); setSaving(false); return false; }
       const { data: urlData } = supabase.storage.from('employee-documents').getPublicUrl(path);
       file_url = urlData?.publicUrl ?? null;
@@ -186,8 +209,8 @@ function AddDocModal({ onClose, onSaved, employees = [], companyId = null }) {
       doc_date:     form.doc_date || null,
       notes,
       file_url,
-      size: file ? `${(file.size / 1024).toFixed(0)} KB` : null,
-      type: file ? (file.type?.includes('image') ? 'image' : 'pdf') : 'pdf',
+      size: fileToUpload ? `${(fileToUpload.size / 1024).toFixed(0)} KB` : null,
+      type: fileToUpload ? (fileToUpload.type?.includes('image') ? 'image' : 'pdf') : 'pdf',
       status: 'ok',
       uploaded_by: userId,
     };
@@ -432,7 +455,7 @@ function AddDocModal({ onClose, onSaved, employees = [], companyId = null }) {
           <button
             className="btn"
             onClick={handleSaveAndContinue}
-            disabled={saving || !cat || !form.name.trim()}
+            disabled={saving || compressing || !cat || !form.name.trim()}
             title="Salva e abre um novo documento"
           >
             <Icon name="plus" size={13} /> Adicionar e continuar
@@ -440,9 +463,9 @@ function AddDocModal({ onClose, onSaved, employees = [], companyId = null }) {
           <button
             className="btn primary"
             onClick={handleSave}
-            disabled={saving || !cat || !form.name.trim()}
+            disabled={saving || compressing || !cat || !form.name.trim()}
           >
-            {saving ? 'Salvando…' : 'Salvar'}
+            {compressing ? 'Comprimindo…' : saving ? 'Salvando…' : 'Salvar'}
           </button>
         </div>
       </div>
