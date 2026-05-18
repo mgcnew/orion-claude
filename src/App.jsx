@@ -63,7 +63,7 @@ export default function App() {
     const hash = new URLSearchParams(window.location.hash.slice(1));
     return hash.get('type') === 'invite';
   });
-  const [route, setRoute] = useState('dashboard');
+  const [route, setRoute] = useState(() => sessionStorage.getItem('orion.route') ?? 'dashboard');
   const [routeParam, setRouteParam] = useState(null);   // ex: employee UUID
   const [routeLabel, setRouteLabel] = useState(null);   // ex: employee name (para breadcrumb)
   const [routeIntent, setRouteIntent] = useState(null); // ex: 'new', 'upload', 'new-warn'
@@ -80,6 +80,7 @@ export default function App() {
   const { items: notifItems, loading: notifLoading, refetch: notifRefetch } = useNotifications();
 
   const navigate = (r, intent = null) => { setRoute(r); setRouteIntent(intent); setMobileOpen(false); };
+  useEffect(() => { sessionStorage.setItem('orion.route', route); }, [route]);
   useEffect(() => { const t = setTimeout(() => setRouteIntent(null), 80); return () => clearTimeout(t); }, [route]);
 
   // Supabase auth state
