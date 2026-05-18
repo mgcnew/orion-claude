@@ -65,11 +65,13 @@ function CompanyAvatar({ company }) {
   );
 }
 
-function CompanyPicker({ companies, activeCompany, setActiveCompany, theme }) {
+function CompanyPicker({ companies, activeCompany, setActiveCompany, theme, collapsed }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
+  const btnRef = useRef(null);
+  const [dropY, setDropY] = useState(0);
 
-  useEffect(() => { setOpen(false); }, [theme]);
+  useEffect(() => { setOpen(false); }, [theme, collapsed]);
 
   useEffect(() => {
     if (!open) return;
@@ -81,16 +83,91 @@ function CompanyPicker({ companies, activeCompany, setActiveCompany, theme }) {
   const label = activeCompany?.name || 'Todas as empresas';
   const all = [{ id: '', name: 'Todas as empresas' }, ...companies];
 
+  const handleOpen = () => {
+    if (collapsed && btnRef.current) {
+      setDropY(btnRef.current.getBoundingClientRect().top);
+    }
+    setOpen(o => !o);
+  };
+
+  const options = all.map((c) => {
+    const isActive = (c.id === '' && !activeCompany) || c.id === activeCompany?.id;
+    return (
+      <button
+        key={c.id}
+        onClick={() => { setActiveCompany(c.id ? c : null); setOpen(false); }}
+        style={{
+          width: '100%', display: 'flex', alignItems: 'center', gap: 8,
+          padding: '8px 10px', border: 'none', textAlign: 'left',
+          background: isActive ? 'var(--brand-tint)' : 'transparent',
+          color: isActive ? 'var(--brand)' : 'var(--ink)',
+          cursor: 'pointer', fontSize: 12.5, fontWeight: isActive ? 600 : 500,
+          transition: 'background .1s',
+        }}
+        onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = 'var(--hover)'; }}
+        onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'transparent'; }}
+      >
+        {c.id
+          ? <CompanyAvatar company={c} />
+          : <div style={{ width: 26, height: 26, borderRadius: 6, background: 'var(--surface-2)', border: '1px solid var(--line)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <Icon name="building" size={13} style={{ color: 'var(--muted)' }} />
+            </div>
+        }
+        <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.name}</span>
+        {isActive && <Icon name="check" size={13} style={{ color: 'var(--brand)', flexShrink: 0 }} />}
+      </button>
+    );
+  });
+
+  if (collapsed) {
+    return (
+      <div ref={ref} style={{ display: 'flex', justifyContent: 'center', padding: '8px 0', borderBottom: '1px solid var(--line)' }}>
+        <button
+          ref={btnRef}
+          onClick={handleOpen}
+          title={`Empresa: ${label}`}
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: 7, borderRadius: 8,
+            border: `1px solid ${open ? 'var(--brand)' : 'var(--line)'}`,
+            background: open ? 'var(--brand-tint)' : 'transparent',
+            cursor: 'pointer', transition: 'border-color .15s, background .15s',
+          }}
+        >
+          {activeCompany
+            ? <CompanyAvatar company={activeCompany} />
+            : <div style={{ width: 26, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Icon name="building" size={16} style={{ color: 'var(--muted)' }} />
+              </div>
+          }
+        </button>
+        {open && (
+          <div style={{
+            position: 'fixed', top: dropY, left: 76,
+            background: 'var(--sidebar)', border: '1px solid var(--line)',
+            borderRadius: 10, zIndex: 9999, overflow: 'hidden', minWidth: 210,
+            boxShadow: '0 8px 24px rgba(0,0,0,.12), 0 2px 6px rgba(0,0,0,.06)',
+          }}>
+            <div style={{ padding: '8px 10px 4px', fontSize: 10, fontWeight: 700, color: 'var(--muted-2)', letterSpacing: 1, textTransform: 'uppercase' }}>
+              Empresa
+            </div>
+            {options}
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div ref={ref} style={{ padding: '8px 10px', borderBottom: '1px solid var(--line)', position: 'relative' }}>
       <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--muted-2)', letterSpacing: 1, marginBottom: 5, paddingLeft: 2 }}>
         EMPRESA
       </div>
       <button
-        onClick={() => setOpen(o => !o)}
+        onClick={handleOpen}
         style={{
           width: '100%', display: 'flex', alignItems: 'center', gap: 8,
-          padding: '7px 8px 7px 8px', borderRadius: 8,
+          padding: '7px 8px', borderRadius: 8,
           border: `1px solid ${open ? 'var(--brand)' : 'var(--line)'}`,
           background: open ? 'var(--brand-tint)' : 'var(--sidebar)',
           color: 'var(--ink)', cursor: 'pointer',
@@ -109,43 +186,14 @@ function CompanyPicker({ companies, activeCompany, setActiveCompany, theme }) {
         </span>
         <Icon name="chevron-down" size={13} style={{ color: 'var(--muted)', flexShrink: 0, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }} />
       </button>
-
       {open && (
         <div style={{
           position: 'absolute', left: 10, right: 10, top: 'calc(100% - 4px)',
           background: 'var(--sidebar)', border: '1px solid var(--line)',
           borderRadius: 10, zIndex: 50, overflow: 'hidden',
           boxShadow: '0 8px 24px rgba(0,0,0,.10), 0 2px 6px rgba(0,0,0,.06)',
-          transition: 'background-color 0.12s ease, border-color 0.12s ease',
         }}>
-          {all.map((c) => {
-            const isActive = (c.id === '' && !activeCompany) || c.id === activeCompany?.id;
-            return (
-              <button
-                key={c.id}
-                onClick={() => { setActiveCompany(c.id ? c : null); setOpen(false); }}
-                style={{
-                  width: '100%', display: 'flex', alignItems: 'center', gap: 8,
-                  padding: '8px 10px', border: 'none', textAlign: 'left',
-                  background: isActive ? 'var(--brand-tint)' : 'transparent',
-                  color: isActive ? 'var(--brand)' : 'var(--ink)',
-                  cursor: 'pointer', fontSize: 12.5, fontWeight: isActive ? 600 : 500,
-                  transition: 'background .1s',
-                }}
-                onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = 'var(--hover)'; }}
-                onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'transparent'; }}
-              >
-                {c.id
-                  ? <CompanyAvatar company={c} />
-                  : <div style={{ width: 26, height: 26, borderRadius: 6, background: 'var(--surface-2)', border: '1px solid var(--line)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      <Icon name="building" size={13} style={{ color: 'var(--muted)' }} />
-                    </div>
-                }
-                <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.name}</span>
-                {isActive && <Icon name="check" size={13} style={{ color: 'var(--brand)', flexShrink: 0 }} />}
-              </button>
-            );
-          })}
+          {options}
         </div>
       )}
     </div>
@@ -295,13 +343,14 @@ export default function Sidebar({ route, setRoute, collapsed, setCollapsed, mobi
         )}
       </div>
 
-      {/* Seletor de empresa — visível quando expandido e houver empresas */}
-      {!col && companies.length > 0 && (
+      {/* Seletor de empresa — avatar clicável quando colapsado, picker completo quando expandido */}
+      {companies.length > 0 && (
         <CompanyPicker
           companies={companies}
           activeCompany={activeCompany}
           setActiveCompany={setActiveCompany}
           theme={theme}
+          collapsed={col}
         />
       )}
 
