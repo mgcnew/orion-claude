@@ -519,38 +519,46 @@ export default function Sidebar({ route, setRoute, collapsed, setCollapsed, mobi
               borderRadius: 10,
               background: 'var(--surface-2)',
               border: '1px solid var(--line)',
-              cursor: onOpenProfile ? 'pointer' : 'default',
             }}
-            onClick={onOpenProfile}
-            title={onOpenProfile ? 'Meu perfil' : undefined}
           >
-            <Avatar name={userName || 'U'} size={32} hue={profile?.avatar_hue ?? 215} url={profile?.avatar_url ?? null} />
-            <div className="grow" style={{ minWidth: 0 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{
-                  fontSize: 12.5, fontWeight: 600,
+            <button
+              className="row gap-2 grow"
+              style={{
+                background: 'none', border: 'none', padding: 0, minWidth: 0,
+                cursor: onOpenProfile ? 'pointer' : 'default',
+                textAlign: 'left', alignItems: 'center',
+              }}
+              onClick={onOpenProfile}
+              title={onOpenProfile ? 'Meu perfil' : undefined}
+            >
+              <Avatar name={userName || 'U'} size={32} hue={profile?.avatar_hue ?? 215} url={profile?.avatar_url ?? null} />
+              <div className="grow" style={{ minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{
+                    fontSize: 12.5, fontWeight: 600,
+                    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                  }}>
+                    {userName || 'Usuário'}
+                  </span>
+                  {isAdmin && (
+                    <span style={{
+                      fontSize: 9.5, fontWeight: 700, letterSpacing: 0.4,
+                      background: 'var(--brand)', color: 'var(--brand-ink)',
+                      borderRadius: 4, padding: '1px 5px', flexShrink: 0,
+                    }}>
+                      ADM
+                    </span>
+                  )}
+                </div>
+                <div style={{
+                  fontSize: 11, color: 'var(--muted)',
                   whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                 }}>
-                  {userName || 'Usuário'}
-                </span>
-                {isAdmin && (
-                  <span style={{
-                    fontSize: 9.5, fontWeight: 700, letterSpacing: 0.4,
-                    background: 'var(--brand)', color: 'var(--brand-ink)',
-                    borderRadius: 4, padding: '1px 5px', flexShrink: 0,
-                  }}>
-                    ADM
-                  </span>
-                )}
+                  {userEmail || ''}
+                </div>
               </div>
-              <div style={{
-                fontSize: 11, color: 'var(--muted)',
-                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-              }}>
-                {userEmail || ''}
-              </div>
-            </div>
-            <button className="btn ghost icon sm" title="Sair" onClick={onLogout}>
+            </button>
+            <button className="btn ghost icon sm" title="Sair" onClick={(e) => { e.stopPropagation(); onLogout(); }}>
               <Icon name="logout" size={15} />
             </button>
           </div>
