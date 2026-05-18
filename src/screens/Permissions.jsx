@@ -19,6 +19,16 @@ import { SendInviteModal } from './Auth.jsx';
 
 const OWNER_ID = '__owner__';
 
+const permStyle = `
+  .perm-grid { display:grid; grid-template-columns:290px 1fr; gap:16px; }
+  .perm-back { display:none; }
+  @media (max-width:768px) {
+    .perm-grid     { display:flex; flex-direction:column; }
+    .perm-hide-mob { display:none !important; }
+    .perm-back     { display:inline-flex; margin-bottom:12px; }
+  }
+`;
+
 export default function PermissionsScreen({ addToast, embedded, activeCompany: propCompany }) {
   const { companies } = useCompanies();
   const [localCompanyId, setLocalCompanyId] = useState(propCompany?.id ?? null);
@@ -138,6 +148,8 @@ export default function PermissionsScreen({ addToast, embedded, activeCompany: p
   const fmtDate = (d) => d ? new Date(d).toLocaleDateString('pt-BR') : '—';
 
   return (
+    <>
+    <style>{permStyle}</style>
     <div className={embedded ? '' : 'fade-up'} style={{ padding: embedded ? 0 : 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
       {!embedded && (
         <div className="row" style={{ gap: 12, flexWrap: 'wrap' }}>
@@ -178,8 +190,8 @@ export default function PermissionsScreen({ addToast, embedded, activeCompany: p
           <div style={{ fontSize: 12.5, marginTop: 6 }}>As permissões são individuais por empresa.</div>
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: '290px 1fr', gap: 16 }}>
-          <div className="card" style={{ padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        <div className="perm-grid">
+          <div className={`card${activeId ? ' perm-hide-mob' : ''}`} style={{ padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
             <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--line)' }}>
               <input className="field" placeholder="Buscar…" value={search} onChange={e => setSearch(e.target.value)} style={{ height: 33, fontSize: 13 }} />
             </div>
@@ -326,6 +338,10 @@ export default function PermissionsScreen({ addToast, embedded, activeCompany: p
             </div>
           </div>
 
+          <div className={!activeId ? 'perm-hide-mob' : ''}>
+          <button className="btn ghost sm perm-back" onClick={() => setActiveId(null)}>
+            <Icon name="chevron-left" size={14} /> Voltar
+          </button>
           {activeId === OWNER_ID ? (
             <div className="card" style={{ padding: 32, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', gap: 12 }}>
               <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'linear-gradient(135deg, var(--brand) 0%, var(--brand-700) 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -447,6 +463,7 @@ export default function PermissionsScreen({ addToast, embedded, activeCompany: p
               <div style={{ fontSize: 12.5, maxWidth: 280, lineHeight: 1.6 }}>Clique em um usuário à esquerda para configurar suas permissões nesta empresa.</div>
             </div>
           )}
+          </div>
         </div>
       )}
 
@@ -459,5 +476,6 @@ export default function PermissionsScreen({ addToast, embedded, activeCompany: p
         />
       )}
     </div>
+    </>
   );
 }
