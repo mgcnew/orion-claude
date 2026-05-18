@@ -814,15 +814,44 @@ export async function addAuditEntry({ company_id, who, actor_id, action, target,
   await supabase.from('audit_log').insert({ company_id, who, actor_id, action, target, ip, device });
 }
 
+function parseDevice(ua) {
+  const os =
+    /Windows NT 10/.test(ua) ? 'Windows 11/10' :
+    /Windows NT 6\.1/.test(ua) ? 'Windows 7' :
+    /Mac OS X/.test(ua) ? 'macOS' :
+    /Android/.test(ua) ? 'Android' :
+    /iPhone|iPad/.test(ua) ? 'iOS' :
+    /Linux/.test(ua) ? 'Linux' : 'Desconhecido';
+  const browser =
+    /Edg\//.test(ua) ? 'Edge' :
+    /OPR\/|Opera/.test(ua) ? 'Opera' :
+    /Chrome\//.test(ua) ? 'Chrome' :
+    /Firefox\//.test(ua) ? 'Firefox' :
+    /Safari\//.test(ua) ? 'Safari' : 'Navegador';
+  return `${browser} · ${os}`;
+}
+
+async function fetchIp() {
+  try {
+    const r = await fetch('https://api.ipify.org?format=json', { signal: AbortSignal.timeout(4000) });
+    const j = await r.json();
+    return j.ip ?? null;
+  } catch { return null; }
+}
+
 export async function logAudit(company_id, action, target) {
   try {
     const { data: { user } } = await supabase.auth.getUser();
+    const [ip] = await Promise.all([fetchIp()]);
+    const device = parseDevice(navigator.userAgent);
     await supabase.from('audit_log').insert({
       company_id: company_id || null,
       who: user?.user_metadata?.name || user?.email || 'Sistema',
       actor_id: user?.id || null,
       action,
       target: target || null,
+      ip,
+      device,
     });
   } catch (_) {}
 }
