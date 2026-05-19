@@ -2,6 +2,7 @@ import { useState } from 'react';
 import Icon from '../components/Icon.jsx';
 import Avatar from '../components/Avatar.jsx';
 import Skeleton from '../components/Skeleton.jsx';
+import TutorialBanner from '../components/TutorialBanner.jsx';
 import { useAuditLog } from '../hooks/useEmployees.js';
 
 const auditStyle = `
@@ -64,6 +65,7 @@ export default function AuditScreen({ activeCompany }) {
     <>
     <style>{auditStyle}</style>
     <div className="fade-up aud-page">
+      <TutorialBanner screenKey="audit" />
       <div className="row" style={{ flexWrap: 'wrap', gap: 12 }}>
         <div className="grow">
           <h1 style={{ margin: '0 0 4px', fontSize: 22, fontWeight: 700, letterSpacing: -0.4 }}>

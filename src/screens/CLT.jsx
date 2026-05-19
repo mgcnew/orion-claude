@@ -1,5 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import Icon from '../components/Icon.jsx';
+import TutorialBanner from '../components/TutorialBanner.jsx';
 
 const cltStyle = `
   .clt-page      { padding: clamp(14px, 4vw, 28px); }
@@ -710,6 +711,7 @@ export default function CLTScreen() {
     <>
     <style>{cltStyle}</style>
     <div className="fade-up clt-page" style={{ maxWidth: 1180, margin: '0 auto', width: '100%', display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <TutorialBanner screenKey="clt" />
       <div className="clt-header" style={{ display: 'flex', alignItems: 'flex-end', gap: 16, flexWrap: 'wrap' }}>
         <div style={{ flex: 1, minWidth: 200 }}>
           <h1 style={{ margin: '0 0 4px', fontSize: 22, fontWeight: 700, letterSpacing: -0.4 }}>CLT & Direitos</h1>

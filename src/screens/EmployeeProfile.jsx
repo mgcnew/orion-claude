@@ -19,6 +19,7 @@ import {
 } from '../hooks/useEmployees.js';
 import { supabase } from '../lib/supabase.js';
 import { DateInput, EditEmployeeModal } from './Employees.jsx';
+import TutorialBanner from '../components/TutorialBanner.jsx';
 
 const fmtDate = (d) => d ? new Date(d + 'T00:00:00').toLocaleDateString('pt-BR') : '—';
 
@@ -308,6 +309,7 @@ function EmployeeProfile({ setRoute, employeeId }) {
       }
     `}</style>
     <div className="fade-up ep-page">
+      <TutorialBanner screenKey="employees-profile" />
       {/* Back */}
       <button className="btn ghost sm" style={{ alignSelf: 'flex-start' }} onClick={() => setRoute('employees')}>
         <Icon name="chevron-left" size={13} /> Funcionários

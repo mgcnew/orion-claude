@@ -5,6 +5,7 @@ import Avatar from '../components/Avatar.jsx';
 import Pagination from '../components/Pagination.jsx';
 import Skeleton from '../components/Skeleton.jsx';
 import { useEmployees, useMonthEntries, createTimeEntry } from '../hooks/useEmployees.js';
+import TutorialBanner from '../components/TutorialBanner.jsx';
 
 // ── QuickEntry ───────────────────────────────────────────────
 const QUICK_TYPES = [
@@ -1541,7 +1542,7 @@ export function TimeScreen({ addToast, activeCompany }) {
       }
     `}</style>
     <div className="fade-up" style={{ padding:24, display:'flex', flexDirection:'column', gap:18 }}>
-
+      <TutorialBanner screenKey="time" />
       {/* ── Header ── */}
       <div style={{ display:'flex', alignItems:'flex-start', gap:12, flexWrap:'wrap' }}>
         <div style={{ flex:1 }}>

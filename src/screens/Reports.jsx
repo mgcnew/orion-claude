@@ -9,6 +9,7 @@ import {
   useAllDocuments,
   useAllTimecards,
 } from '../hooks/useEmployees.js';
+import TutorialBanner from '../components/TutorialBanner.jsx';
 
 const REPORT_CATALOG = [
   {
@@ -698,6 +699,7 @@ export default function ReportsScreen({ addToast, activeCompany }) {
       }
     `}</style>
     <div className="fade-up rep-root">
+      <TutorialBanner screenKey="reports" />
       <div className="rep-col">
         <div className="rep-head">
           <div className="rep-head-row">

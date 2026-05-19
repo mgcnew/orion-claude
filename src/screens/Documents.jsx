@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import imageCompression from 'browser-image-compression';
 import Icon from '../components/Icon.jsx';
+import TutorialBanner from '../components/TutorialBanner.jsx';
 import Skeleton from '../components/Skeleton.jsx';
 import { useAllDocuments, useEmployees, logAudit } from '../hooks/useEmployees.js';
 import { supabase } from '../lib/supabase.js';
@@ -833,6 +834,7 @@ export default function DocumentsScreen({ addToast, activeCompany, openModal }) 
           .doc-grid { grid-template-columns: repeat(2, 1fr) !important; padding: 12px !important; gap: 10px !important; }
         }
       `}</style>
+      <TutorialBanner screenKey="documents" />
       {/* Drag overlay */}
       {dragOver && (
         <div style={{ position: 'absolute', inset: 0, zIndex: 50, background: 'var(--brand-tint)', border: '2px dashed var(--brand)', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 10, backdropFilter: 'blur(2px)' }}>

@@ -4,6 +4,8 @@ import Icon from '../components/Icon.jsx';
 import { supabase } from '../lib/supabase.js';
 import { useCompanies, createCompany, updateCompany } from '../hooks/useEmployees.js';
 import PermissionsScreen from './Permissions.jsx';
+import { TUTORIALS } from '../components/TutorialBanner.jsx';
+import { getTutorialDismissedMap, resetAllTutorials } from '../hooks/useTutorial.js';
 
 const settStyle = `
   .sett-page     { padding: clamp(14px, 4vw, 28px); display:flex; flex-direction:column; gap:20px; max-width:1180px; margin:0 auto; width:100%; }
@@ -841,6 +843,83 @@ function SegurancaTab({ addToast, tweaks, setTweak }) {
   );
 }
 
+// ── AjudaTab ────────────────────────────────────────────────────
+function AjudaTab({ addToast }) {
+  const [dismissed, setDismissed] = useState(() => getTutorialDismissedMap());
+
+  const handleResetAll = () => {
+    resetAllTutorials();
+    setDismissed({});
+    addToast({ kind: 'ok', msg: 'Todos os tutoriais foram reativados.' });
+  };
+
+
+  const entries = Object.entries(TUTORIALS);
+  const dismissedCount = entries.filter(([k]) => dismissed[k]).length;
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+        <div>
+          <div style={{ fontSize: 15, fontWeight: 700 }}>Tutoriais por tela</div>
+          <div style={{ fontSize: 12.5, color: 'var(--muted)', marginTop: 2 }}>
+            {dismissedCount === 0
+              ? 'Todos os tutoriais estão ativos — aparecerão na primeira visita a cada tela.'
+              : `${dismissedCount} de ${entries.length} tutoriais dispensados.`}
+          </div>
+        </div>
+        <button className="btn sm" onClick={handleResetAll} disabled={dismissedCount === 0}>
+          <Icon name="refresh" size={13} /> Reativar todos
+        </button>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {entries.map(([key, tut]) => {
+          const isDone = !!dismissed[key];
+          return (
+            <div key={key} className="card" style={{ padding: '14px 18px', display: 'flex', gap: 14, alignItems: 'flex-start' }}>
+              <div style={{
+                width: 36, height: 36, borderRadius: 9, flexShrink: 0,
+                background: tut.color + '18', color: tut.color,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <Icon name={tut.icon} size={17} />
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                  <span style={{ fontSize: 13.5, fontWeight: 600 }}>{tut.title}</span>
+                  <span className={`pill ${isDone ? '' : 'ok'}`} style={{ fontSize: 10 }}>
+                    {isDone ? 'Dispensado' : 'Ativo'}
+                  </span>
+                </div>
+                <ul style={{ margin: 0, padding: '0 0 0 16px', display: 'flex', flexDirection: 'column', gap: 3 }}>
+                  {tut.tips.map((tip, i) => (
+                    <li key={i} style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.5 }}>{tip.text}</li>
+                  ))}
+                </ul>
+              </div>
+              {isDone && (
+                <button
+                  className="btn ghost sm"
+                  style={{ flexShrink: 0, fontSize: 11 }}
+                  onClick={() => {
+                    const state = JSON.parse(localStorage.getItem('orion.tutorial.dismissed') || '{}');
+                    delete state[key];
+                    localStorage.setItem('orion.tutorial.dismissed', JSON.stringify(state));
+                    setDismissed(prev => { const n = { ...prev }; delete n[key]; return n; });
+                  }}
+                >
+                  <Icon name="refresh" size={12} /> Reativar
+                </button>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ── SettingsScreen ──────────────────────────────────────────────
 export default function SettingsScreen({ initialTab, addToast, setRoute, activeCompany, tweaks, setTweak }) {
   const [tab, setTab] = useState(initialTab || 'empresas');
@@ -853,6 +932,7 @@ export default function SettingsScreen({ initialTab, addToast, setRoute, activeC
     { id: 'aparencia',  l: 'Aparência',   i: 'sparkle' },
     { id: 'seguranca',  l: 'Segurança',   i: 'shield' },
     { id: 'permissoes', l: 'Permissões',  i: 'key' },
+    { id: 'ajuda',      l: 'Ajuda',       i: 'sparkle' },
   ];
 
   return (
@@ -898,6 +978,7 @@ export default function SettingsScreen({ initialTab, addToast, setRoute, activeC
       {tab === 'aparencia' && tweaks && <AparenciaTab tweaks={tweaks} setTweak={setTweak} />}
       {tab === 'seguranca' && <SegurancaTab addToast={addToast} tweaks={tweaks} setTweak={setTweak} />}
       {tab === 'permissoes' && <PermissionsScreen addToast={addToast} embedded={true} activeCompany={activeCompany} />}
+      {tab === 'ajuda' && <AjudaTab addToast={addToast} />}
     </div>
     </>
   );

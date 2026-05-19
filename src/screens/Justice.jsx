@@ -10,6 +10,7 @@ import {
   logAudit,
 } from '../hooks/useEmployees.js';
 import { supabase } from '../lib/supabase.js';
+import TutorialBanner from '../components/TutorialBanner.jsx';
 
 // ── helpers ──────────────────────────────────────────────────
 const fmtDate = (d) => d ? new Date(d + 'T00:00').toLocaleDateString('pt-BR') : '—';
@@ -626,7 +627,7 @@ export default function JusticeScreen({ addToast, activeCompany }) {
         }
       `}</style>
       <div className="fade-up just-page">
-
+        <TutorialBanner screenKey="justice" />
         <div className="just-header">
           <div style={{ width: 38, height: 38, borderRadius: 10, background: 'var(--brand-tint)', color: 'var(--brand)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             <Icon name="gavel" size={19} />

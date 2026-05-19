@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import Icon from '../components/Icon.jsx';
 import Avatar from '../components/Avatar.jsx';
 import Skeleton from '../components/Skeleton.jsx';
+import TutorialBanner from '../components/TutorialBanner.jsx';
 import { supabase } from '../lib/supabase.js';
 
 function Sparkline({ data, color, height = 40, width = 120, fill = true }) {
@@ -590,6 +591,7 @@ export default function Dashboard({ setRoute, navigate, addToast, activeCompany,
       }
     `}</style>
     <div className="fade-up dash-page">
+      <TutorialBanner screenKey="dashboard" />
       {/* Page header */}
       <div className="row" style={{ alignItems: 'flex-start', flexWrap: 'wrap', gap: 16 }}>
         <div className="grow" style={{ minWidth: 240 }}>

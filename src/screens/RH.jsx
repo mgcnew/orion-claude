@@ -12,6 +12,7 @@ import {
 } from '../hooks/useEmployees.js';
 import { supabase } from '../lib/supabase.js';
 import { usePermissions } from '../lib/permissions.jsx';
+import TutorialBanner from '../components/TutorialBanner.jsx';
 
 const TABS = [
   { id: 'resumo',       label: 'Resumo',      icon: 'dashboard' },
@@ -60,6 +61,7 @@ export default function RHScreen({ addToast, activeCompany, route, openModal, us
       className="fade-up rh-screen"
       style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 0, boxSizing: 'border-box' }}
     >
+      <TutorialBanner screenKey="rh" />
       <div style={{ marginBottom: 16 }}>
         <h1 style={{ margin: '0 0 4px', fontSize: 22, fontWeight: 700, letterSpacing: -0.4 }}>Recursos Humanos</h1>
         <p style={{ margin: 0, fontSize: 13, color: 'var(--muted)' }}>Advertências, férias, benefícios, avaliações e holerites da equipe.</p>

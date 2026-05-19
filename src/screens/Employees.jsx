@@ -6,6 +6,7 @@ import Skeleton from '../components/Skeleton.jsx';
 import { useEmployees, useEmployee, useEmployeeCounts, useEmployeeWarnings, useEmployeeVacations, useEmployeeDocuments, useEmployeeHistory, useEmployeeTimeEntries, clockIn, clockOut, createEmployee, updateEmployee, updateEmployeeStatus, createDocuments, useCompanies, useOnboardingDocs, createOnboardingDocs, markOnboardingDocUploaded, useAllPendingOnboarding, logAudit } from '../hooks/useEmployees.js';
 import { supabase } from '../lib/supabase.js';
 import { usePermissions } from '../lib/permissions.jsx';
+import TutorialBanner from '../components/TutorialBanner.jsx';
 
 // ── Checklist de admissão ─────────────────────────────────────
 const ONBOARDING_BASE = [
@@ -1295,6 +1296,7 @@ export function EmployeesList({ setRoute, setRouteParam, setRouteLabel, companyI
       }
     `}</style>
     <div className="fade-up emp-page">
+      <TutorialBanner screenKey="employees" />
       <div className="emp-header">
         <div className="emp-header-title">
           <h1 className="emp-h1">Funcionários</h1>
