@@ -831,7 +831,7 @@ function parseDevice(ua) {
   return `${browser} · ${os}`;
 }
 
-async function fetchIp() {
+export async function fetchIp() {
   try {
     const r = await fetch('https://api.ipify.org?format=json', { signal: AbortSignal.timeout(4000) });
     const j = await r.json();

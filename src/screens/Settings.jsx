@@ -1,8 +1,8 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import Icon from '../components/Icon.jsx';
 import { supabase } from '../lib/supabase.js';
-import { useCompanies, createCompany, updateCompany } from '../hooks/useEmployees.js';
+import { useCompanies, createCompany, updateCompany, fetchIp } from '../hooks/useEmployees.js';
 import PermissionsScreen from './Permissions.jsx';
 import { TUTORIALS } from '../components/TutorialBanner.jsx';
 import { getTutorialDismissedMap, resetAllTutorials } from '../hooks/useTutorial.js';
@@ -521,8 +521,40 @@ function SegurancaTab({ addToast, tweaks, setTweak }) {
   const [newPwd, setNewPwd] = useState('');
   const [confirmPwd, setConfirmPwd] = useState('');
   const [pwdLoading, setPwdLoading] = useState(false);
+  const [blockedIps, setBlockedIps] = useState([]);
+  const [currentIp, setCurrentIp] = useState(null);
 
   const lockValue = tweaks?.inactivityLock ?? 'off';
+
+  useEffect(() => { fetchIp().then(ip => setCurrentIp(ip)); }, []);
+
+  const loadBlockedIps = useCallback(async () => {
+    const { data } = await supabase.from('blocked_ips').select('*').order('created_at', { ascending: false });
+    setBlockedIps(data ?? []);
+  }, []);
+
+  useEffect(() => { loadBlockedIps(); }, [loadBlockedIps]);
+
+  const blockedIpSet = useMemo(() => new Set(blockedIps.map(b => b.ip)), [blockedIps]);
+
+  const handleBlockIp = async (ip) => {
+    if (!ip || ip === '—') return;
+    if (ip === currentIp) { addToast({ kind: 'warn', msg: 'Não é possível bloquear o seu próprio IP.' }); return; }
+    const { error } = await supabase.from('blocked_ips').insert({ ip, blocked_by: user?.id ?? null });
+    if (error) {
+      if (error.code === '23505') addToast({ kind: 'warn', msg: 'Este IP já está bloqueado.' });
+      else addToast({ kind: 'err', msg: error.message });
+    } else {
+      addToast({ kind: 'ok', msg: `IP ${ip} bloqueado.` });
+      loadBlockedIps();
+    }
+  };
+
+  const handleUnblockIp = async (id, ip) => {
+    const { error } = await supabase.from('blocked_ips').delete().eq('id', id);
+    if (error) addToast({ kind: 'err', msg: error.message });
+    else { addToast({ kind: 'ok', msg: `IP ${ip} desbloqueado.` }); loadBlockedIps(); }
+  };
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUser(data?.user ?? null));
@@ -745,7 +777,7 @@ function SegurancaTab({ addToast, tweaks, setTweak }) {
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
                 <thead>
                   <tr style={{ background: 'var(--surface-2)' }}>
-                    {['Data', 'Ação', 'Alvo', 'IP', 'Dispositivo'].map(h => (
+                    {['Data', 'Ação', 'Alvo', 'IP', 'Dispositivo', ''].map(h => (
                       <th key={h} style={{ textAlign: 'left', padding: '7px 10px', color: 'var(--muted)', fontWeight: 600, fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5, borderBottom: '1px solid var(--line)', whiteSpace: 'nowrap' }}>{h}</th>
                     ))}
                   </tr>
@@ -765,6 +797,21 @@ function SegurancaTab({ addToast, tweaks, setTweak }) {
                       <td style={{ padding: '8px 10px', color: 'var(--ink-soft)', maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.target || '—'}</td>
                       <td style={{ padding: '8px 10px', color: 'var(--muted)', fontFamily: 'monospace', fontSize: 11.5, whiteSpace: 'nowrap' }}>{r.ip || '—'}</td>
                       <td style={{ padding: '8px 10px', color: 'var(--muted)', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.device || '—'}</td>
+                      <td style={{ padding: '8px 10px' }}>
+                        {r.ip && r.ip !== '—' && (
+                          blockedIpSet.has(r.ip)
+                            ? <span className="pill bad" style={{ fontSize: 10 }}>Bloqueado</span>
+                            : <button
+                                className="btn ghost sm"
+                                style={{ fontSize: 10, color: 'var(--bad)', padding: '2px 7px', opacity: r.ip === currentIp ? 0.4 : 1 }}
+                                onClick={() => handleBlockIp(r.ip)}
+                                disabled={r.ip === currentIp}
+                                title={r.ip === currentIp ? 'Este é o seu IP atual' : `Bloquear ${r.ip}`}
+                              >
+                                <Icon name="x" size={11} /> Bloquear
+                              </button>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -796,6 +843,21 @@ function SegurancaTab({ addToast, tweaks, setTweak }) {
                     <div className="sett-acc-row">
                       <span className="sett-acc-lbl">Device</span>
                       <span className="sett-acc-val">{r.device}</span>
+                    </div>
+                  )}
+                  {r.ip && r.ip !== '—' && (
+                    <div className="sett-acc-row" style={{ justifyContent: 'flex-end' }}>
+                      {blockedIpSet.has(r.ip)
+                        ? <span className="pill bad" style={{ fontSize: 10 }}>Bloqueado</span>
+                        : <button
+                            className="btn ghost sm"
+                            style={{ fontSize: 10, color: 'var(--bad)', padding: '2px 8px', opacity: r.ip === currentIp ? 0.4 : 1 }}
+                            onClick={() => handleBlockIp(r.ip)}
+                            disabled={r.ip === currentIp}
+                          >
+                            <Icon name="x" size={11} /> Bloquear IP
+                          </button>
+                      }
                     </div>
                   )}
                 </div>
@@ -837,6 +899,42 @@ function SegurancaTab({ addToast, tweaks, setTweak }) {
               </div>
             )}
           </>
+        )}
+      </div>
+
+      <div className="card" style={{ padding: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+          <SectionTitle>IPs Bloqueados</SectionTitle>
+          {blockedIps.length > 0 && (
+            <span style={{ fontSize: 11, color: 'var(--muted)' }}>{blockedIps.length} {blockedIps.length === 1 ? 'bloqueado' : 'bloqueados'}</span>
+          )}
+        </div>
+        {blockedIps.length === 0 ? (
+          <div style={{ fontSize: 13, color: 'var(--muted)' }}>Nenhum IP bloqueado. Use o botão <strong>Bloquear</strong> no histórico de acesso para adicionar.</div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {blockedIps.map(b => (
+              <div key={b.id} style={{
+                display: 'flex', alignItems: 'center', gap: 10,
+                padding: '10px 14px', borderRadius: 8,
+                background: 'color-mix(in srgb, var(--bad) 6%, transparent)',
+                border: '1px solid color-mix(in srgb, var(--bad) 20%, transparent)',
+              }}>
+                <Icon name="shield" size={14} style={{ color: 'var(--bad)', flexShrink: 0 }} />
+                <span style={{ fontFamily: 'monospace', fontSize: 13, fontWeight: 600, flex: 1 }}>{b.ip}</span>
+                <span style={{ fontSize: 11, color: 'var(--muted)', whiteSpace: 'nowrap' }}>
+                  {new Date(b.created_at).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
+                </span>
+                <button
+                  className="btn ghost sm"
+                  style={{ color: 'var(--bad)', fontSize: 11, flexShrink: 0 }}
+                  onClick={() => handleUnblockIp(b.id, b.ip)}
+                >
+                  <Icon name="check" size={12} /> Desbloquear
+                </button>
+              </div>
+            ))}
+          </div>
         )}
       </div>
     </div>

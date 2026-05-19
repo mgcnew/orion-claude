@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
 import { supabase } from './lib/supabase.js';
-import { useCompanies, logAudit, useNotifications } from './hooks/useEmployees.js';
+import { useCompanies, logAudit, useNotifications, fetchIp } from './hooks/useEmployees.js';
 import { PermissionsProvider } from './lib/permissions.jsx';
 
 import Sidebar from './components/Sidebar.jsx';
@@ -59,6 +59,7 @@ export default function App() {
   const [tweaks, setTweak] = useTweaks(TWEAK_DEFAULTS);
   const [session, setSession] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [ipBlocked, setIpBlocked] = useState(false);
   const [isInviteFlow, setIsInviteFlow] = useState(() => {
     const hash = new URLSearchParams(window.location.hash.slice(1));
     return hash.get('type') === 'invite';
@@ -83,25 +84,53 @@ export default function App() {
   useEffect(() => { sessionStorage.setItem('orion.route', route); }, [route]);
   useEffect(() => { const t = setTimeout(() => setRouteIntent(null), 80); return () => clearTimeout(t); }, [route]);
 
+  // Verifica se o IP atual está bloqueado; retorna true se bloqueado
+  const checkIpBlocked = async () => {
+    const ip = await fetchIp();
+    if (!ip) return false;
+    const { data } = await supabase.from('blocked_ips').select('id').eq('ip', ip).maybeSingle();
+    return !!data;
+  };
+
   // Supabase auth state
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session: s } }) => {
-      setSession(s);
-      setAuthLoading(false);
+    supabase.auth.getSession().then(async ({ data: { session: s } }) => {
       if (s?.user) {
+        const blocked = await checkIpBlocked();
+        if (blocked) {
+          setIpBlocked(true);
+          await supabase.auth.signOut();
+          setAuthLoading(false);
+          return;
+        }
+        setSession(s);
         supabase.from('profiles').select('*').eq('id', s.user.id).maybeSingle()
           .then(({ data }) => { if (data) setUserProfile(data); });
+      } else {
+        setSession(s);
       }
+      setAuthLoading(false);
     });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, s) => {
+      if (event === 'SIGNED_IN' && s?.user) {
+        (async () => {
+          const blocked = await checkIpBlocked();
+          if (blocked) {
+            setIpBlocked(true);
+            await supabase.auth.signOut();
+            return;
+          }
+          setSession(s);
+          setAuthLoading(false);
+          setRoute('dashboard');
+          logAudit(null, 'LOGIN', s.user.email);
+          supabase.from('profiles').select('*').eq('id', s.user.id).maybeSingle()
+            .then(({ data }) => { if (data) setUserProfile(data); });
+        })();
+        return;
+      }
       setSession(s);
       setAuthLoading(false);
-      if (event === 'SIGNED_IN' && s?.user) {
-        setRoute('dashboard');
-        logAudit(null, 'LOGIN', s.user.email);
-        supabase.from('profiles').select('*').eq('id', s.user.id).maybeSingle()
-          .then(({ data }) => { if (data) setUserProfile(data); });
-      }
       if (event === 'USER_UPDATED') {
         setIsInviteFlow(false);
         // Limpa o hash da URL após senha definida
@@ -198,6 +227,44 @@ export default function App() {
       <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>
         <div style={{ textAlign: 'center' }}>
           <div className="pulse" style={{ fontSize: 14, color: 'var(--muted)' }}>Carregando…</div>
+        </div>
+      </div>
+    );
+  }
+
+  // ===== IP BLOQUEADO =====
+  if (ipBlocked) {
+    return (
+      <div style={{
+        height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: 'var(--bg)', padding: 24,
+      }}>
+        <div style={{
+          maxWidth: 420, width: '100%', textAlign: 'center',
+          background: 'var(--surface)', borderRadius: 16,
+          padding: '40px 32px',
+          boxShadow: '0 8px 40px rgba(0,0,0,.12)',
+          border: '1px solid var(--line)',
+        }}>
+          <div style={{
+            width: 56, height: 56, borderRadius: 14, margin: '0 auto 20px',
+            background: 'color-mix(in srgb, var(--bad) 10%, transparent)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <Icon name="shield" size={26} style={{ color: 'var(--bad)' }} />
+          </div>
+          <h1 style={{ fontSize: 20, fontWeight: 700, margin: '0 0 8px', color: 'var(--ink)' }}>Acesso Bloqueado</h1>
+          <p style={{ fontSize: 13.5, color: 'var(--muted)', lineHeight: 1.6, margin: '0 0 24px' }}>
+            O seu endereço IP foi bloqueado pelo administrador do sistema.
+            Entre em contato com o suporte para mais informações.
+          </p>
+          <button
+            className="btn"
+            onClick={() => { setIpBlocked(false); }}
+            style={{ fontSize: 13 }}
+          >
+            Tentar novamente
+          </button>
         </div>
       </div>
     );
