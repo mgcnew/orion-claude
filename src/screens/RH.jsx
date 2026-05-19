@@ -13,6 +13,14 @@ import {
 import { supabase } from '../lib/supabase.js';
 import { usePermissions } from '../lib/permissions.jsx';
 import TutorialBanner from '../components/TutorialBanner.jsx';
+import imageCompression from 'browser-image-compression';
+
+const IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
+async function compressIfImage(file) {
+  if (!IMAGE_TYPES.includes(file.type.toLowerCase())) return file;
+  const compressed = await imageCompression(file, { maxSizeMB: 1.5, maxWidthOrHeight: 2560, useWebWorker: true, fileType: file.type });
+  return new File([compressed], file.name, { type: compressed.type });
+}
 
 const TABS = [
   { id: 'resumo',       label: 'Resumo',      icon: 'dashboard' },
@@ -1271,6 +1279,7 @@ function HoleritesTab({ addToast, companyId, activeEmployees, can, payslips, ref
   const [showModal, setShowModal] = useState(false);
   const [q, setQ] = useState('');
   const [saving, setSaving] = useState(false);
+  const [compressing, setCompressing] = useState(false);
   const [form, setForm] = useState({ employee_id: '', mes_ref: '', ano_ref: String(new Date().getFullYear()), file: null });
   const fileRef = useRef();
 
@@ -1305,19 +1314,28 @@ function HoleritesTab({ addToast, companyId, activeEmployees, can, payslips, ref
 
   const handleSave = async () => {
     if (!form.employee_id || !form.mes_ref) return;
+    const rawFile = form.file;
+    let fileToUpload = rawFile;
+
+    if (rawFile && IMAGE_TYPES.includes(rawFile.type.toLowerCase())) {
+      setCompressing(true);
+      try { fileToUpload = await compressIfImage(rawFile); } catch { fileToUpload = rawFile; }
+      setCompressing(false);
+    }
+
     setSaving(true);
-    const file = form.file;
     let file_url = null;
 
-    if (file) {
-      const ext  = file.name.split('.').pop();
+    if (fileToUpload) {
+      const ext  = fileToUpload.name.split('.').pop();
       const path = `${form.employee_id}/${Date.now()}.${ext}`;
-      const { error: upErr } = await supabase.storage.from('employee-documents').upload(path, file, { upsert: false });
+      const { error: upErr } = await supabase.storage.from('employee-documents').upload(path, fileToUpload, { upsert: false });
       if (upErr) { addToast({ kind: 'bad', msg: 'Erro no upload: ' + upErr.message }); setSaving(false); return; }
       const { data: { publicUrl } } = supabase.storage.from('employee-documents').getPublicUrl(path);
       file_url = publicUrl;
     }
 
+    const isImage = fileToUpload && IMAGE_TYPES.includes(fileToUpload.type.toLowerCase());
     const { error } = await supabase.from('documents').insert({
       employee_id:  form.employee_id,
       company_id:   companyId,
@@ -1326,8 +1344,8 @@ function HoleritesTab({ addToast, companyId, activeEmployees, can, payslips, ref
       doc_date:     null,
       notes:        JSON.stringify({ mes_ref: form.mes_ref, ano_ref: form.ano_ref }),
       file_url,
-      size: file ? `${(file.size / 1024).toFixed(0)} KB` : null,
-      type: 'pdf',
+      size: fileToUpload ? `${(fileToUpload.size / 1024).toFixed(0)} KB` : null,
+      type: isImage ? 'image' : 'pdf',
       status: 'ok',
     });
 
@@ -1472,8 +1490,10 @@ function HoleritesTab({ addToast, companyId, activeEmployees, can, payslips, ref
               </div>
             </div>
             <div>
-              <label className="label">Arquivo (PDF)</label>
-              <input ref={fileRef} type="file" accept=".pdf,application/pdf" style={{ display: 'none' }}
+              <label className="label">Arquivo (PDF ou imagem)</label>
+              <input ref={fileRef} type="file"
+                accept=".pdf,application/pdf,image/jpeg,image/png,image/webp,image/heic,image/heif"
+                style={{ display: 'none' }}
                 onChange={e => setForm(f => ({ ...f, file: e.target.files?.[0] ?? null }))} />
               <div
                 style={{ border: '1.5px dashed var(--line)', borderRadius: 8, padding: '12px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, background: form.file ? 'var(--brand-tint)' : 'transparent' }}
@@ -1481,7 +1501,7 @@ function HoleritesTab({ addToast, companyId, activeEmployees, can, payslips, ref
               >
                 <Icon name={form.file ? 'check' : 'upload'} size={15} style={{ color: form.file ? 'var(--brand)' : 'var(--muted)', flexShrink: 0 }} />
                 <span style={{ fontSize: 13, color: form.file ? 'var(--ink)' : 'var(--muted)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {form.file ? form.file.name : 'Clique para selecionar o PDF'}
+                  {form.file ? form.file.name : 'PDF, JPG, PNG, WebP ou HEIC'}
                 </span>
                 {form.file && <span style={{ fontSize: 11, color: 'var(--muted)', flexShrink: 0 }}>{(form.file.size / 1024).toFixed(0)} KB</span>}
               </div>
@@ -1491,8 +1511,8 @@ function HoleritesTab({ addToast, companyId, activeEmployees, can, payslips, ref
           <div className="row gap-2" style={{ marginTop: 20 }}>
             <button className="btn" onClick={() => setShowModal(false)}>Cancelar</button>
             <span className="grow" />
-            <button className="btn primary" disabled={!form.employee_id || !form.mes_ref || saving} onClick={handleSave}>
-              {saving ? <span className="pulse">Enviando…</span> : <><Icon name="check" size={14} /> Salvar</>}
+            <button className="btn primary" disabled={!form.employee_id || !form.mes_ref || saving || compressing} onClick={handleSave}>
+              {compressing ? <span className="pulse">Comprimindo…</span> : saving ? <span className="pulse">Enviando…</span> : <><Icon name="check" size={14} /> Salvar</>}
             </button>
           </div>
         </div>
