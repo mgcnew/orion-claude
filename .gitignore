@@ -34,3 +34,9 @@ yarn-error.log*
 /completo noturno.png
 /completo transparente.png
 /logo completa.png
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
+!.env.example
